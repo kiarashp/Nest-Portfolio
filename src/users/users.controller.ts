@@ -12,16 +12,42 @@ import {
 } from '@nestjs/common'
 import { CreateUserDto } from './dtos/create-user.dtos'
 import { PatchUserDto } from './dtos/patch-user.dto'
+import { UsersService } from './providers/users.service'
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 
 @Controller('users')
+@ApiTags('Users')
 export class UsersController {
+  // Injecting UsersService
+  constructor(private usersService: UsersService) {}
+
   // GET ALL Users
   @Get()
+  @ApiOperation({ summary: 'Get all users with pagination and limit' })
+  @ApiResponse({
+    status: 200,
+    description: 'Users fetched successfully based on limit and page',
+  })
+  @ApiQuery({
+    name: 'limit',
+    type: Number,
+    required: false,
+    description: 'Limit number',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'page',
+    type: Number,
+    required: false,
+    description: 'Page number',
+    example: 1,
+  })
   public getAllUsers(
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe)
+    limit: number,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
   ) {
-    return `This action returns all users ${limit} ${page}`
+    return this.usersService.findAll(limit, page)
   }
   // CREATE ONE User
   @Post()
@@ -32,7 +58,7 @@ export class UsersController {
   @Get(':id')
   public getUser(@Param('id', ParseIntPipe) id: number) {
     console.log(id)
-    return `This action returns user ${id}`
+    return this.usersService.findOneById(id)
   }
   // UPDATE ONE User
   @Patch(':id')
