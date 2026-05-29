@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { CreatePostDto } from '../dto/create-post.dto'
-import { UpdatePostDto } from '../dto/update-post.dto'
+import { PatchPostDto } from '../dto/update-post.dto'
 import { UsersService } from 'src/users/providers/users.service'
 import { PostType } from '../enums/postType.enum'
 import { PostStatus } from '../enums/postStatus.enum'
@@ -21,10 +21,18 @@ export interface Post {
   metaOptions?: CreatePostMetaOptionsDto[] // Optional!
 }
 
+/**
+ * Class to connect to the posts "database" and perform actions on it
+ */
 @Injectable()
 export class PostsService {
+  /**
+   * Creates an instance of PostsService and injects UsersService
+   */
   constructor(private readonly usersService: UsersService) {}
-  // Mock array acting as our posts "database" referencing user IDs
+  /**
+   * Mock array acting as our posts "database" referencing user IDs
+   */
   private readonly posts: Post[] = [
     {
       id: 1,
@@ -147,6 +155,9 @@ export class PostsService {
       metaOptions: [{ key: 'status', value: 'hungry' }],
     },
   ]
+  /**
+   * We use this method to create a new post
+   */
   create(createPostDto: CreatePostDto) {
     const newPost = {
       id: this.posts.length + 1,
@@ -156,22 +167,32 @@ export class PostsService {
     this.posts.push(newPost)
     return newPost
   }
-
+  /**
+   * We use this method to get all the posts
+   */
   findAll() {
     return this.posts
   }
-
+  /**
+   * We use this method to get a single post
+   */
   findOne(id: number) {
     const thePost = this.posts.find((post) => post.id === id)
     const theUser = this.usersService.findOneById(thePost?.userId || 0)
-    return { ...thePost, userId: theUser }
+    return { ...thePost, userAuthor: theUser }
   }
-
-  update(id: number, updatePostDto: UpdatePostDto) {
-    console.log(updatePostDto)
-    return `This action updates a #${id} post`
+  /**
+   * We use this method to update a post
+   */
+  update(id: number, patchPostDto: PatchPostDto) {
+    const thePost = this.posts.find((post) => post.id === id)
+    if (!thePost) return
+    Object.assign(thePost, patchPostDto)
+    return thePost
   }
-
+  /**
+   * We use this method to remove a post
+   */
   remove(id: number) {
     return `This action removes a #${id} post`
   }
