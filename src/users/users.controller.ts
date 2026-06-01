@@ -21,7 +21,9 @@ export class UsersController {
   // Injecting UsersService
   constructor(private usersService: UsersService) {}
 
-  // GET ALL Users
+  /**
+   * Get all users
+   */
   @Get()
   @ApiOperation({ summary: 'Get all users with pagination and limit' })
   @ApiResponse({
@@ -49,10 +51,12 @@ export class UsersController {
   ) {
     return this.usersService.findAll(limit, page)
   }
-  // CREATE ONE User
+  /**
+   * Create a User
+   */
   @Post()
   public createUser(@Body() createUserDto: CreateUserDto) {
-    console.log(createUserDto)
+    return this.usersService.craeteUser(createUserDto)
   }
   // GET ONE User
   @Get(':id')
