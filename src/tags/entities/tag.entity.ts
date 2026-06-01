@@ -23,7 +23,7 @@ export class Tag {
   // slug
   @Column({
     type: 'varchar',
-    length: 512,
+    length: 256,
     nullable: false,
     unique: true,
   })

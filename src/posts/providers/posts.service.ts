@@ -1,25 +1,11 @@
-import { Injectable } from '@nestjs/common'
+import { Body, Injectable } from '@nestjs/common'
 import { CreatePostDto } from '../dto/create-post.dto'
 import { PatchPostDto } from '../dto/update-post.dto'
 import { UsersService } from 'src/users/providers/users.service'
-import { PostType } from '../enums/postType.enum'
-import { PostStatus } from '../enums/postStatus.enum'
-import { CreatePostMetaOptionsDto } from '../dto/create-post-meta-options.dto'
-
-export interface Post {
-  id: number
-  userId: number
-  title: string
-  postType: PostType | string
-  slug: string
-  status: PostStatus | string
-  content?: string // Optional!
-  schema?: string // Optional!
-  featuredImage?: string // Optional!
-  publishOn?: Date // Optional!
-  tags?: string[] // Optional!
-  metaOptions?: CreatePostMetaOptionsDto[] // Optional!
-}
+import { Repository } from 'typeorm'
+import { Post } from '../entities/post.entity'
+import { InjectRepository } from '@nestjs/typeorm'
+import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 
 /**
  * Class to connect to the posts "database" and perform actions on it
@@ -29,11 +15,29 @@ export class PostsService {
   /**
    * Creates an instance of PostsService and injects UsersService
    */
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    /**
+     * Inject User Service
+     */
+
+    private readonly usersService: UsersService,
+
+    /**
+     * Inject Post Repository
+     */
+    @InjectRepository(Post)
+    private readonly postsRepository: Repository<Post>,
+
+    /**
+     * Inject Meta Option Repository
+     */
+    @InjectRepository(MetaOption)
+    private readonly metaOptionsRepository: Repository<MetaOption>,
+  ) {}
   /**
    * Mock array acting as our posts "database" referencing user IDs
    */
-  private readonly posts: Post[] = [
+  private readonly posts = [
     {
       id: 1,
       userId: 1, // Naruto Uzumaki
@@ -47,7 +51,9 @@ export class PostsService {
       publishOn: new Date('2026-05-29T12:00:00.000Z'),
       tags: ['ninja', 'hokage', 'konoha'],
       schema: '{"village":"Konoha","clan":"Uzumaki"}',
-      metaOptions: [{ key: 'sidebar', value: 'true' }],
+      metaOptions: [
+        { metaValue: JSON.stringify({ key: 'sidebar', value: 'true' }) },
+      ],
     },
     {
       id: 2,
@@ -78,7 +84,9 @@ export class PostsService {
       publishOn: new Date('2026-05-25T18:00:00.000Z'),
       tags: ['pirates', 'meat', 'grand-line'],
       schema: '{"crew":"StrawHat","bounty":"3 Billion"}',
-      metaOptions: [{ key: 'allowComments', value: 'true' }],
+      metaOptions: [
+        { metaValue: JSON.stringify({ key: 'allowComments', value: 'true' }) },
+      ],
     },
     {
       id: 4,
@@ -122,7 +130,9 @@ export class PostsService {
       publishOn: new Date('2026-05-28T21:15:00.000Z'),
       tags: ['food', 'ramen'],
       schema: '{"favoriteDish":"Miso Chashu"}',
-      metaOptions: [{ key: 'rating', value: '5-stars' }],
+      metaOptions: [
+        { metaValue: JSON.stringify({ key: 'rating', value: '5-stars' }) },
+      ],
     },
     {
       id: 7,
@@ -152,34 +162,29 @@ export class PostsService {
       publishOn: undefined,
       tags: ['gravity-training', 'bulking'],
       schema: '{"caloriesNeeded":50000}',
-      metaOptions: [{ key: 'status', value: 'hungry' }],
+      metaOptions: [
+        { metaValue: JSON.stringify({ key: 'status', value: 'hungry' }) },
+      ],
     },
   ]
   /**
    * We use this method to create a new post
    */
-  create(createPostDto: CreatePostDto) {
-    const newPost = {
-      id: this.posts.length + 1,
-      userId: 1,
-      ...createPostDto,
-    }
-    this.posts.push(newPost)
-    return newPost
+  public async create(createPostDto: CreatePostDto) {
+    const post = this.postsRepository.create(createPostDto)
+    return await this.postsRepository.save(post)
   }
   /**
    * We use this method to get all the posts
    */
-  findAll() {
-    return this.posts
+  public async findAll() {
+    return await this.postsRepository.find()
   }
   /**
    * We use this method to get a single post
    */
   findOne(id: number) {
-    const thePost = this.posts.find((post) => post.id === id)
-    const theUser = this.usersService.findOneById(thePost?.userId || 0)
-    return { ...thePost, userAuthor: theUser }
+    return this.postsRepository.findOneBy({ id })
   }
   /**
    * We use this method to update a post

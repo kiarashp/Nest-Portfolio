@@ -9,11 +9,10 @@ import {
   IsUrl,
   MaxLength,
   MinLength,
-  ValidateNested,
 } from 'class-validator'
 import { PostStatus } from '../enums/postStatus.enum'
 import { PostType } from '../enums/postType.enum'
-import { CreatePostMetaOptionsDto } from './create-post-meta-options.dto'
+import { CreatePostMetaOptionsDto } from '../../meta-options/dto/create-post-meta-options.dto'
 import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
@@ -101,29 +100,10 @@ export class CreatePostDto {
   tags?: string[]
   // metaOptions
   @ApiPropertyOptional({
-    type: 'array',
-    required: false,
-    items: {
-      type: 'object',
-      properties: {
-        key: {
-          type: 'string',
-          description:
-            'The key can be any string identifier for the meta option',
-          example: 'sidebarEnabled',
-        },
-        value: {
-          type: 'any',
-          description: 'Any value can be assigned to the Key.',
-          example: true,
-        },
-      },
-    },
+    type: CreatePostMetaOptionsDto,
     description: 'The meta options for the post',
   })
-  @IsArray()
   @IsOptional()
-  @ValidateNested({ each: true })
   @Type(() => CreatePostMetaOptionsDto)
-  metaOptions?: CreatePostMetaOptionsDto[]
+  metaOptions?: CreatePostMetaOptionsDto | null
 }
