@@ -1,7 +1,7 @@
 import { Injectable, Inject, forwardRef } from '@nestjs/common'
 import { AuthService } from 'src/auth/providers/auth.service'
 import { Repository } from 'typeorm'
-import { User } from '../user.entity'
+import { User } from '../entities/user.entity'
 import { InjectRepository } from '@nestjs/typeorm'
 import { CreateUserDto } from '../dtos/create-user.dtos'
 
