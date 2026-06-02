@@ -198,7 +198,23 @@ export class PostsService {
   /**
    * We use this method to remove a post
    */
-  remove(id: number) {
-    return `This action removes a #${id} post`
+  public async remove(id: number) {
+    //find the post
+    const post = await this.postsRepository.findOneBy({ id })
+    if (!post)
+      return {
+        message: 'Post not found',
+        status: 404,
+      }
+    // delete the post
+    await this.postsRepository.delete(post.id)
+    //delete the meta option
+    if (!post.metaOptions)
+      return {
+        message: 'Meta option not found',
+      }
+    await this.metaOptionsRepository.delete(post.metaOptions.id)
+    //confirmation
+    return { deleted: true, id }
   }
 }
