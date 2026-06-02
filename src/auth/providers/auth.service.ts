@@ -10,10 +10,10 @@ export class AuthService {
   ) {}
 
   // login
-  public login(id: number, email?: string, password?: string) {
+  public async login(id: number, email?: string, password?: string) {
     console.log(email, password)
-    const user = this.usersService.findOneById(id)
-    if (user?.name === 'Ichigo Kurosaki') return 'SAMPLE_TOKEN'
+    const user = await this.usersService.findOneById(id)
+    if (user?.firstName === 'Satoru') return 'SAMPLE_TOKEN'
     return 'NO_TOKEN'
   }
 

@@ -40,7 +40,9 @@ export class UsersService {
     },
   ]
   constructor(
-    // injecting auth service
+    /**
+     * Injecting Auth Service
+     */
     @Inject(forwardRef(() => AuthService))
     private readonly authService: AuthService,
 
@@ -56,10 +58,8 @@ export class UsersService {
     return this.fakeDatabase
   }
   // find one user by id
-  public findOneById(id: number) {
-    const user = this.fakeDatabase.find((user) => user.id === id)
-    const isAuth = this.authService.isAuth('SAMPLE_TOKEN2')
-    return { ...user, isAuth }
+  public async findOneById(id: number) {
+    return await this.userRepository.findOneBy({ id })
   }
   // create a new user
   public async craeteUser(createUserDto: CreateUserDto) {
