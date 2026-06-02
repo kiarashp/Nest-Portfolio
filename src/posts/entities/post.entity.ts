@@ -1,6 +1,8 @@
 import {
   Column,
   Entity,
+  JoinTable,
+  ManyToMany,
   ManyToOne,
   OneToOne,
   PrimaryGeneratedColumn,
@@ -9,6 +11,7 @@ import { PostType } from '../enums/postType.enum'
 import { PostStatus } from '../enums/postStatus.enum'
 import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 import { User } from 'src/users/entities/user.entity'
+import { Tag } from 'src/tags/entities/tag.entity'
 
 @Entity()
 export class Post {
@@ -71,8 +74,6 @@ export class Post {
     nullable: true,
   })
   publishOn?: Date
-  //   tags
-  tags?: string[]
   //   metaOptions
   @OneToOne(() => MetaOption, (metaOption) => metaOption.post, {
     cascade: true,
@@ -80,6 +81,10 @@ export class Post {
   })
   metaOptions?: MetaOption | null
   // author
-  @ManyToOne(() => User, (user) => user.post)
+  @ManyToOne(() => User, (user) => user.post, { eager: true })
   author!: User
+  //   tags
+  @ManyToMany(() => Tag, (tag) => tag.posts, { eager: true })
+  @JoinTable()
+  tags?: Tag[]
 }

@@ -6,6 +6,7 @@ import { Repository } from 'typeorm'
 import { Post } from '../entities/post.entity'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
+import { TagsService } from 'src/tags/providers/tags.service'
 
 /**
  * Class to connect to the posts "database" and perform actions on it
@@ -19,8 +20,12 @@ export class PostsService {
     /**
      * Inject User Service
      */
-
     private readonly usersService: UsersService,
+
+    /*
+     * Inject Tag Service
+     */
+    private readonly tagsService: TagsService,
 
     /**
      * Inject Post Repository
@@ -40,12 +45,16 @@ export class PostsService {
   public async create(createPostDto: CreatePostDto) {
     //find author
     const author = await this.usersService.findOneById(createPostDto.authorId)
-
     if (!author) return { message: 'Author not found', status: 404 }
+    //find tags
+
+    const tags = await this.tagsService.findMany(createPostDto.tags)
+
     //create post
     const post = this.postsRepository.create({
       ...createPostDto,
       author: author,
+      tags: tags,
     })
     return await this.postsRepository.save(post)
   }
@@ -56,8 +65,7 @@ export class PostsService {
     return await this.postsRepository.find({
       relations: {
         metaOptions: true,
-        author: true,
-      }
+      },
     })
   }
   /**
@@ -70,11 +78,23 @@ export class PostsService {
    * We use this method to update a post
    */
   public async update(id: number, patchPostDto: PatchPostDto) {
-    const thePost = await this.postsRepository.findOneBy({ id })
-    if (!thePost) return { message: 'Post not found', status: 404 }
-
-    await this.postsRepository.update(id, patchPostDto)
-    return thePost
+    // Find the tags
+    const tags = await this.tagsService.findMany(patchPostDto.tags)
+    //Find the post
+    const post = await this.postsRepository.findOneBy({ id })
+    if (!post) return { message: 'Post not found', status: 404 }
+    //update the post
+    post.title = patchPostDto.title ?? post.title
+    post.postType = patchPostDto.postType ?? post.postType
+    post.slug = patchPostDto.slug ?? post.slug
+    post.status = patchPostDto.status ?? post.status
+    post.content = patchPostDto.content ?? post.content
+    post.featuredImage = patchPostDto.featuredImage ?? post.featuredImage
+    post.publishOn = patchPostDto.publishOn ?? post.publishOn
+    //assign the new tags
+    post.tags = tags
+    //save the post
+    return await this.postsRepository.save(post)
   }
   /**
    * We use this method to remove a post

@@ -19,7 +19,9 @@ export class PostsController {
   // Injecting PostsService
   constructor(private readonly postsService: PostsService) {}
 
-  // Creating a post
+  /**
+   * create a new post
+   */
   @ApiOperation({ summary: 'Create a new post' })
   @ApiResponse({
     status: 201,
@@ -31,15 +33,23 @@ export class PostsController {
     return this.postsService.create(createPostDto)
   }
 
+  /**
+   * get all the posts
+   */
   @Get()
   findAll() {
     return this.postsService.findAll()
   }
-
+  /**
+   * get a single post
+   */
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.postsService.findOne(+id)
   }
+  /**
+   * update a post
+   */
 
   @ApiOperation({ summary: 'Update a post' })
   @ApiResponse({
@@ -55,6 +65,9 @@ export class PostsController {
     return this.postsService.update(id, patchPostDto)
   }
 
+  /**
+   * delete a post
+   */
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.postsService.remove(id)
