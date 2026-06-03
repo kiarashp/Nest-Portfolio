@@ -14,6 +14,7 @@ import { CreateUserDto } from './dtos/create-user.dtos'
 import { PatchUserDto } from './dtos/patch-user.dto'
 import { UsersService } from './providers/users.service'
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { CreateManyUsersDto } from './dtos/create-many-users.dto'
 
 @Controller('users')
 @ApiTags('Users')
@@ -58,13 +59,24 @@ export class UsersController {
   public createUser(@Body() createUserDto: CreateUserDto) {
     return this.usersService.craeteUser(createUserDto)
   }
-  // GET ONE User
+  /**
+   * Create multiple Users
+   */
+  @Post('create-many')
+  public createManyUsers(@Body() createManyUsersDto: CreateManyUsersDto) {
+    return this.usersService.createMany(createManyUsersDto)
+  }
+  /**
+   * GET ONE User
+   */
   @Get(':id')
   public getUser(@Param('id', ParseIntPipe) id: number) {
     console.log(id)
     return this.usersService.findOneById(id)
   }
-  // UPDATE ONE User
+  /**
+   * UPDATE ONE User
+   */
   @Patch(':id')
   public updateUser(
     @Param('id', ParseIntPipe) id: number,
@@ -74,7 +86,9 @@ export class UsersController {
     return `This action updates user`
   }
 
-  // DELETE ONE User
+  /**
+   * DELETE ONE User
+   */
   @Delete(':id')
   public deleteUser(@Param('id', ParseIntPipe) id: number) {
     console.log(id)
