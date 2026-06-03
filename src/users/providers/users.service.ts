@@ -1,4 +1,11 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common'
+import {
+  Injectable,
+  Inject,
+  forwardRef,
+  RequestTimeoutException,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common'
 import { AuthService } from 'src/auth/providers/auth.service'
 import { Repository } from 'typeorm'
 import { User } from '../entities/user.entity'
@@ -7,38 +14,6 @@ import { CreateUserDto } from '../dtos/create-user.dtos'
 
 @Injectable()
 export class UsersService {
-  private fakeDatabase = [
-    {
-      id: 1,
-      name: 'Naruto Uzumaki',
-      email: 'naruto@hokage.com',
-      password: '123456',
-    },
-    {
-      id: 2,
-      name: 'Ichigo Kurosaki',
-      email: 'ichigo@bleach.com',
-      password: '123456789',
-    },
-    {
-      id: 3,
-      name: 'Orihime Yoshikage',
-      email: 'orihime@bleach.com',
-      password: '987654321',
-    },
-    {
-      id: 4,
-      name: 'Monkey D. Luffy',
-      email: 'luffy@pirateking.com',
-      password: 'meatlover123',
-    },
-    {
-      id: 5,
-      name: 'Goku Son',
-      email: 'goku@capsulecorp.com',
-      password: 'supergoku12',
-    },
-  ]
   constructor(
     /**
      * Injecting Auth Service
@@ -52,25 +27,65 @@ export class UsersService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
   ) {}
-  // find all users
+  /**
+   * Find all users
+   */
   public findAll(limit: number, page: number) {
     console.log(limit, page)
-    return this.fakeDatabase
+    return this.userRepository.find()
   }
-  // find one user by id
+  /**
+   * Find user by id
+   */
   public async findOneById(id: number) {
-    return await this.userRepository.findOneBy({ id })
+    let existingUser: User | null = null
+    try {
+      existingUser = await this.userRepository.findOne({ where: { id } })
+    } catch {
+      throw new RequestTimeoutException(
+        'Unable to process your request, please try again later',
+        {
+          description: 'Error connecting to database',
+        },
+      )
+    }
+    if (!existingUser) throw new NotFoundException('User not found')
+    return existingUser
   }
-  // create a new user
+  /**
+   * Create a new user
+   */
   public async craeteUser(createUserDto: CreateUserDto) {
     //check if user exist with the smae email
-    const existingUser = await this.userRepository.findOne({
-      where: { email: createUserDto.email },
-    })
-    if (existingUser) throw new Error('User already exist')
+    let existingUser: User | null = null
+    try {
+      existingUser = await this.userRepository.findOne({
+        where: { email: createUserDto.email },
+      })
+    } catch {
+      throw new RequestTimeoutException(
+        'Unable to process your request, please try again later',
+        {
+          description: 'Error connecting to database',
+        },
+      )
+    }
+
     //handle execption
+    if (existingUser) throw new BadRequestException('User already exist')
     //create a new user
-    const newUser = this.userRepository.create(createUserDto)
-    return this.userRepository.save(newUser)
+    let newUser: User | null = null
+    try {
+      newUser = this.userRepository.create(createUserDto)
+      await this.userRepository.save(newUser)
+    } catch {
+      throw new RequestTimeoutException(
+        'Unable to process your request, please try again later',
+        {
+          description: 'Error connecting to database',
+        },
+      )
+    }
+    return newUser
   }
 }

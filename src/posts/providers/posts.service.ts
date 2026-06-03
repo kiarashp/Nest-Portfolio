@@ -1,4 +1,10 @@
-import { Body, Injectable } from '@nestjs/common'
+import {
+  BadRequestException,
+  Body,
+  Injectable,
+  NotFoundException,
+  RequestTimeoutException,
+} from '@nestjs/common'
 import { CreatePostDto } from '../dto/create-post.dto'
 import { PatchPostDto } from '../dto/update-post.dto'
 import { UsersService } from 'src/users/providers/users.service'
@@ -7,6 +13,7 @@ import { Post } from '../entities/post.entity'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 import { TagsService } from 'src/tags/providers/tags.service'
+import { Tag } from 'src/tags/entities/tag.entity'
 
 /**
  * Class to connect to the posts "database" and perform actions on it
@@ -71,18 +78,53 @@ export class PostsService {
   /**
    * We use this method to get a single post
    */
-  findOne(id: number) {
-    return this.postsRepository.findOneBy({ id })
+  public async findOne(id: number) {
+    let existingPost: Post | null = null
+    try {
+      existingPost = await this.postsRepository.findOneBy({ id })
+    } catch {
+      throw new RequestTimeoutException(
+        'Unable to process your request, please try again later',
+      )
+    }
+    if (!existingPost) {
+      throw new NotFoundException(`Post with ID ${id} not found`)
+    }
+    return existingPost
   }
   /**
    * We use this method to update a post
    */
   public async update(id: number, patchPostDto: PatchPostDto) {
     // Find the tags
-    const tags = await this.tagsService.findMany(patchPostDto.tags)
+    let tags: Tag[] | null = null
+    if (patchPostDto.tags) {
+      try {
+        tags = await this.tagsService.findMany(patchPostDto.tags)
+      } catch {
+        throw new RequestTimeoutException(
+          'Unable to process your request, please try again later',
+        )
+      }
+      /**
+       * number of tags need to be equal the number of tags in the database
+       */
+      if (!tags || tags.length !== patchPostDto.tags.length) {
+        throw new BadRequestException('please check the tags ID and try again')
+      }
+    }
     //Find the post
-    const post = await this.postsRepository.findOneBy({ id })
-    if (!post) return { message: 'Post not found', status: 404 }
+    let post: Post | null = null
+    try {
+      post = await this.postsRepository.findOneBy({ id })
+    } catch {
+      throw new RequestTimeoutException(
+        'Unable to process your request, please try again later',
+      )
+    }
+    if (!post) {
+      throw new NotFoundException(`Post with ID ${id} not found`)
+    }
     //update the post
     post.title = patchPostDto.title ?? post.title
     post.postType = patchPostDto.postType ?? post.postType
@@ -92,9 +134,18 @@ export class PostsService {
     post.featuredImage = patchPostDto.featuredImage ?? post.featuredImage
     post.publishOn = patchPostDto.publishOn ?? post.publishOn
     //assign the new tags
-    post.tags = tags
+    if (tags) {
+      post.tags = tags
+    }
     //save the post
-    return await this.postsRepository.save(post)
+    try {
+      await this.postsRepository.save(post)
+    } catch {
+      throw new RequestTimeoutException(
+        'Unable to process your request, please try again later',
+      )
+    }
+    return post
   }
   /**
    * We use this method to remove a post
