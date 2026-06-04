@@ -7,6 +7,11 @@ import { User } from './entities/user.entity'
 import { UserCreateManyProvider } from './providers/user-create-many.provider'
 import { CreateUserProvider } from './providers/create-user.provider'
 import { FindOneUserByEmailProvider } from './providers/find-one-user-by-email.provider'
+import { ConfigModule } from '@nestjs/config'
+import jwtConfig from 'src/auth/config/jwt.config'
+import { JwtModule } from '@nestjs/jwt'
+import { AccessTokenGuard } from 'src/auth/guards/access-token/access-token.guard'
+import { APP_GUARD } from '@nestjs/core'
 
 @Module({
   controllers: [UsersController],
@@ -17,6 +22,11 @@ import { FindOneUserByEmailProvider } from './providers/find-one-user-by-email.p
     FindOneUserByEmailProvider,
   ],
   exports: [UsersService],
-  imports: [forwardRef(() => AuthModule), TypeOrmModule.forFeature([User])],
+  imports: [
+    forwardRef(() => AuthModule),
+    TypeOrmModule.forFeature([User]),
+    ConfigModule.forFeature(jwtConfig),
+    JwtModule.registerAsync(jwtConfig.asProvider()),
+  ],
 })
 export class UsersModule {}
