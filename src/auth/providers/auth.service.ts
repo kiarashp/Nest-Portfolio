@@ -1,5 +1,7 @@
 import { Injectable, Inject, forwardRef } from '@nestjs/common'
 import { UsersService } from 'src/users/providers/users.service'
+import { SignInDto } from '../dtos/signin.dto'
+import { SignInProvider } from './sign-in.provider'
 
 @Injectable()
 export class AuthService {
@@ -7,19 +9,14 @@ export class AuthService {
     // injecting users service
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
+    /**
+     * inject sign in provider
+     */
+    private readonly signInProvider: SignInProvider,
   ) {}
 
   // login
-  public async login(id: number, email?: string, password?: string) {
-    console.log(email, password)
-    const user = await this.usersService.findOneById(id)
-    if (user?.firstName === 'Satoru') return 'SAMPLE_TOKEN'
-    return 'NO_TOKEN'
-  }
-
-  // Authenticate
-  public isAuth(token: string) {
-    if (token === 'SAMPLE_TOKEN') return true
-    return false
+  public async signIn(signInDto: SignInDto) {
+    return await this.signInProvider.signIn(signInDto)
   }
 }
