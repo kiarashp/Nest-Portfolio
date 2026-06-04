@@ -1,8 +1,8 @@
 import {
   IsArray,
+  IsDate,
   IsEnum,
   IsInt,
-  IsISO8601,
   IsJSON,
   IsNotEmpty,
   IsOptional,
@@ -86,7 +86,7 @@ export class CreatePostDto {
     description: 'The date and time when the post will be published',
     example: '2023-05-29T12:00:00.000Z',
   })
-  @IsISO8601()
+  @IsDate()
   @IsOptional()
   publishOn?: Date
   // tags

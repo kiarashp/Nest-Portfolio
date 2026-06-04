@@ -14,6 +14,9 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 import { TagsService } from 'src/tags/providers/tags.service'
 import { Tag } from 'src/tags/entities/tag.entity'
+import { GetPostsDto } from '../dto/get-posts.dto'
+import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
+import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
 
 /**
  * Class to connect to the posts "database" and perform actions on it
@@ -34,6 +37,10 @@ export class PostsService {
      */
     private readonly tagsService: TagsService,
 
+    /**
+     * Inject pagination provider
+     */
+    private readonly paginationProvider: PaginationProvider,
     /**
      * Inject Post Repository
      */
@@ -68,12 +75,14 @@ export class PostsService {
   /**
    * We use this method to get all the posts
    */
-  public async findAll() {
-    return await this.postsRepository.find({
-      relations: {
-        metaOptions: true,
+  public async findAll(getPostsDto: GetPostsDto): Promise<Paginated<Post>> {
+    return await this.paginationProvider.paginateQuery(
+      {
+        page: getPostsDto.page,
+        limit: getPostsDto.limit,
       },
-    })
+      this.postsRepository,
+    )
   }
   /**
    * We use this method to get a single post
