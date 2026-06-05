@@ -17,6 +17,8 @@ import { Tag } from 'src/tags/entities/tag.entity'
 import { GetPostsDto } from '../dto/get-posts.dto'
 import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
+import { CreatePostProvider } from './create-post.provider'
+import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 
 /**
  * Class to connect to the posts "database" and perform actions on it
@@ -52,25 +54,19 @@ export class PostsService {
      */
     @InjectRepository(MetaOption)
     private readonly metaOptionsRepository: Repository<MetaOption>,
+    /**
+     * Inject create post provider
+     */
+    private readonly createPostProvider: CreatePostProvider,
   ) {}
   /**
    * We use this method to create a new post
    */
-  public async create(createPostDto: CreatePostDto) {
-    //find author
-    const author = await this.usersService.findOneById(createPostDto.authorId)
-    if (!author) return { message: 'Author not found', status: 404 }
-    //find tags
-
-    const tags = await this.tagsService.findMany(createPostDto.tags)
-
-    //create post
-    const post = this.postsRepository.create({
-      ...createPostDto,
-      author: author,
-      tags: tags,
-    })
-    return await this.postsRepository.save(post)
+  public async create(
+    createPostDto: CreatePostDto,
+    activeUser: ActiveUserData,
+  ) {
+    return await this.createPostProvider.create(createPostDto, activeUser)
   }
   /**
    * We use this method to get all the posts

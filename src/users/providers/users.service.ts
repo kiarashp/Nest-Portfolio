@@ -46,7 +46,6 @@ export class UsersService {
    * Find all users
    */
   public findAll(limit: number, page: number) {
-    console.log(limit, page)
     return this.userRepository.find()
   }
   /**

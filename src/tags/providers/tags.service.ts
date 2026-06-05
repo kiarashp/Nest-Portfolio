@@ -35,9 +35,7 @@ export class TagsService {
     if (!ids || ids.length === 0) {
       return []
     }
-    console.log(ids)
     const result = await this.tagsRepository.find({ where: { id: In(ids) } })
-    console.log(result)
     return result
   }
   /**

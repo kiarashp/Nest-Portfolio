@@ -27,7 +27,6 @@ export class PaginationProvider {
     const baseURL =
       this.request.protocol + '://' + this.request.headers.host + '/'
     const newURL = new URL(this.request.url, baseURL)
-    console.log(newURL)
     /**
      * Calculate page numbers
      */

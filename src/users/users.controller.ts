@@ -17,6 +17,8 @@ import { UsersService } from './providers/users.service'
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { CreateManyUsersDto } from './dtos/create-many-users.dto'
 import { AccessTokenGuard } from 'src/auth/guards/access-token/access-token.guard'
+import { AuthType } from 'src/auth/enums/auth-type.enum'
+import { Auth } from 'src/auth/decorators/auth.decorator'
 
 @Controller('users')
 @ApiTags('Users')
@@ -58,13 +60,13 @@ export class UsersController {
    * Create a User
    */
   @Post()
+  @Auth(AuthType.None)
   public createUser(@Body() createUserDto: CreateUserDto) {
     return this.usersService.craeteUser(createUserDto)
   }
   /**
    * Create multiple Users
    */
-  @UseGuards(AccessTokenGuard)
   @Post('create-many')
   public createManyUsers(@Body() createManyUsersDto: CreateManyUsersDto) {
     return this.usersService.createMany(createManyUsersDto)
@@ -74,7 +76,6 @@ export class UsersController {
    */
   @Get(':id')
   public getUser(@Param('id', ParseIntPipe) id: number) {
-    console.log(id)
     return this.usersService.findOneById(id)
   }
   /**
@@ -85,7 +86,6 @@ export class UsersController {
     @Param('id', ParseIntPipe) id: number,
     @Body() patchUserDto: PatchUserDto,
   ) {
-    console.log(patchUserDto)
     return `This action updates user`
   }
 
@@ -94,7 +94,6 @@ export class UsersController {
    */
   @Delete(':id')
   public deleteUser(@Param('id', ParseIntPipe) id: number) {
-    console.log(id)
     return `This action deletes user ${id}`
   }
 }

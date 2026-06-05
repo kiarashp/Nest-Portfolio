@@ -12,4 +12,8 @@ export default Joi.object({
   DB_HOST: Joi.string().required(),
   DB_SYNC: Joi.string().valid('true', 'false').default('false'),
   DB_AUTO_LOAD_ENTITIES: Joi.string().valid('true', 'false').default('false'),
+  JWT_SECRET: Joi.string().required(),
+  JWT_TOKEN_AUDIENCE: Joi.string().required(),
+  JWT_TOKEN_ISSUER: Joi.string().required(),
+  JWT_ACCESS_TOEKN_TTL: Joi.number().default(3600),
 })
