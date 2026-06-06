@@ -36,6 +36,9 @@ export class SignInProvider {
     //find the user using email id
     //throw exception if user not found
     const user = await this.userService.findOneByEmail(signInDto.email)
+    if (!user.password) {
+      throw new UnauthorizedException('This account uses Google Sign-In')
+    }
     //compare password to the hashed password
     let isEqual: boolean = false
     try {
