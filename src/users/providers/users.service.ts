@@ -17,6 +17,8 @@ import { FindOneUserByEmailProvider } from './find-one-user-by-email.provider'
 import { FindOneByGoogleIdProvider } from './find-one-by-google-id.provider'
 import { CreateGoogleUserProvider } from './create-google-user.provider'
 import { GoogleUser } from '../interfaces/google-user.interface'
+import { FindOneByIdProvider } from './find-one-by-id.provider'
+import { RemoveOneByIdProvider } from './remove-one-by-id.provider'
 
 @Injectable()
 export class UsersService {
@@ -52,6 +54,14 @@ export class UsersService {
      * Inject createGoogleUser provider
      */
     private readonly createGoogleUserProvider: CreateGoogleUserProvider,
+    /**
+     * Inject find one by database id
+     */
+    private readonly findOneByIdProvider: FindOneByIdProvider,
+    /**
+     * remove one user by id
+     */
+    private readonly removeOneByIdProvider: RemoveOneByIdProvider,
   ) {}
   /**
    * Find all users
@@ -61,21 +71,10 @@ export class UsersService {
   }
   /**
    * Find user by id
+   * handle execption when user is not found
    */
   public async findOneById(id: number) {
-    let existingUser: User | null = null
-    try {
-      existingUser = await this.userRepository.findOne({ where: { id } })
-    } catch {
-      throw new RequestTimeoutException(
-        'Unable to process your request, please try again later',
-        {
-          description: 'Error connecting to database',
-        },
-      )
-    }
-    if (!existingUser) throw new NotFoundException('User not found')
-    return existingUser
+    return await this.findOneByIdProvider.findOneById(id)
   }
   /**
    * Create a new user
@@ -107,5 +106,12 @@ export class UsersService {
    */
   public async createGoogleUser(googleUser: GoogleUser) {
     return await this.createGoogleUserProvider.createGoogleUser(googleUser)
+  }
+
+  /**
+   * remove a user by id
+   */
+  public async removeUserById(id: number) {
+    return await this.removeOneByIdProvider.removeUserById(id)
   }
 }
