@@ -10,6 +10,8 @@ import {
   Patch,
   Delete,
   UseGuards,
+  UseInterceptors,
+  ClassSerializerInterceptor,
 } from '@nestjs/common'
 import { CreateUserDto } from './dtos/create-user.dtos'
 import { PatchUserDto } from './dtos/patch-user.dto'
@@ -60,6 +62,7 @@ export class UsersController {
    * Create a User
    */
   @Post()
+  @UseInterceptors(ClassSerializerInterceptor)
   @Auth(AuthType.None)
   public createUser(@Body() createUserDto: CreateUserDto) {
     return this.usersService.craeteUser(createUserDto)
