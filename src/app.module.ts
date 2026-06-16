@@ -11,8 +11,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
 import { PaginationModule } from './common/pagination/pagination.module'
 import appConfig from './config/app.config'
 import databaseConfig from './config/database.config'
+import cloudinaryConfig from './config/cloudinary.config'
 import environmentValidation from './config/environment.validation'
 import jwtConfig from './auth/config/jwt.config'
+import { UploadsModule } from './uploads/uploads.module'
 import { JwtModule } from '@nestjs/jwt'
 import { AccessTokenGuard } from './auth/guards/access-token/access-token.guard'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
@@ -29,7 +31,7 @@ const ENV = process.env.NODE_ENV
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: !ENV ? '.env' : `.env.${ENV}`,
-      load: [appConfig, databaseConfig],
+      load: [appConfig, databaseConfig, cloudinaryConfig],
       validationSchema: environmentValidation,
     }),
     TypeOrmModule.forRootAsync({
@@ -49,6 +51,7 @@ const ENV = process.env.NODE_ENV
     TagsModule,
     MetaOptionsModule,
     PaginationModule,
+    UploadsModule,
     ConfigModule.forFeature(jwtConfig),
     JwtModule.registerAsync(jwtConfig.asProvider()),
   ],

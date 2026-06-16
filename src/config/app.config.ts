@@ -4,7 +4,4 @@ export default registerAs('appConfig', () => ({
   environments: process.env.NODE_ENV || 'production',
   appPort: parseInt(process.env.APP_PORT || '3000', 10),
   apiVersion: process.env.API_VERSION,
-  cloudinaryName: process.env.CLOUDINARY_NAME,
-  cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
-  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
 }))
