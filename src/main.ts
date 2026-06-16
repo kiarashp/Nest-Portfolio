@@ -20,7 +20,7 @@ async function bootstrap() {
   )
 
   // Swagger configuration
-  const config = new DocumentBuilder()
+  const swaggerConfig = new DocumentBuilder()
     .setTitle('NestJS API - BlogApp')
     .setDescription('Use the base API URL as http://localhost:3000')
     .setTermsOfService('http://localhost:3000/terms-of-service')
@@ -29,7 +29,7 @@ async function bootstrap() {
     .setVersion('1.0')
     .build()
   // Instantiate the SwaggerModule
-  const document = SwaggerModule.createDocument(app, config)
+  const document = SwaggerModule.createDocument(app, swaggerConfig)
   SwaggerModule.setup('api', app, document)
   // Enable CORS
   app.enableCors()
