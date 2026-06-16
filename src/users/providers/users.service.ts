@@ -19,6 +19,7 @@ import { CreateGoogleUserProvider } from './create-google-user.provider'
 import { GoogleUser } from '../interfaces/google-user.interface'
 import { FindOneByIdProvider } from './find-one-by-id.provider'
 import { RemoveOneByIdProvider } from './remove-one-by-id.provider'
+import { UploadAvatarProvider } from './upload-avatar.provider'
 
 @Injectable()
 export class UsersService {
@@ -62,6 +63,10 @@ export class UsersService {
      * remove one user by id
      */
     private readonly removeOneByIdProvider: RemoveOneByIdProvider,
+    /**
+     * inject upload avatar provider
+     */
+    private readonly uploadAvatarProvider: UploadAvatarProvider,
   ) {}
   /**
    * Find all users
@@ -113,5 +118,12 @@ export class UsersService {
    */
   public async removeUserById(id: number) {
     return await this.removeOneByIdProvider.removeUserById(id)
+  }
+
+  /**
+   * Upload and set the avatar for the authenticated user.
+   */
+  public async uploadAvatar(file: Express.Multer.File, userId: number) {
+    return await this.uploadAvatarProvider.uploadAvatar(file, userId)
   }
 }

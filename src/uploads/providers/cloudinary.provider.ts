@@ -1,14 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common'
 import type { ConfigType } from '@nestjs/config'
-import { v2 as cloudinary, UploadApiResponse } from 'cloudinary'
+import { v2 as cloudinary } from 'cloudinary'
 import cloudinaryConfig from 'src/config/cloudinary.config'
+import { StorageProvider, UploadResult } from './storage.provider'
 
 /**
- * Talks to the Cloudinary SDK directly. The only class in this module that knows
- * about Cloudinary - everything else just uses the result it returns.
+ * Cloudinary implementation of `StorageProvider`.
+ * The only class in this module that touches the Cloudinary SDK — swap this
+ * class out (and update `useClass` in `UploadsModule`) to change storage backends.
  */
 @Injectable()
-export class CloudinaryProvider {
+export class CloudinaryProvider extends StorageProvider {
   constructor(
     /**
      * inject cloudinary configuration
@@ -18,6 +20,7 @@ export class CloudinaryProvider {
       typeof cloudinaryConfig
     >,
   ) {
+    super()
     cloudinary.config({
       cloud_name: this.cloudinaryConfiguration.cloudName,
       api_key: this.cloudinaryConfiguration.apiKey,
@@ -26,12 +29,10 @@ export class CloudinaryProvider {
   }
 
   /**
-   * Streams the file's in-memory buffer to Cloudinary and resolves with the upload result.
+   * Streams the file's in-memory buffer to Cloudinary and resolves with the
+   * generic `UploadResult` shape (no Cloudinary types leak past this class).
    */
-  public uploadImage(
-    file: Express.Multer.File,
-    folder = 'uploads',
-  ): Promise<UploadApiResponse> {
+  public upload(file: Express.Multer.File, folder: string): Promise<UploadResult> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         { resource_type: 'image', folder },
@@ -43,10 +44,17 @@ export class CloudinaryProvider {
                 : new Error(error?.message ?? 'Cloudinary upload failed'),
             )
           }
-          resolve(result)
+          resolve({ url: result.secure_url, publicId: result.public_id })
         },
       )
       uploadStream.end(file.buffer)
     })
+  }
+
+  /**
+   * Deletes an asset from Cloudinary by its public id.
+   */
+  public async delete(publicId: string): Promise<void> {
+    await cloudinary.uploader.destroy(publicId)
   }
 }

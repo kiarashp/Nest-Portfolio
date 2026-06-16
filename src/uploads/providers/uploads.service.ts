@@ -2,11 +2,11 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import type { UploadApiResponse } from 'cloudinary'
-import { CloudinaryProvider } from './cloudinary.provider'
+import { StorageProvider, UploadResult } from './storage.provider'
 import { UploadFile } from '../entities/upload-file.entity'
 import { FileType } from '../enums/file-type.enum'
 
@@ -30,15 +30,16 @@ function isSupportedImageBuffer(buffer: Buffer): boolean {
 }
 
 /**
- * Orchestrates file uploads: sends the file to Cloudinary, then saves its metadata.
+ * Orchestrates file uploads: validates the file, delegates storage to
+ * `StorageProvider`, then persists the upload metadata.
  */
 @Injectable()
 export class UploadsService {
   constructor(
     /**
-     * inject `CloudinaryProvider`
+     * inject the active storage backend (currently Cloudinary, see UploadsModule)
      */
-    private readonly cloudinaryProvider: CloudinaryProvider,
+    private readonly storageProvider: StorageProvider,
     /**
      * inject `UploadFile` repository
      */
@@ -47,7 +48,7 @@ export class UploadsService {
   ) {}
 
   /**
-   * Uploads the given file to Cloudinary and saves a record of it for the given user.
+   * Validates, uploads, and records a file for the given user under `folder`.
    */
   public async uploadFile(
     file: Express.Multer.File,
@@ -62,21 +63,21 @@ export class UploadsService {
       )
     }
 
-    // Step 2: send the file to Cloudinary and get back its hosted URL and id.
-    let uploadResult: UploadApiResponse
+    // Step 2: hand off to the storage backend and get back a provider-agnostic result.
+    let uploadResult: UploadResult
     try {
-      uploadResult = await this.cloudinaryProvider.uploadImage(file, folder)
+      uploadResult = await this.storageProvider.upload(file, folder)
     } catch (error) {
       throw new ConflictException(error, {
-        description: 'Could not upload the file to Cloudinary',
+        description: 'Could not upload the file to storage',
       })
     }
 
-    // Step 3: build the database record from the file and the Cloudinary result.
+    // Step 3: build the database record from the file and the storage result.
     const newFile = this.filesRepository.create({
       name: file.originalname,
-      path: uploadResult.secure_url,
-      publicId: uploadResult.public_id,
+      path: uploadResult.url,
+      publicId: uploadResult.publicId,
       type: FileType.IMAGE,
       mime: file.mimetype,
       size: file.size,
@@ -91,5 +92,26 @@ export class UploadsService {
         description: 'Could not persist the file record',
       })
     }
+  }
+
+  /**
+   * Deletes a file from storage and removes its `UploadFile` record from the DB.
+   * Looked up by the stored URL (`path` column) so callers only need the URL.
+   */
+  public async deleteFile(url: string): Promise<void> {
+    const uploadFile = await this.filesRepository.findOneBy({ path: url })
+    if (!uploadFile) {
+      throw new NotFoundException(`No upload record found for url: ${url}`)
+    }
+
+    try {
+      await this.storageProvider.delete(uploadFile.publicId)
+    } catch (error) {
+      throw new ConflictException(error, {
+        description: 'Could not delete the file from storage',
+      })
+    }
+
+    await this.filesRepository.remove(uploadFile)
   }
 }

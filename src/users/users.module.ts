@@ -14,6 +14,8 @@ import { FindOneByGoogleIdProvider } from './providers/find-one-by-google-id.pro
 import { CreateGoogleUserProvider } from './providers/create-google-user.provider'
 import { RemoveOneByIdProvider } from './providers/remove-one-by-id.provider'
 import { FindOneByIdProvider } from './providers/find-one-by-id.provider'
+import { UploadAvatarProvider } from './providers/upload-avatar.provider'
+import { UploadsModule } from 'src/uploads/uploads.module'
 
 @Module({
   controllers: [UsersController],
@@ -26,6 +28,7 @@ import { FindOneByIdProvider } from './providers/find-one-by-id.provider'
     CreateGoogleUserProvider,
     RemoveOneByIdProvider,
     FindOneByIdProvider,
+    UploadAvatarProvider,
   ],
   exports: [UsersService],
   imports: [
@@ -33,6 +36,7 @@ import { FindOneByIdProvider } from './providers/find-one-by-id.provider'
     TypeOrmModule.forFeature([User]),
     ConfigModule.forFeature(jwtConfig),
     JwtModule.registerAsync(jwtConfig.asProvider()),
+    UploadsModule,
   ],
 })
 export class UsersModule {}

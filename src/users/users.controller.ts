@@ -1,6 +1,9 @@
 import {
   Controller,
+  FileTypeValidator,
   Get,
+  MaxFileSizeValidator,
+  ParseFilePipe,
   Post,
   Param,
   Body,
@@ -9,21 +12,31 @@ import {
   DefaultValuePipe,
   Patch,
   Delete,
-  UseGuards,
+  UploadedFile,
   UseInterceptors,
   ClassSerializerInterceptor,
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { memoryStorage } from 'multer'
 import { CreateUserDto } from './dtos/create-user.dtos'
 import { PatchUserDto } from './dtos/patch-user.dto'
 import { UsersService } from './providers/users.service'
-import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger'
 import { CreateManyUsersDto } from './dtos/create-many-users.dto'
-import { AccessTokenGuard } from 'src/auth/guards/access-token/access-token.guard'
 import { AuthType } from 'src/auth/enums/auth-type.enum'
 import { Auth } from 'src/auth/decorators/auth.decorator'
+import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
 
 @Controller('users')
 @ApiTags('Users')
+@UseInterceptors(ClassSerializerInterceptor)
 export class UsersController {
   // Injecting UsersService
   constructor(private usersService: UsersService) {}
@@ -62,7 +75,6 @@ export class UsersController {
    * Create a User
    */
   @Post()
-  @UseInterceptors(ClassSerializerInterceptor)
   @Auth(AuthType.None)
   public createUser(@Body() createUserDto: CreateUserDto) {
     return this.usersService.craeteUser(createUserDto)
@@ -81,6 +93,41 @@ export class UsersController {
   public getUser(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.findOneById(id)
   }
+
+  /**
+   * Upload or replace the avatar for the currently logged-in user.
+   * The file is stored under users/<userId>/ in the storage backend.
+   */
+  @Patch('avatar')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Upload user avatar',
+    description:
+      'Uploads an image (jpeg, png, webp or gif, max 5MB) and sets it as the avatar for the authenticated user.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Avatar updated successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'File is missing, too large, or not a supported image type',
+  })
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  public async uploadAvatar(
+    // The uploaded image file, validated for size (5MB) and type (jpeg/png/webp/gif).
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: /^image\/(jpeg|png|webp|gif)$/ }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    // Id of the logged-in user, read from the JWT payload's `sub` claim.
+    @ActiveUser('sub') userId: number,
+  ) {
+    return await this.usersService.uploadAvatar(file, userId)
+  }
   /**
    * UPDATE ONE User
    */
@@ -91,7 +138,6 @@ export class UsersController {
   ) {
     return `This action updates user`
   }
-
   /**
    * DELETE ONE User
    */

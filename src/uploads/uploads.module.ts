@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { ConfigModule } from '@nestjs/config'
 import { UploadsController } from './uploads.controller'
 import { UploadsService } from './providers/uploads.service'
+import { StorageProvider } from './providers/storage.provider'
 import { CloudinaryProvider } from './providers/cloudinary.provider'
 import { UploadFile } from './entities/upload-file.entity'
 import cloudinaryConfig from 'src/config/cloudinary.config'
@@ -13,7 +14,11 @@ import cloudinaryConfig from 'src/config/cloudinary.config'
     TypeOrmModule.forFeature([UploadFile]),
     ConfigModule.forFeature(cloudinaryConfig),
   ],
-  providers: [UploadsService, CloudinaryProvider],
+  providers: [
+    UploadsService,
+    // To swap storage backends, change `useClass` here — nothing else needs to change.
+    { provide: StorageProvider, useClass: CloudinaryProvider },
+  ],
   exports: [UploadsService],
 })
 export class UploadsModule {}

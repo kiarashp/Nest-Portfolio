@@ -42,7 +42,15 @@ export class User {
     type: 'varchar',
     nullable: true,
   })
+  @Exclude()
   googleId?: string
+  // cloudinary secure_url of the user's avatar, null until the user uploads one
+  @Column({
+    type: 'varchar',
+    length: 2048,
+    nullable: true,
+  })
+  avatarUrl?: string
   // posts
   @OneToMany(() => Post, (post) => post.author)
   post!: Post[]
