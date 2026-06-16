@@ -37,8 +37,9 @@ export class UploadAvatarProvider {
     }
 
     // Step 2: if the user already has an avatar, delete it from storage and the DB.
-    if (user.avatarUrl) {
-      await this.uploadsService.deleteFile(user.avatarUrl)
+    const currentAvatarUrl = user.avatarUrl
+    if (currentAvatarUrl) {
+      await this.uploadsService.deleteFile(currentAvatarUrl)
     }
 
     // Step 3: upload the new file and persist the UploadFile record.
