@@ -18,6 +18,7 @@ import { UploadsModule } from './uploads/uploads.module'
 import { JwtModule } from '@nestjs/jwt'
 import { AccessTokenGuard } from './auth/guards/access-token/access-token.guard'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
+import { ClassSerializerInterceptor } from '@nestjs/common'
 import { AuthenticationGuard } from './auth/guards/authentication/authentication.guard'
 import { RolesGuard } from './auth/guards/authorization/roles.guard'
 import { DataResponseInterceptor } from './common/interceptors/data-response/data-response.interceptor'
@@ -68,6 +69,9 @@ const ENV = process.env.NODE_ENV
       useClass: RolesGuard,
     },
     { provide: APP_INTERCEPTOR, useClass: DataResponseInterceptor },
+    // registered after DataResponseInterceptor so it runs on the raw controller
+    // output before the response gets wrapped in { apiVersion, data }
+    { provide: APP_INTERCEPTOR, useClass: ClassSerializerInterceptor },
     AccessTokenGuard,
   ],
 })

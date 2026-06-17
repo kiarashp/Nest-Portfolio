@@ -12,9 +12,9 @@ import {
   DefaultValuePipe,
   Patch,
   Delete,
+  SerializeOptions,
   UploadedFile,
   UseInterceptors,
-  ClassSerializerInterceptor,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
@@ -39,7 +39,8 @@ import { ChangeUserRoleDto } from './dtos/change-user-role.dto'
 
 @Controller('users')
 @ApiTags('Users')
-@UseInterceptors(ClassSerializerInterceptor)
+// activates the 'admin' group so email and role are included in all responses from this controller
+@SerializeOptions({ groups: ['admin'] })
 export class UsersController {
   constructor(private usersService: UsersService) {}
 

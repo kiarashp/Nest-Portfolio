@@ -1,4 +1,4 @@
-import { Exclude } from 'class-transformer'
+import { Exclude, Expose } from 'class-transformer'
 import { Post } from 'src/posts/entities/post.entity'
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm'
 import { UserRole } from 'src/auth/enums/user-role.enum'
@@ -29,6 +29,8 @@ export class User {
     nullable: false,
     unique: true,
   })
+  // only included in responses when the 'admin' serialization group is active
+  @Expose({ groups: ['admin'] })
   email!: string
   //   Password
   @Column({
@@ -58,6 +60,8 @@ export class User {
     enum: UserRole,
     default: UserRole.USER,
   })
+  // only included in responses when the 'admin' serialization group is active
+  @Expose({ groups: ['admin'] })
   role!: UserRole
   // posts
   @OneToMany(() => Post, (post) => post.author)
