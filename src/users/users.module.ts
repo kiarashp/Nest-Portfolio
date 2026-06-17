@@ -16,6 +16,8 @@ import { RemoveOneByIdProvider } from './providers/remove-one-by-id.provider'
 import { FindOneByIdProvider } from './providers/find-one-by-id.provider'
 import { UploadAvatarProvider } from './providers/upload-avatar.provider'
 import { ChangeUserRoleProvider } from './providers/change-user-role.provider'
+import { VerifyEmailProvider } from './providers/verify-email.provider'
+import { ResendVerificationProvider } from './providers/resend-verification.provider'
 import { UploadsModule } from 'src/uploads/uploads.module'
 import { MailModule } from 'src/mail/mail.module'
 
@@ -32,6 +34,8 @@ import { MailModule } from 'src/mail/mail.module'
     FindOneByIdProvider,
     UploadAvatarProvider,
     ChangeUserRoleProvider,
+    VerifyEmailProvider,
+    ResendVerificationProvider,
   ],
   exports: [UsersService],
   imports: [

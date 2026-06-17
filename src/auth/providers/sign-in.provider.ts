@@ -39,6 +39,11 @@ export class SignInProvider {
     if (!user.password) {
       throw new UnauthorizedException('This account uses Google Sign-In')
     }
+    if (!user.isEmailVerified) {
+      throw new UnauthorizedException(
+        'Please verify your email address before signing in',
+      )
+    }
     //compare password to the hashed password
     let isEqual: boolean = false
     try {

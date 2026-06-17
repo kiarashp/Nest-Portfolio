@@ -4,6 +4,7 @@ import mailConfig from './config/mail.config'
 import { NodemailerProvider } from './providers/nodemailer.provider'
 import { SendMailProvider } from './providers/send-mail.provider'
 import { SendWelcomeMailProvider } from './providers/send-welcome-mail.provider'
+import { SendVerificationMailProvider } from './providers/send-verification-mail.provider'
 import { MailService } from './mail.service'
 
 @Module({
@@ -12,6 +13,7 @@ import { MailService } from './mail.service'
     NodemailerProvider,
     SendMailProvider,
     SendWelcomeMailProvider,
+    SendVerificationMailProvider,
     MailService,
   ],
   exports: [MailService],

@@ -23,6 +23,7 @@ export class CreateGoogleUserProvider {
       const user = this.userRepository.create({
         ...googleUser,
         role: UserRole.USER,
+        isEmailVerified: true,
       })
       return await this.userRepository.save(user)
     } catch (error) {

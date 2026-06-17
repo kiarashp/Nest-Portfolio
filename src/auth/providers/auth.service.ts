@@ -36,4 +36,12 @@ export class AuthService {
   public async refreshTokens(refreshTokenDto: RefreshTokenDto) {
     return await this.refreshTokensProvider.refreshTokens(refreshTokenDto)
   }
+
+  public async verifyEmail(token: string) {
+    return this.usersService.verifyEmail(token)
+  }
+
+  public async resendVerificationEmail(email: string) {
+    return this.usersService.resendVerificationEmail(email)
+  }
 }

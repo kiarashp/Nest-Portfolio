@@ -21,6 +21,8 @@ import { FindOneByIdProvider } from './find-one-by-id.provider'
 import { RemoveOneByIdProvider } from './remove-one-by-id.provider'
 import { UploadAvatarProvider } from './upload-avatar.provider'
 import { ChangeUserRoleProvider } from './change-user-role.provider'
+import { VerifyEmailProvider } from './verify-email.provider'
+import { ResendVerificationProvider } from './resend-verification.provider'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 
 @Injectable()
@@ -73,6 +75,14 @@ export class UsersService {
      * inject change user role provider
      */
     private readonly changeUserRoleProvider: ChangeUserRoleProvider,
+    /**
+     * inject verify email provider
+     */
+    private readonly verifyEmailProvider: VerifyEmailProvider,
+    /**
+     * inject resend verification provider
+     */
+    private readonly resendVerificationProvider: ResendVerificationProvider,
   ) {}
   /**
    * Find all users
@@ -138,5 +148,13 @@ export class UsersService {
    */
   public async changeUserRole(id: number, role: UserRole) {
     return await this.changeUserRoleProvider.changeUserRole(id, role)
+  }
+
+  public async verifyEmail(token: string) {
+    return this.verifyEmailProvider.verify(token)
+  }
+
+  public async resendVerificationEmail(email: string) {
+    return this.resendVerificationProvider.resend(email)
   }
 }
