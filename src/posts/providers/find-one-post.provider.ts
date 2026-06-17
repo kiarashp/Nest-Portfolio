@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Post } from '../entities/post.entity'
+import { PostStatus } from '../enums/postStatus.enum'
 
 @Injectable()
 export class FindOnePostProvider {
@@ -37,6 +38,28 @@ export class FindOnePostProvider {
    */
   public async findOneByIdOrFail(id: number): Promise<Post> {
     const post = await this.findOneById(id)
+    if (!post) {
+      throw new NotFoundException(`Post with ID ${id} not found`)
+    }
+    return post
+  }
+
+  /**
+   * Public-facing lookup by ID — only returns the post if it is published.
+   * Throws NotFoundException for drafts, scheduled, and review posts so that
+   * unpublished content is indistinguishable from non-existent content.
+   */
+  public async findOnePublishedByIdOrFail(id: number): Promise<Post> {
+    let post: Post | null = null
+    try {
+      post = await this.postsRepository.findOne({
+        where: { id, status: PostStatus.PUBLISHED },
+      })
+    } catch {
+      throw new RequestTimeoutException(
+        'Unable to process your request, please try again later',
+      )
+    }
     if (!post) {
       throw new NotFoundException(`Post with ID ${id} not found`)
     }

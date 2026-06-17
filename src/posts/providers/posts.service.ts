@@ -9,6 +9,7 @@ import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { CreatePostProvider } from './create-post.provider'
 import { FindOnePostProvider } from './find-one-post.provider'
 import { FindAllPostsProvider } from './find-all-posts.provider'
+import { FindPostBySlugProvider } from './find-post-by-slug.provider'
 import { UpdatePostProvider } from './update-post.provider'
 import { RemovePostProvider } from './remove-post.provider'
 import { UploadPostImageProvider } from './upload-post-image.provider'
@@ -40,6 +41,10 @@ export class PostsService {
      * inject upload post image provider
      */
     private readonly uploadPostImageProvider: UploadPostImageProvider,
+    /**
+     * inject find post by slug provider
+     */
+    private readonly findPostBySlugProvider: FindPostBySlugProvider,
   ) {}
 
   public async create(
@@ -54,7 +59,11 @@ export class PostsService {
   }
 
   public async findOne(id: number): Promise<Post> {
-    return await this.findOnePostProvider.findOneByIdOrFail(id)
+    return await this.findOnePostProvider.findOnePublishedByIdOrFail(id)
+  }
+
+  public async findBySlug(slug: string): Promise<Post> {
+    return await this.findPostBySlugProvider.findBySlug(slug)
   }
 
   public async update(

@@ -31,6 +31,8 @@ import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
 import type { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { UserRole } from 'src/auth/enums/user-role.enum'
+import { Auth } from 'src/auth/decorators/auth.decorator'
+import { AuthType } from 'src/auth/enums/auth-type.enum'
 
 @Controller('posts')
 @ApiTags('Posts')
@@ -55,19 +57,30 @@ export class PostsController {
   }
 
   /**
-   * get all the posts
+   * get all published posts (public)
    */
+  @Auth(AuthType.None)
   @Get()
   findAll(@Query() getPostsDto: GetPostsDto) {
     return this.postsService.findAll(getPostsDto)
   }
 
   /**
-   * get a single post
+   * get a single published post by slug (public)
    */
+  @Auth(AuthType.None)
+  @Get('slug/:slug')
+  findBySlug(@Param('slug') slug: string) {
+    return this.postsService.findBySlug(slug)
+  }
+
+  /**
+   * get a single published post by id (public)
+   */
+  @Auth(AuthType.None)
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.postsService.findOne(+id)
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.postsService.findOne(id)
   }
 
   /**
