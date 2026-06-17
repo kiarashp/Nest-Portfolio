@@ -32,7 +32,10 @@ export class CloudinaryProvider extends StorageProvider {
    * Streams the file's in-memory buffer to Cloudinary and resolves with the
    * generic `UploadResult` shape (no Cloudinary types leak past this class).
    */
-  public upload(file: Express.Multer.File, folder: string): Promise<UploadResult> {
+  public upload(
+    file: Express.Multer.File,
+    folder: string,
+  ): Promise<UploadResult> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         { resource_type: 'image', folder },

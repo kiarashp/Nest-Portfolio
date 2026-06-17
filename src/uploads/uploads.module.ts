@@ -5,6 +5,8 @@ import { UploadsController } from './uploads.controller'
 import { UploadsService } from './providers/uploads.service'
 import { StorageProvider } from './providers/storage.provider'
 import { CloudinaryProvider } from './providers/cloudinary.provider'
+import { UploadFileProvider } from './providers/upload-file.provider'
+import { DeleteFileProvider } from './providers/delete-file.provider'
 import { UploadFile } from './entities/upload-file.entity'
 import cloudinaryConfig from 'src/config/cloudinary.config'
 
@@ -16,6 +18,8 @@ import cloudinaryConfig from 'src/config/cloudinary.config'
   ],
   providers: [
     UploadsService,
+    UploadFileProvider,
+    DeleteFileProvider,
     // To swap storage backends, change `useClass` here — nothing else needs to change.
     { provide: StorageProvider, useClass: CloudinaryProvider },
   ],

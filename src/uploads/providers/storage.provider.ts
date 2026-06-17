@@ -8,9 +8,13 @@ export interface UploadResult {
 }
 
 /**
- * Abstract storage backend. Inject this token instead of any concrete provider
- * so that swapping Cloudinary for S3 (or any other backend) only requires
- * changing the `useClass` registration in `UploadsModule`.
+ * Abstract storage backend. We use an abstract class instead of an interface
+ * because NestJS needs something that exists at runtime to wire up dependencies
+ * — interfaces disappear after compilation, abstract classes don't.
+ *
+ * The actual implementation (currently `CloudinaryProvider`) is swapped in via
+ * `useClass` in `UploadsModule`, so nothing that injects this ever needs to
+ * know which storage backend is actually running.
  */
 @Injectable()
 export abstract class StorageProvider {
