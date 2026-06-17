@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm'
 import { User } from 'src/users/entities/user.entity'
+import { Post } from 'src/posts/entities/post.entity'
 import { FileType } from '../enums/file-type.enum'
 
 @Entity()
@@ -44,6 +45,13 @@ export class UploadFile {
   @ManyToOne(() => User, { nullable: false })
   @JoinColumn({ name: 'userId' })
   user!: User
+  // post id — null for uploads not tied to a post (e.g. avatars)
+  @Column({ type: 'int', nullable: true })
+  postId?: number
+  // post
+  @ManyToOne(() => Post, (post) => post.uploadFiles, { nullable: true })
+  @JoinColumn({ name: 'postId' })
+  post?: Post
   // created at
   @CreateDateColumn()
   createdAt!: Date

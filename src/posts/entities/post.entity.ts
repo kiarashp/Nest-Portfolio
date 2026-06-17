@@ -4,6 +4,7 @@ import {
   JoinTable,
   ManyToMany,
   ManyToOne,
+  OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm'
@@ -12,6 +13,7 @@ import { PostStatus } from '../enums/postStatus.enum'
 import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 import { User } from 'src/users/entities/user.entity'
 import { Tag } from 'src/tags/entities/tag.entity'
+import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 
 @Entity()
 export class Post {
@@ -87,4 +89,7 @@ export class Post {
   @ManyToMany(() => Tag, (tag) => tag.posts, { eager: true })
   @JoinTable()
   tags?: Tag[]
+  // images uploaded for this post — not eager, only loaded when needed (e.g. on delete)
+  @OneToMany(() => UploadFile, (uploadFile) => uploadFile.post)
+  uploadFiles?: UploadFile[]
 }

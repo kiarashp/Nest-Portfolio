@@ -27,8 +27,14 @@ export class UploadsService {
     file: Express.Multer.File,
     userId: number,
     folder = 'uploads',
+    postId?: number,
   ): Promise<UploadFile> {
-    return await this.uploadFileProvider.uploadFile(file, userId, folder)
+    return await this.uploadFileProvider.uploadFile(
+      file,
+      userId,
+      folder,
+      postId,
+    )
   }
 
   /**
