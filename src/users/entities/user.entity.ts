@@ -1,6 +1,7 @@
 import { Exclude } from 'class-transformer'
 import { Post } from 'src/posts/entities/post.entity'
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm'
+import { UserRole } from 'src/auth/enums/user-role.enum'
 
 @Entity()
 export class User {
@@ -51,6 +52,13 @@ export class User {
     nullable: true,
   })
   avatarUrl?: string
+  // role — controls what the user is allowed to do
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.USER,
+  })
+  role!: UserRole
   // posts
   @OneToMany(() => Post, (post) => post.author)
   post!: Post[]

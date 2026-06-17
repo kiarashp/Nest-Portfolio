@@ -8,10 +8,10 @@ import { SignInProvider } from './providers/sign-in.provider'
 import { ConfigModule } from '@nestjs/config'
 
 import { JwtModule } from '@nestjs/jwt'
-import { GenerateTokensProvider } from './providers/generate-tokens.provider';
-import { RefreshTokensProvider } from './providers/refresh-tokens.provider';
-import { GoogleAuthenticationController } from './social/google-authentication.controller';
-import { GoogleAuthenticationService } from './social/providers/google-authentication.service';
+import { GenerateTokensProvider } from './providers/generate-tokens.provider'
+import { RefreshTokensProvider } from './providers/refresh-tokens.provider'
+import { GoogleAuthenticationController } from './social/google-authentication.controller'
+import { GoogleAuthenticationService } from './social/providers/google-authentication.service'
 import jwtConfig from './config/jwt.config'
 @Module({
   controllers: [AuthController, GoogleAuthenticationController],

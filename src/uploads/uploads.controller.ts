@@ -18,6 +18,8 @@ import {
 } from '@nestjs/swagger'
 import { UploadsService } from './providers/uploads.service'
 import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
+import { Roles } from 'src/auth/decorators/roles.decorator'
+import { UserRole } from 'src/auth/enums/user-role.enum'
 
 /**
  * Handles HTTP requests for uploading files (currently images) to Cloudinary.
@@ -55,6 +57,7 @@ export class UploadsController {
     status: 409,
     description: 'The upload to Cloudinary or saving the file record failed',
   })
+  @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
   @Post()
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   public async uploadFile(

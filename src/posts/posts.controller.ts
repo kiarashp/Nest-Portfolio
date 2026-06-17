@@ -29,11 +29,12 @@ import {
 import { GetPostsDto } from './dto/get-posts.dto'
 import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
 import type { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
+import { Roles } from 'src/auth/decorators/roles.decorator'
+import { UserRole } from 'src/auth/enums/user-role.enum'
 
 @Controller('posts')
 @ApiTags('Posts')
 export class PostsController {
-  // Injecting PostsService
   constructor(private readonly postsService: PostsService) {}
 
   /**
@@ -42,15 +43,15 @@ export class PostsController {
   @ApiOperation({ summary: 'Create a new post' })
   @ApiResponse({
     status: 201,
-    description:
-      'The post has been successfully created,and you got 201 status code',
+    description: 'The post has been successfully created',
   })
+  @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
   @Post()
   public createPost(
     @Body() createPostDto: CreatePostDto,
-    @ActiveUser() ActiveUser: ActiveUserData,
+    @ActiveUser() activeUser: ActiveUserData,
   ) {
-    return this.postsService.create(createPostDto, ActiveUser)
+    return this.postsService.create(createPostDto, activeUser)
   }
 
   /**
@@ -60,6 +61,7 @@ export class PostsController {
   findAll(@Query() getPostsDto: GetPostsDto) {
     return this.postsService.findAll(getPostsDto)
   }
+
   /**
    * get a single post
    */
@@ -67,22 +69,23 @@ export class PostsController {
   findOne(@Param('id') id: string) {
     return this.postsService.findOne(+id)
   }
+
   /**
    * update a post
    */
-
   @ApiOperation({ summary: 'Update a post' })
   @ApiResponse({
     status: 200,
-    description:
-      'The post has been successfully updated and you got 200 status code',
+    description: 'The post has been successfully updated',
   })
+  @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() patchPostDto: PatchPostDto,
+    @ActiveUser() activeUser: ActiveUserData,
   ) {
-    return this.postsService.update(id, patchPostDto)
+    return this.postsService.update(id, patchPostDto, activeUser)
   }
 
   /**
@@ -95,6 +98,7 @@ export class PostsController {
   @ApiResponse({ status: 403, description: 'Not the post author' })
   @ApiResponse({ status: 404, description: 'Post not found' })
   @ApiBearerAuth()
+  @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
   @Post(':id/images')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   public uploadPostImage(
@@ -116,8 +120,12 @@ export class PostsController {
   /**
    * delete a post
    */
+  @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.postsService.remove(id)
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @ActiveUser() activeUser: ActiveUserData,
+  ) {
+    return this.postsService.remove(id, activeUser)
   }
 }

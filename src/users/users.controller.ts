@@ -33,61 +33,52 @@ import { CreateManyUsersDto } from './dtos/create-many-users.dto'
 import { AuthType } from 'src/auth/enums/auth-type.enum'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
+import { Roles } from 'src/auth/decorators/roles.decorator'
+import { UserRole } from 'src/auth/enums/user-role.enum'
+import { ChangeUserRoleDto } from './dtos/change-user-role.dto'
 
 @Controller('users')
 @ApiTags('Users')
 @UseInterceptors(ClassSerializerInterceptor)
 export class UsersController {
-  // Injecting UsersService
   constructor(private usersService: UsersService) {}
 
   /**
-   * Get all users
+   * Get all users — admin only
    */
+  @Roles(UserRole.ADMIN)
   @Get()
   @ApiOperation({ summary: 'Get all users with pagination and limit' })
-  @ApiResponse({
-    status: 200,
-    description: 'Users fetched successfully based on limit and page',
-  })
-  @ApiQuery({
-    name: 'limit',
-    type: Number,
-    required: false,
-    description: 'Limit number',
-    example: 10,
-  })
-  @ApiQuery({
-    name: 'page',
-    type: Number,
-    required: false,
-    description: 'Page number',
-    example: 1,
-  })
+  @ApiResponse({ status: 200, description: 'Users fetched successfully' })
+  @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
+  @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
   public getAllUsers(
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe)
-    limit: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
   ) {
     return this.usersService.findAll(limit, page)
   }
+
   /**
-   * Create a User
+   * Register a new user — public
    */
-  @Post()
   @Auth(AuthType.None)
+  @Post()
   public createUser(@Body() createUserDto: CreateUserDto) {
     return this.usersService.craeteUser(createUserDto)
   }
+
   /**
-   * Create multiple Users
+   * Create multiple users — admin only
    */
+  @Roles(UserRole.ADMIN)
   @Post('create-many')
   public createManyUsers(@Body() createManyUsersDto: CreateManyUsersDto) {
     return this.usersService.createMany(createManyUsersDto)
   }
+
   /**
-   * GET ONE User
+   * Get a single user by id
    */
   @Get(':id')
   public getUser(@Param('id', ParseIntPipe) id: number) {
@@ -96,15 +87,10 @@ export class UsersController {
 
   /**
    * Upload or replace the avatar for the currently logged-in user.
-   * The file is stored under users/<userId>/ in the storage backend.
    */
   @Patch('avatar')
   @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Upload user avatar',
-    description:
-      'Uploads an image (jpeg, png, webp or gif, max 5MB) and sets it as the avatar for the authenticated user.',
-  })
+  @ApiOperation({ summary: 'Upload user avatar' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Avatar updated successfully' })
   @ApiResponse({
@@ -113,7 +99,6 @@ export class UsersController {
   })
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   public async uploadAvatar(
-    // The uploaded image file, validated for size (5MB) and type (jpeg/png/webp/gif).
     @UploadedFile(
       new ParseFilePipe({
         validators: [
@@ -123,14 +108,27 @@ export class UsersController {
       }),
     )
     file: Express.Multer.File,
-    // Id of the logged-in user, read from the JWT payload's `sub` claim.
     @ActiveUser('sub') userId: number,
   ) {
     return await this.usersService.uploadAvatar(file, userId)
   }
+
   /**
-   * UPDATE ONE User
+   * Change a user's role — admin only
    */
+  @Roles(UserRole.ADMIN)
+  @Patch(':id/role')
+  public changeUserRole(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() changeUserRoleDto: ChangeUserRoleDto,
+  ) {
+    return this.usersService.changeUserRole(id, changeUserRoleDto.role)
+  }
+
+  /**
+   * Update a user — admin only
+   */
+  @Roles(UserRole.ADMIN)
   @Patch(':id')
   public updateUser(
     @Param('id', ParseIntPipe) id: number,
@@ -138,9 +136,11 @@ export class UsersController {
   ) {
     return `This action updates user`
   }
+
   /**
-   * DELETE ONE User
+   * Delete a user — admin only
    */
+  @Roles(UserRole.ADMIN)
   @Delete(':id')
   public deleteUser(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.removeUserById(id)

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   RequestTimeoutException,
 } from '@nestjs/common'
@@ -10,6 +11,8 @@ import { Tag } from 'src/tags/entities/tag.entity'
 import { PatchPostDto } from '../dto/update-post.dto'
 import { TagsService } from 'src/tags/providers/tags.service'
 import { FindOnePostProvider } from './find-one-post.provider'
+import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
+import { UserRole } from 'src/auth/enums/user-role.enum'
 
 @Injectable()
 export class UpdatePostProvider {
@@ -32,7 +35,11 @@ export class UpdatePostProvider {
   /**
    * Updates a post's fields and optionally its tags.
    */
-  public async update(id: number, patchPostDto: PatchPostDto): Promise<Post> {
+  public async update(
+    id: number,
+    patchPostDto: PatchPostDto,
+    activeUser: ActiveUserData,
+  ): Promise<Post> {
     // Step 1: resolve tags if provided, and validate they all exist.
     let tags: Tag[] | null = null
     if (patchPostDto.tags) {
@@ -51,7 +58,15 @@ export class UpdatePostProvider {
     // Step 2: find the post, throws NotFoundException if missing.
     const post = await this.findOnePostProvider.findOneByIdOrFail(id)
 
-    // Step 3: apply the updates.
+    // Step 3: editors can only update posts they authored.
+    if (
+      activeUser.role === UserRole.EDITOR &&
+      post.author.id !== activeUser.sub
+    ) {
+      throw new ForbiddenException('You can only edit your own posts')
+    }
+
+    // Step 4: apply the updates.
     post.title = patchPostDto.title ?? post.title
     post.postType = patchPostDto.postType ?? post.postType
     post.slug = patchPostDto.slug ?? post.slug
@@ -63,7 +78,7 @@ export class UpdatePostProvider {
       post.tags = tags
     }
 
-    // Step 4: persist.
+    // Step 5: persist.
     try {
       return await this.postsRepository.save(post)
     } catch {

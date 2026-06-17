@@ -3,6 +3,7 @@ import { UploadsService } from 'src/uploads/providers/uploads.service'
 import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { FindOnePostProvider } from './find-one-post.provider'
+import { UserRole } from 'src/auth/enums/user-role.enum'
 
 @Injectable()
 export class UploadPostImageProvider {
@@ -30,8 +31,11 @@ export class UploadPostImageProvider {
     // Step 1: make sure the post exists.
     const post = await this.findOnePostProvider.findOneByIdOrFail(postId)
 
-    // Step 2: only the author can upload images to their own post.
-    if (post.author.id !== activeUser.sub) {
+    // Step 2: editors can only upload to posts they authored; authors/admins can upload to any.
+    if (
+      activeUser.role === UserRole.EDITOR &&
+      post.author.id !== activeUser.sub
+    ) {
       throw new ForbiddenException(
         'You are not allowed to upload images to this post',
       )

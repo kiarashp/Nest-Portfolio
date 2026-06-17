@@ -10,6 +10,7 @@ import { Repository } from 'typeorm'
 import { InjectRepository } from '@nestjs/typeorm'
 import { User } from '../entities/user.entity'
 import { HashingProvider } from 'src/auth/providers/hashing.provider'
+import { UserRole } from 'src/auth/enums/user-role.enum'
 
 @Injectable()
 export class CreateUserProvider {
@@ -56,6 +57,7 @@ export class CreateUserProvider {
         password: await this.hashingProvider.hashPassword(
           createUserDto.password,
         ),
+        role: UserRole.USER,
       })
 
       await this.userRepository.save(newUser)

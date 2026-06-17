@@ -20,6 +20,8 @@ import { GoogleUser } from '../interfaces/google-user.interface'
 import { FindOneByIdProvider } from './find-one-by-id.provider'
 import { RemoveOneByIdProvider } from './remove-one-by-id.provider'
 import { UploadAvatarProvider } from './upload-avatar.provider'
+import { ChangeUserRoleProvider } from './change-user-role.provider'
+import { UserRole } from 'src/auth/enums/user-role.enum'
 
 @Injectable()
 export class UsersService {
@@ -67,6 +69,10 @@ export class UsersService {
      * inject upload avatar provider
      */
     private readonly uploadAvatarProvider: UploadAvatarProvider,
+    /**
+     * inject change user role provider
+     */
+    private readonly changeUserRoleProvider: ChangeUserRoleProvider,
   ) {}
   /**
    * Find all users
@@ -125,5 +131,12 @@ export class UsersService {
    */
   public async uploadAvatar(file: Express.Multer.File, userId: number) {
     return await this.uploadAvatarProvider.uploadAvatar(file, userId)
+  }
+
+  /**
+   * Change the role of a user. Only callable by an admin.
+   */
+  public async changeUserRole(id: number, role: UserRole) {
+    return await this.changeUserRoleProvider.changeUserRole(id, role)
   }
 }

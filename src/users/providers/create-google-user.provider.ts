@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { User } from '../entities/user.entity'
 import { Repository } from 'typeorm'
 import { GoogleUser } from '../interfaces/google-user.interface'
+import { UserRole } from 'src/auth/enums/user-role.enum'
 
 @Injectable()
 export class CreateGoogleUserProvider {
@@ -19,7 +20,10 @@ export class CreateGoogleUserProvider {
    */
   public async createGoogleUser(googleUser: GoogleUser) {
     try {
-      const user = this.userRepository.create(googleUser)
+      const user = this.userRepository.create({
+        ...googleUser,
+        role: UserRole.USER,
+      })
       return await this.userRepository.save(user)
     } catch (error) {
       throw new ConflictException(error, {

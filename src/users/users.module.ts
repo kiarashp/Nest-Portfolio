@@ -15,6 +15,7 @@ import { CreateGoogleUserProvider } from './providers/create-google-user.provide
 import { RemoveOneByIdProvider } from './providers/remove-one-by-id.provider'
 import { FindOneByIdProvider } from './providers/find-one-by-id.provider'
 import { UploadAvatarProvider } from './providers/upload-avatar.provider'
+import { ChangeUserRoleProvider } from './providers/change-user-role.provider'
 import { UploadsModule } from 'src/uploads/uploads.module'
 
 @Module({
@@ -29,6 +30,7 @@ import { UploadsModule } from 'src/uploads/uploads.module'
     RemoveOneByIdProvider,
     FindOneByIdProvider,
     UploadAvatarProvider,
+    ChangeUserRoleProvider,
   ],
   exports: [UsersService],
   imports: [

@@ -57,12 +57,16 @@ export class PostsService {
     return await this.findOnePostProvider.findOneByIdOrFail(id)
   }
 
-  public async update(id: number, patchPostDto: PatchPostDto): Promise<Post> {
-    return await this.updatePostProvider.update(id, patchPostDto)
+  public async update(
+    id: number,
+    patchPostDto: PatchPostDto,
+    activeUser: ActiveUserData,
+  ): Promise<Post> {
+    return await this.updatePostProvider.update(id, patchPostDto, activeUser)
   }
 
-  public async remove(id: number) {
-    return await this.removePostProvider.remove(id)
+  public async remove(id: number, activeUser: ActiveUserData) {
+    return await this.removePostProvider.remove(id, activeUser)
   }
 
   public async uploadPostImage(
