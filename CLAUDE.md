@@ -25,6 +25,8 @@ pnpm run test:e2e            # jest using test/jest-e2e.json (test/**/*.e2e-spec
 pnpm run test:debug          # node --inspect-brk for debugging a jest run
 
 pnpm run doc                 # compodoc, served on port 3001, output to ./documentation
+
+pnpm run seed:admin          # create or promote the first admin user (reads NODE_ENV=development)
 ```
 
 Run a single unit test file: `pnpm jest path/to/file.spec.ts` (or `pnpm exec jest -t "test name"`).
@@ -34,9 +36,25 @@ Swagger/OpenAPI docs are served at `/api` once the app is running (see `main.ts`
 
 ## Environment configuration
 
-Env file selection is driven by `NODE_ENV`: `.env` when unset, otherwise `.env.<NODE_ENV>` (see `app.module.ts`). `.env.example` documents the required variables; `environment.validation.ts` (Joi) is the source of truth for which variables are required vs. defaulted — check it before adding new env vars instead of guessing. Required: DB_PASSWORD, DB_USER, DB_NAME, DB_HOST, JWT_SECRET, JWT_TOKEN_AUDIENCE, JWT_TOKEN_ISSUER, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, API_VERSION, CLOUDINARY_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET.
+Env file selection is driven by `NODE_ENV`: `.env` when unset, otherwise `.env.<NODE_ENV>` (see `app.module.ts`). `.env.example` documents the required variables; `environment.validation.ts` (Joi) is the source of truth for which variables are required vs. defaulted — check it before adding new env vars instead of guessing. Required: DB_PASSWORD, DB_USER, DB_NAME, DB_HOST, JWT_SECRET, JWT_TOKEN_AUDIENCE, JWT_TOKEN_ISSUER, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, API_VERSION, CLOUDINARY_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, MAIL_HOST, MAIL_USER, MAIL_PASSWORD, MAIL_FROM.
 
 Config is exposed to the app via `@nestjs/config` `registerAs` namespaces, not `process.env` directly outside of `src/config/*` and `src/auth/config/jwt.config.ts`. Inject `ConfigService` and read e.g. `configService.get('appConfig.appPort')` or `configService.get('database.host')`.
+
+## Database seeds
+
+Seed scripts live in `src/database/seeds/`. They use `NestFactory.createApplicationContext(SeedModule)` — this boots the DI container and database connection without starting an HTTP server, runs the script, then exits.
+
+**Admin seed** (`src/database/seeds/admin.seed.ts`):
+- Reads `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` from the env file
+- If the email exists → promotes that user to `ADMIN`
+- If not → creates a new user with `ADMIN` role
+- Safe to run multiple times
+
+```bash
+pnpm run seed:admin   # uses NODE_ENV=development → .env.development
+```
+
+`SeedModule` (`src/database/seeds/seed.module.ts`) is a minimal module — only `ConfigModule` + `TypeOrmModule`. It skips Joi validation intentionally (the seed only needs DB vars). All entities must be listed explicitly in `entities: [...]` because `autoLoadEntities` only works when all feature modules are loaded.
 
 ## Architecture
 
@@ -56,8 +74,9 @@ Entity relations:
 1. **`AuthenticationGuard`** (`APP_GUARD`, first) reads `AuthType[]` metadata set by `@Auth(...)` (`src/auth/decorators/auth.decorator.ts`); defaults to `[AuthType.Bearer]` if absent. Maps each type to a guard (`Bearer` → `AccessTokenGuard`, `None` → always-allow) and tries them in order. To make a route public, decorate with `@Auth(AuthType.None)`.
 2. **`AccessTokenGuard`** extracts a bearer token, verifies it via `JwtService`, and attaches the decoded payload to the request under `REQUEST_USER_KEY` (`src/auth/constants/auth.constants.ts`). Read the current user in controllers via `@ActiveUser()` (`src/auth/decorators/active-user.decorator.ts`).
 3. **`RolesGuard`** (`APP_GUARD`, second) reads `UserRole[]` metadata set by `@Roles(...)` (`src/auth/decorators/roles.decorator.ts`). If no `@Roles()` is set, the guard passes. If roles are required but no user is on the request, access is denied. See `src/auth/CLAUDE.md` for full RBAC details.
-4. **`DataResponseInterceptor`** (`APP_INTERCEPTOR`) wraps every response as `{ apiVersion, data }`. Controllers return plain data — do not wrap manually.
-5. A global `ValidationPipe` (`main.ts`) runs with `whitelist: true, forbidNonWhitelisted: true, transform: true` — extra fields in request bodies are stripped, undeclared fields rejected.
+4. **`DataResponseInterceptor`** (`APP_INTERCEPTOR`, registered first) wraps every response as `{ apiVersion, data }`. Controllers return plain data — do not wrap manually.
+5. **`ClassSerializerInterceptor`** (`APP_INTERCEPTOR`, registered second) runs on the raw controller output before `DataResponseInterceptor` wraps it. This activates `@Exclude()` and `@Expose()` decorators on entities globally. See the Serialization section below for the groups pattern used on `User`.
+6. A global `ValidationPipe` (`main.ts`) runs with `whitelist: true, forbidNonWhitelisted: true, transform: true` — extra fields in request bodies are stripped, undeclared fields rejected.
 
 ### Auth
 
@@ -67,9 +86,59 @@ Entity relations:
 - `AuthModule` uses `forwardRef(() => UsersModule)` because of a circular dependency — keep that in mind if you touch either module's imports/exports. See `src/auth/CLAUDE.md` for details.
 - RBAC: four roles (`USER`, `EDITOR`, `AUTHOR`, `ADMIN`) defined in `src/auth/enums/user-role.enum.ts`. See `src/auth/CLAUDE.md` for the full access control rules.
 
+### Posts — public routes and draft visibility
+
+Public blog routes are decorated with `@Auth(AuthType.None)` and only return posts with `status = published`. Draft, scheduled, and review posts are never exposed to unauthenticated callers — they appear as 404.
+
+- `GET /posts` — paginated list of published posts
+- `GET /posts/:id` — single published post by database ID
+- `GET /posts/slug/:slug` — single published post by slug (via `FindPostBySlugProvider`)
+
+The status filter is applied in `FindAllPostsProvider` (via the `where` param on `paginateQuery`) and `FindOnePostProvider.findOnePublishedByIdOrFail`. The internal `findOneByIdOrFail` method (used by update/delete/image-upload providers) is unchanged and returns any status — authenticated operations need to see drafts.
+
+### Serialization
+
+`ClassSerializerInterceptor` is global. Entity fields control their own visibility via class-transformer decorators.
+
+**`User` entity field visibility:**
+
+| Field | Decorator | Visible to |
+|---|---|---|
+| `password`, `googleId` | `@Exclude()` | nobody |
+| `email`, `role` | `@Expose({ groups: ['admin'] })` | only when 'admin' group is active |
+| `id`, `firstName`, `lastName`, `avatarUrl` | none | everyone |
+
+`UsersController` is decorated with `@SerializeOptions({ groups: ['admin'] })`, so all its responses include `email` and `role`. `PostsController` has no `@SerializeOptions`, so the author object embedded in post responses only contains the public fields.
+
+If a new controller or endpoint needs to expose admin-only fields, add `@SerializeOptions({ groups: ['admin'] })` to it.
+
 ### Pagination
 
-`common/pagination` exports a request-scoped `PaginationProvider` (injects `REQUEST` to build absolute `first/last/current/next/prev` links). Domain services call `paginationProvider.paginateQuery(paginationQueryDto, repository)` rather than reimplementing pagination per module.
+`common/pagination` exports a request-scoped `PaginationProvider` (injects `REQUEST` to build absolute `first/last/current/next/prev` links). Domain services call `paginationProvider.paginateQuery(paginationQueryDto, repository, where?)` rather than reimplementing pagination per module. The optional `where` parameter filters both the result set and the total count used for page calculations.
+
+### Mail
+
+`src/mail` is a dedicated module for transactional email. It uses raw `nodemailer` (SMTP) + EJS templates. `MailModule` is not global — import it explicitly in any feature module that needs to send email.
+
+**Structure:**
+- `mail.config.ts` — `registerAs('mail', ...)` namespace; reads `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` from env.
+- `providers/nodemailer.provider.ts` — custom DI token `NODEMAILER_TRANSPORTER`; creates the nodemailer transporter once via `useFactory`.
+- `providers/send-mail.provider.ts` — core send logic: renders an EJS template then calls `transporter.sendMail()`. Template path resolves to `dist/mail/templates/<name>.ejs` at runtime.
+- `providers/send-welcome-mail.provider.ts` — dedicated provider for the welcome email; calls `SendMailProvider` with `template: 'welcome'`.
+- `mail.service.ts` — thin facade; currently exposes `sendMail(options)` and `sendWelcomeMail({ email, firstName })`.
+- `templates/` — EJS files; one per email type (e.g. `welcome.ejs`). Variables are injected via the `context` field of `MailOptions`.
+
+**Adding a new email type:**
+1. Add a `<name>.ejs` file in `src/mail/templates/`.
+2. Create `src/mail/providers/send-<name>-mail.provider.ts` — inject `SendMailProvider`, call `.send()` with the right template and context.
+3. Register the new provider in `mail.module.ts` `providers: [...]`.
+4. Add a `send<Name>Mail()` method to `MailService` that delegates to the new provider.
+
+**Templates and build:** `nest-cli.json` is configured with `assets: [{ include: "mail/templates/**/*.ejs", watchAssets: true }]` so EJS files are copied to `dist/` on build and watched in dev mode. If you add a new template subdirectory, update the glob in `nest-cli.json`.
+
+**Dev testing:** Use [Mailtrap](https://mailtrap.io) sandbox — set `MAIL_HOST=sandbox.smtp.mailtrap.io`, `MAIL_PORT=2525`, `MAIL_SECURE=false` and your Mailtrap credentials in `.env.development`. Sent emails appear in the Mailtrap inbox without reaching real recipients.
+
+**Current wiring:** `UsersModule` imports `MailModule`. `CreateUserProvider` calls `mailService.sendWelcomeMail()` after saving a new user.
 
 ### Uploads
 

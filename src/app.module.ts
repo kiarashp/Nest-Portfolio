@@ -15,6 +15,7 @@ import cloudinaryConfig from './config/cloudinary.config'
 import environmentValidation from './config/environment.validation'
 import jwtConfig from './auth/config/jwt.config'
 import { UploadsModule } from './uploads/uploads.module'
+import { MailModule } from './mail/mail.module'
 import { JwtModule } from '@nestjs/jwt'
 import { AccessTokenGuard } from './auth/guards/access-token/access-token.guard'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
@@ -54,6 +55,7 @@ const ENV = process.env.NODE_ENV
     MetaOptionsModule,
     PaginationModule,
     UploadsModule,
+    MailModule,
     ConfigModule.forFeature(jwtConfig),
     JwtModule.registerAsync(jwtConfig.asProvider()),
   ],

@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { User } from '../entities/user.entity'
 import { HashingProvider } from 'src/auth/providers/hashing.provider'
 import { UserRole } from 'src/auth/enums/user-role.enum'
+import { MailService } from 'src/mail/mail.service'
 
 @Injectable()
 export class CreateUserProvider {
@@ -26,6 +27,8 @@ export class CreateUserProvider {
      */
     @Inject(forwardRef(() => HashingProvider))
     private readonly hashingProvider: HashingProvider,
+
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -69,6 +72,11 @@ export class CreateUserProvider {
         },
       )
     }
+    await this.mailService.sendWelcomeMail({
+      email: newUser.email,
+      firstName: newUser.firstName,
+    })
+
     return newUser
   }
 }

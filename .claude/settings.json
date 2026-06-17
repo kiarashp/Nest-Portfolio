@@ -1,11 +1,17 @@
 {
   "permissions": {
+    "allow": [
+      "Read(./.env.example)"
+    ],
     "deny": [
       "Read(./.env)",
-      "Read(./.env.*)",
+      "Read(./.env.development)",
+      "Read(./.env.production)",
+      "Read(./.env.staging)",
+      "Read(./.env.test)",
       "Read(*.pem)",
       "Read(*.key)",
       "Read(~/.ssh/**)"
     ]
   }
-} 
+}

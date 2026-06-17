@@ -17,6 +17,7 @@ import { FindOneByIdProvider } from './providers/find-one-by-id.provider'
 import { UploadAvatarProvider } from './providers/upload-avatar.provider'
 import { ChangeUserRoleProvider } from './providers/change-user-role.provider'
 import { UploadsModule } from 'src/uploads/uploads.module'
+import { MailModule } from 'src/mail/mail.module'
 
 @Module({
   controllers: [UsersController],
@@ -39,6 +40,7 @@ import { UploadsModule } from 'src/uploads/uploads.module'
     ConfigModule.forFeature(jwtConfig),
     JwtModule.registerAsync(jwtConfig.asProvider()),
     UploadsModule,
+    MailModule,
   ],
 })
 export class UsersModule {}
