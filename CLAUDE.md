@@ -21,7 +21,7 @@ pnpm run format             # prettier --write on src/test
 pnpm run test                # jest unit tests (*.spec.ts colocated with source)
 pnpm run test:watch
 pnpm run test:cov
-pnpm run test:e2e            # jest using test/jest-e2e.json (test/**/*.e2e-spec.ts)
+pnpm run test:e2e            # jest using test/jest-e2e.json (test/**/*.e2e-spec.ts) — sets NODE_ENV=test automatically, requires .env.test pointing at a separate DB (DB_NAME=nest_portfolio_test)
 pnpm run test:debug          # node --inspect-brk for debugging a jest run
 
 pnpm run doc                 # compodoc, served on port 3001, output to ./documentation
@@ -85,6 +85,20 @@ Entity relations:
 - Google OAuth: `auth/social/google-authentication.controller.ts` + `social/providers/google-authentication.service.ts` verify Google ID tokens, then create/find a local user. Both local and Google users are always created with `role: UserRole.USER` — roles must be elevated explicitly by an admin.
 - `AuthModule` uses `forwardRef(() => UsersModule)` because of a circular dependency — keep that in mind if you touch either module's imports/exports. See `src/auth/CLAUDE.md` for details.
 - RBAC: four roles (`USER`, `EDITOR`, `AUTHOR`, `ADMIN`) defined in `src/auth/enums/user-role.enum.ts`. See `src/auth/CLAUDE.md` for the full access control rules.
+
+### Users routes
+
+| Route | Auth | Notes |
+|---|---|---|
+| `POST /users` | None (public) | Registration — triggers email verification flow |
+| `GET /users` | ADMIN | Paginated list |
+| `GET /users/me` | Bearer (any role) | Returns the caller's own profile |
+| `GET /users/:id` | ADMIN | Lookup any user by ID — **not** accessible to regular users; use `/me` for self |
+| `PATCH /users/avatar` | Bearer (any role) | Uploads and replaces the caller's avatar |
+| `PATCH /users/:id/role` | ADMIN | Elevate or downgrade a user's role |
+| `DELETE /users/:id` | ADMIN | Remove a user |
+
+`GET /users/me` must be declared before `GET /users/:id` in the controller so NestJS routes the literal segment `me` before trying to parse it as an integer ID via `ParseIntPipe`.
 
 ### Posts — public routes and draft visibility
 
