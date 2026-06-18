@@ -1,16 +1,12 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common'
-import { Test, TestingModule } from '@nestjs/testing'
-import * as bcrypt from 'bcrypt'
+import { INestApplication } from '@nestjs/common'
+import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { App } from 'supertest/types'
 import { DataSource } from 'typeorm'
 import { AppModule } from '../../src/app.module'
-import { User } from '../../src/users/entities/user.entity'
-
-interface ApiResponse<T> {
-  apiVersion: string
-  data: T
-}
+import { ApiResponse } from '../helpers/auth.helper'
+import { createApp } from '../helpers/create-app.helper'
+import { cleanupUsers, seedUser } from '../helpers/seed.helper'
 
 interface TokensResponse {
   accessToken: string
@@ -27,46 +23,30 @@ describe('POST /auth/refresh-tokens (e2e)', () => {
   const TEST_PASSWORD = 'Password123!'
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     }).compile()
 
-    app = moduleFixture.createNestApplication()
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-        transformOptions: { enableImplicitConversion: true },
-      }),
-    )
-    await app.init()
+    ;({ app, dataSource } = await createApp(moduleFixture))
 
-    dataSource = app.get(DataSource)
-
-    // Seed a verified user directly to bypass the mail service.
-    const userRepo = dataSource.getRepository(User)
-    await userRepo.save({
-      firstName: 'Refresh',
+    await seedUser(dataSource, {
       email: TEST_EMAIL,
-      password: await bcrypt.hash(TEST_PASSWORD, 10),
-      isEmailVerified: true,
+      password: TEST_PASSWORD,
+      firstName: 'Refresh',
     })
 
     // Sign in via HTTP to obtain a real refresh token issued by the app.
-    // This is intentional: we want the token the actual JwtService produces,
-    // not one we manufactured manually.
+    // We want the token the actual JwtService produces, not one we manufactured.
     const res = await request(app.getHttpServer())
       .post('/auth/sign-in')
       .send({ email: TEST_EMAIL, password: TEST_PASSWORD })
 
-    const body = res.body as ApiResponse<TokensResponse>
-    validRefreshToken = body.data.refreshToken
+    validRefreshToken = (res.body as ApiResponse<TokensResponse>).data
+      .refreshToken
   })
 
   afterAll(async () => {
-    const userRepo = dataSource.getRepository(User)
-    await userRepo.delete({ email: TEST_EMAIL })
+    await cleanupUsers(dataSource, [TEST_EMAIL])
     await app.close()
   })
 

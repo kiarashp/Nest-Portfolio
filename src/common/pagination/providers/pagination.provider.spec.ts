@@ -35,7 +35,10 @@ describe('PaginationProvider', () => {
     mockRepo.find.mockResolvedValue([])
     mockRepo.count.mockResolvedValue(0)
 
-    await provider.paginateQuery({ limit: 10, page: 3 }, mockRepo as unknown as AnyRepo)
+    await provider.paginateQuery(
+      { limit: 10, page: 3 },
+      mockRepo as unknown as AnyRepo,
+    )
 
     expect(mockRepo.find).toHaveBeenCalledWith(
       expect.objectContaining({ take: 10, skip: 20 }),
@@ -122,7 +125,7 @@ describe('PaginationProvider', () => {
     await provider.paginateQuery(
       { limit: 5, page: 1 },
       mockRepo as unknown as AnyRepo,
-      where as unknown as AnyWhere,
+      where,
     )
 
     expect(mockRepo.find).toHaveBeenCalledWith(

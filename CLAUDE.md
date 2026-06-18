@@ -32,7 +32,11 @@ pnpm run seed:admin          # create or promote the first admin user (reads NOD
 Run a single unit test file: `pnpm jest path/to/file.spec.ts` (or `pnpm exec jest -t "test name"`).
 Run a single e2e test file: `pnpm jest --config ./test/jest-e2e.json path/to/file.e2e-spec.ts`.
 
+See `test/CLAUDE.md` for the e2e helper infrastructure and spec-writing conventions.
+
 Swagger/OpenAPI docs are served at `/api` once the app is running (see `main.ts`).
+
+`src/app.create.ts` (beside `main.ts`) contains all post-creation setup: global pipes, Swagger, CORS, and `app.listen()`. `main.ts` just calls `NestFactory.create(AppModule)` then delegates to `appCreate(app)`. Change global middleware or port config there, not in `main.ts`.
 
 ## Environment configuration
 
@@ -76,7 +80,7 @@ Entity relations:
 3. **`RolesGuard`** (`APP_GUARD`, second) reads `UserRole[]` metadata set by `@Roles(...)` (`src/auth/decorators/roles.decorator.ts`). If no `@Roles()` is set, the guard passes. If roles are required but no user is on the request, access is denied. See `src/auth/CLAUDE.md` for full RBAC details.
 4. **`DataResponseInterceptor`** (`APP_INTERCEPTOR`, registered first) wraps every response as `{ apiVersion, data }`. Controllers return plain data — do not wrap manually.
 5. **`ClassSerializerInterceptor`** (`APP_INTERCEPTOR`, registered second) runs on the raw controller output before `DataResponseInterceptor` wraps it. This activates `@Exclude()` and `@Expose()` decorators on entities globally. See the Serialization section below for the groups pattern used on `User`.
-6. A global `ValidationPipe` (`main.ts`) runs with `whitelist: true, forbidNonWhitelisted: true, transform: true` — extra fields in request bodies are stripped, undeclared fields rejected.
+6. A global `ValidationPipe` (`src/app.create.ts`) runs with `whitelist: true, forbidNonWhitelisted: true, transform: true` — extra fields in request bodies are stripped, undeclared fields rejected.
 
 ### Auth
 

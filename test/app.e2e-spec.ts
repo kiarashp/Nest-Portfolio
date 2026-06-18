@@ -1,30 +1,19 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common'
-import { Test, TestingModule } from '@nestjs/testing'
+import { INestApplication } from '@nestjs/common'
+import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { App } from 'supertest/types'
 import { AppModule } from '../src/app.module'
+import { createApp } from './helpers/create-app.helper'
 
 describe('App (e2e)', () => {
   let app: INestApplication<App>
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     }).compile()
 
-    app = moduleFixture.createNestApplication()
-
-    // Mirror main.ts — must be applied manually in tests.
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-        transformOptions: { enableImplicitConversion: true },
-      }),
-    )
-
-    await app.init()
+    ;({ app } = await createApp(moduleFixture))
   })
 
   afterAll(async () => {

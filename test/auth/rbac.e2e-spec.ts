@@ -1,91 +1,58 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common'
-import { Test, TestingModule } from '@nestjs/testing'
-import * as bcrypt from 'bcrypt'
+import { INestApplication } from '@nestjs/common'
+import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { App } from 'supertest/types'
 import { DataSource } from 'typeorm'
 import { UserRole } from '../../src/auth/enums/user-role.enum'
 import { AppModule } from '../../src/app.module'
-import { User } from '../../src/users/entities/user.entity'
-
-interface ApiResponse<T> {
-  apiVersion: string
-  data: T
-}
-
-interface TokensResponse {
-  accessToken: string
-  refreshToken: string
-}
+import { getAuthToken } from '../helpers/auth.helper'
+import { createApp } from '../helpers/create-app.helper'
+import { cleanupUsers, seedUser } from '../helpers/seed.helper'
 
 describe('RBAC (e2e)', () => {
   let app: INestApplication<App>
   let dataSource: DataSource
 
-  // Tokens obtained by signing in as each role.
   let userToken: string
   let adminToken: string
-  // ID of the regular user — used to verify ADMIN can fetch any profile by ID.
+  // ID of the regular user — needed to verify ADMIN can fetch any profile by ID.
   let userId: number
 
   const PASSWORD = 'Password123!'
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     }).compile()
 
-    app = moduleFixture.createNestApplication()
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-        transformOptions: { enableImplicitConversion: true },
-      }),
-    )
-    await app.init()
+    ;({ app, dataSource } = await createApp(moduleFixture))
 
-    dataSource = app.get(DataSource)
-    const userRepo = dataSource.getRepository(User)
-    const hash = await bcrypt.hash(PASSWORD, 10)
-
-    // Seed a regular USER. TypeORM returns the saved row with the generated id.
-    const savedUser = await userRepo.save({
-      firstName: 'Regular',
+    // Seed a regular USER and an ADMIN directly — bypasses the chicken-and-egg
+    // problem of needing an existing admin to elevate roles via the API.
+    const savedUser = await seedUser(dataSource, {
       email: 'rbac-user@example.com',
-      password: hash,
-      isEmailVerified: true,
+      password: PASSWORD,
+      firstName: 'Regular',
       role: UserRole.USER,
     })
     userId = savedUser.id
 
-    // Seed an ADMIN directly — elevating via the API would require an existing
-    // admin, so we bypass that chicken-and-egg problem with a direct DB insert.
-    await userRepo.save({
-      firstName: 'Admin',
+    await seedUser(dataSource, {
       email: 'rbac-admin@example.com',
-      password: hash,
-      isEmailVerified: true,
+      password: PASSWORD,
+      firstName: 'Admin',
       role: UserRole.ADMIN,
     })
 
-    // Sign in as both roles to obtain real access tokens.
-    const signIn = async (email: string) => {
-      const res = await request(app.getHttpServer())
-        .post('/auth/sign-in')
-        .send({ email, password: PASSWORD })
-      return (res.body as ApiResponse<TokensResponse>).data.accessToken
-    }
-
-    userToken = await signIn('rbac-user@example.com')
-    adminToken = await signIn('rbac-admin@example.com')
+    userToken = await getAuthToken(app, 'rbac-user@example.com', PASSWORD)
+    adminToken = await getAuthToken(app, 'rbac-admin@example.com', PASSWORD)
   })
 
   afterAll(async () => {
-    const userRepo = dataSource.getRepository(User)
-    await userRepo.delete({ email: 'rbac-user@example.com' })
-    await userRepo.delete({ email: 'rbac-admin@example.com' })
+    await cleanupUsers(dataSource, [
+      'rbac-user@example.com',
+      'rbac-admin@example.com',
+    ])
     await app.close()
   })
 
@@ -118,7 +85,6 @@ describe('RBAC (e2e)', () => {
 
   it('returns 200 for GET /users/me', async () => {
     // Any authenticated user can fetch their own profile via /me.
-    // Also proves the access token is accepted by AccessTokenGuard.
     await request(app.getHttpServer())
       .get('/users/me')
       .set('Authorization', `Bearer ${userToken}`)

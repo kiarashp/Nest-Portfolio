@@ -42,7 +42,7 @@ export class TagsController {
   @Roles(UserRole.AUTHOR, UserRole.ADMIN)
   @Delete('soft/:id')
   public async softDeleteTag(@Param('id', ParseIntPipe) id: number) {
-    return await this.tagsService.delete(id)
+    return await this.tagsService.softDelete(id)
   }
 
   /**
@@ -51,6 +51,6 @@ export class TagsController {
   @Roles(UserRole.AUTHOR, UserRole.ADMIN)
   @Delete(':id')
   public async deleteTag(@Param('id', ParseIntPipe) id: number) {
-    return await this.tagsService.softDelete(id)
+    return await this.tagsService.delete(id)
   }
 }

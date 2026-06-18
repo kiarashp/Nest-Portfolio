@@ -48,7 +48,12 @@ export class CreatePostProvider {
     } catch (error) {
       throw new ConflictException(error)
     }
-    if (createPostDto.tags?.length !== tags?.length)
+    // How many tag IDs the caller sent (0 when the field is absent).
+    const requestedCount = createPostDto.tags?.length ?? 0
+    // How many of those IDs actually exist in the DB.
+    const foundCount = tags?.length ?? 0
+    // If the numbers differ, at least one ID was invalid — reject early.
+    if (requestedCount !== foundCount)
       throw new BadRequestException('please check the tags ID and try again')
 
     //create post
