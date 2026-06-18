@@ -36,6 +36,7 @@ import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 import { ChangeUserRoleDto } from './dtos/change-user-role.dto'
+import type { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 
 @Controller('users')
 @ApiTags('Users')
@@ -79,8 +80,18 @@ export class UsersController {
   }
 
   /**
-   * Get a single user by id
+   * Get the currently authenticated user's own profile.
+   * Must be defined before :id to prevent 'me' being parsed as an integer.
    */
+  @Get('me')
+  public getMe(@ActiveUser() activeUser: ActiveUserData) {
+    return this.usersService.findOneById(activeUser.sub)
+  }
+
+  /**
+   * Get a single user by id — admin only
+   */
+  @Roles(UserRole.ADMIN)
   @Get(':id')
   public getUser(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.findOneById(id)
