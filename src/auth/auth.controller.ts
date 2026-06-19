@@ -20,6 +20,8 @@ import { AuthType } from './enums/auth-type.enum'
 import { RefreshTokenDto } from './dtos/refresh-token.dto'
 import { VerifyEmailDto } from './dtos/verify-email.dto'
 import { ResendVerificationDto } from './dtos/resend-verification.dto'
+import { ForgotPasswordDto } from './dtos/forgot-password.dto'
+import { ResetPasswordDto } from './dtos/reset-password.dto'
 import jwtConfig from './config/jwt.config'
 
 @Controller('auth')
@@ -110,5 +112,19 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   public async resendVerification(@Body() dto: ResendVerificationDto) {
     return this.authService.resendVerificationEmail(dto.email)
+  }
+
+  @Auth(AuthType.None)
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  public async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email)
+  }
+
+  @Auth(AuthType.None)
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  public async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.newPassword)
   }
 }

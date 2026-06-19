@@ -7,6 +7,9 @@
 # generated OpenAPI schema + types (regenerate with: pnpm run generate:types)
 openapi.json
 openapi-types.ts
+openapi-types.js
+openapi-types.js.map
+openapi-types.d.ts
 
 # Logs
 logs

@@ -29,6 +29,8 @@ import { PatchUserDto } from '../dtos/patch-user.dto'
 import { PatchUserProfileProvider } from './patch-user-profile.provider'
 import { PatchUserProfileDto } from '../dtos/patch-user-profile.dto'
 import { SyncGoogleUserProvider } from './sync-google-user.provider'
+import { ForgotPasswordProvider } from './forgot-password.provider'
+import { ResetPasswordProvider } from './reset-password.provider'
 
 @Injectable()
 export class UsersService {
@@ -103,6 +105,16 @@ export class UsersService {
      * Inject sync google user provider — keeps the stored profile in sync with Google on each login
      */
     private readonly syncGoogleUserProvider: SyncGoogleUserProvider,
+
+    /**
+     * Inject forgot password provider
+     */
+    private readonly forgotPasswordProvider: ForgotPasswordProvider,
+
+    /**
+     * Inject reset password provider
+     */
+    private readonly resetPasswordProviderInstance: ResetPasswordProvider,
   ) {}
   /**
    * Find all users
@@ -201,5 +213,23 @@ export class UsersService {
     googleFields: { email: string; firstName: string; lastName: string },
   ) {
     return this.syncGoogleUserProvider.sync(user, googleFields)
+  }
+
+  /**
+   * Start the password reset flow. Always returns the same message
+   * whether the email is registered or not.
+   */
+  public async forgotPassword(email: string): Promise<{ message: string }> {
+    return this.forgotPasswordProvider.forgotPassword(email)
+  }
+
+  /**
+   * Set a new password using the token from the reset email.
+   */
+  public async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    return this.resetPasswordProviderInstance.resetPassword(token, newPassword)
   }
 }

@@ -21,6 +21,8 @@ import { ResendVerificationProvider } from './providers/resend-verification.prov
 import { PatchUserProvider } from './providers/patch-user.provider'
 import { PatchUserProfileProvider } from './providers/patch-user-profile.provider'
 import { SyncGoogleUserProvider } from './providers/sync-google-user.provider'
+import { ForgotPasswordProvider } from './providers/forgot-password.provider'
+import { ResetPasswordProvider } from './providers/reset-password.provider'
 import { UploadsModule } from 'src/uploads/uploads.module'
 import { MailModule } from 'src/mail/mail.module'
 
@@ -42,6 +44,8 @@ import { MailModule } from 'src/mail/mail.module'
     PatchUserProvider,
     PatchUserProfileProvider,
     SyncGoogleUserProvider,
+    ForgotPasswordProvider,
+    ResetPasswordProvider,
   ],
   exports: [UsersService],
   imports: [

@@ -73,6 +73,12 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true, default: null })
   @Exclude()
   emailVerificationTokenExpiry?: Date | null
+  @Column({ type: 'varchar', length: 128, nullable: true, default: null })
+  @Exclude()
+  passwordResetToken?: string | null
+  @Column({ type: 'timestamptz', nullable: true, default: null })
+  @Exclude()
+  passwordResetTokenExpiry?: Date | null
   // posts
   @OneToMany(() => Post, (post) => post.author)
   post!: Post[]

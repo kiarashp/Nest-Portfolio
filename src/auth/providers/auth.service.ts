@@ -46,4 +46,18 @@ export class AuthService {
   public async resendVerificationEmail(email: string) {
     return this.usersService.resendVerificationEmail(email)
   }
+
+  /**
+   * Start the password reset flow for the given email address.
+   */
+  public async forgotPassword(email: string) {
+    return this.usersService.forgotPassword(email)
+  }
+
+  /**
+   * Set a new password using the token from the reset email.
+   */
+  public async resetPassword(token: string, newPassword: string) {
+    return this.usersService.resetPassword(token, newPassword)
+  }
 }
