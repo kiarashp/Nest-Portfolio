@@ -44,6 +44,26 @@ const user = (res.body as ApiResponse<User>).data
 
 Always cast `res.body as ApiResponse<T>` **before** accessing `.data` — not after — to satisfy `@typescript-eslint/no-unsafe-member-access`.
 
+## TypeORM repository calls in tests
+
+TypeORM's `findOneBy()` / `findOne()` return types go through complex internal conditional types that ESLint's `no-unsafe-assignment` cannot resolve, so assigning the result directly triggers **"Unsafe assignment of an error typed value"**. Always add an explicit type annotation:
+
+```ts
+// ✗ triggers no-unsafe-assignment
+const user = await userRepo.findOneBy({ id: userId })
+
+// ✓ explicit annotation silences the error
+const user: User | null = await userRepo.findOneBy({ id: userId })
+```
+
+Same applies to anything chained off the result (e.g. accessing a nullable column):
+
+```ts
+const token: string = user!.passwordResetToken!
+```
+
+When calling `userRepo.update()` or `userRepo.save()` without capturing the return value, no annotation is needed — the error only fires on assignment.
+
 ## Spec file pattern
 
 ```ts
