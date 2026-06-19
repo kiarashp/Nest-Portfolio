@@ -111,6 +111,12 @@ Keep everything about one resource in one file (one `beforeAll`, shared seed IDs
 
 Do not split just because a file is long — each separate file boots the NestJS app independently (~5–10 s), so unnecessary splits slow the suite significantly.
 
+## User response fields
+
+`email`, `role`, and `isEmailVerified` are `@Expose({ groups: ['admin'] })` on the `User` entity, so they only appear when the `admin` serialization group is active. `UsersController` activates this group class-wide, so all routes under `/users` (including `/users/me`) return these fields. `PostsController` does not activate any group, so embedded author objects on post responses only contain `id`, `firstName`, `lastName`, and `avatarUrl`.
+
+When writing assertions against user data returned from post routes, do not assert on `email`, `role`, or `isEmailVerified` — they will not be present.
+
 ## Paginated response shape
 
 Routes that return paginated lists (`GET /posts`, `GET /users`) wrap their payload in a `Paginated<T>` object:

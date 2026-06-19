@@ -45,7 +45,9 @@ Run a single e2e test file: `pnpm jest --config ./test/jest-e2e.json path/to/fil
 
 **Solo-dev deploy workflow:**
 ```bash
-# 1. Change an entity, then generate a migration (diffs entities vs dev DB)
+# 1. Change an entity, then generate a migration (diffs entities vs dev DB).
+#    Replace DescribeChange with a short name for what changed.
+#    There is no migrate:generate script — the name must be passed directly.
 pnpm run typeorm migration:generate src/database/migrations/DescribeChange -d src/database/data-source.ts
 
 # 2. Review the generated file in src/database/migrations/
@@ -145,11 +147,13 @@ Entity relations:
 | `GET /users` | ADMIN | Paginated list |
 | `GET /users/me` | Bearer (any role) | Returns the caller's own profile |
 | `GET /users/:id` | ADMIN | Lookup any user by ID — **not** accessible to regular users; use `/me` for self |
+| `PATCH /users/me` | Bearer (any role) | Updates the caller's own `firstName` and `lastName` only (`PatchUserProfileDto`) |
 | `PATCH /users/avatar` | Bearer (any role) | Uploads and replaces the caller's avatar |
 | `PATCH /users/:id/role` | ADMIN | Elevate or downgrade a user's role |
+| `PATCH /users/:id` | ADMIN | Full update — can change `firstName`, `lastName`, `email` (uniqueness checked), `password` (hashed) |
 | `DELETE /users/:id` | ADMIN | Remove a user |
 
-`GET /users/me` must be declared before `GET /users/:id` in the controller so NestJS routes the literal segment `me` before trying to parse it as an integer ID via `ParseIntPipe`.
+`GET /users/me` and `PATCH /users/me` must each be declared before their `/:id` counterparts in the controller so NestJS routes the literal segment `me` before trying to parse it as an integer ID via `ParseIntPipe`.
 
 ### Posts — public routes and draft visibility
 
@@ -169,11 +173,11 @@ The status filter is applied in `FindAllPostsProvider` (via the `where` param on
 
 | Field | Decorator | Visible to |
 |---|---|---|
-| `password`, `googleId` | `@Exclude()` | nobody |
-| `email`, `role` | `@Expose({ groups: ['admin'] })` | only when 'admin' group is active |
+| `password`, `googleId`, `emailVerificationToken`, `emailVerificationTokenExpiry` | `@Exclude()` | nobody |
+| `email`, `role`, `isEmailVerified` | `@Expose({ groups: ['admin'] })` | only when 'admin' group is active |
 | `id`, `firstName`, `lastName`, `avatarUrl` | none | everyone |
 
-`UsersController` is decorated with `@SerializeOptions({ groups: ['admin'] })`, so all its responses include `email` and `role`. `PostsController` has no `@SerializeOptions`, so the author object embedded in post responses only contains the public fields.
+`UsersController` is decorated with `@SerializeOptions({ groups: ['admin'] })`, so all its responses include `email`, `role`, and `isEmailVerified`. `PostsController` has no `@SerializeOptions`, so the author object embedded in post responses only contains the public fields (`id`, `firstName`, `lastName`, `avatarUrl`).
 
 If a new controller or endpoint needs to expose admin-only fields, add `@SerializeOptions({ groups: ['admin'] })` to it.
 

@@ -74,6 +74,8 @@ async function seed() {
       email,
       password: hashedPassword,
       role: UserRole.ADMIN,
+      // Column default is false — set explicitly so the admin can sign in immediately.
+      isEmailVerified: true,
     })
 
     await userRepository.save(admin)
