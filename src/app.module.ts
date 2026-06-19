@@ -23,11 +23,13 @@ import { ClassSerializerInterceptor } from '@nestjs/common'
 import { AuthenticationGuard } from './auth/guards/authentication/authentication.guard'
 import { RolesGuard } from './auth/guards/authorization/roles.guard'
 import { DataResponseInterceptor } from './common/interceptors/data-response/data-response.interceptor'
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 
 const ENV = process.env.NODE_ENV
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
     UsersModule,
     PostsModule,
     AuthModule,
@@ -62,6 +64,11 @@ const ENV = process.env.NODE_ENV
   controllers: [AppController],
   providers: [
     AppService,
+    // ThrottlerGuard runs first — rate-limits before auth guard touches the DB
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: AuthenticationGuard,

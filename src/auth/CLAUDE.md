@@ -4,13 +4,13 @@ Guidance specific to this module. See the root `CLAUDE.md` for the global reques
 
 ## Guard/AuthType extension point
 
-`AuthenticationGuard` (`authentication.guard.ts`) is the **first** `APP_GUARD`. It builds an `authTypeGuardMap: Record<AuthType, CanActivate>` (currently `{ [AuthType.Bearer]: AccessTokenGuard, [AuthType.None]: AlwaysAllowGuard }`) and tries the guards for the route's `AuthType[]` (from `@Auth()` metadata, default `[AuthType.Bearer]`) in order, throwing the last `HttpException` if all fail.
+`AuthenticationGuard` (`authentication.guard.ts`) is the **second** `APP_GUARD` (after `ThrottlerGuard`). It builds an `authTypeGuardMap: Record<AuthType, CanActivate>` (currently `{ [AuthType.Bearer]: AccessTokenGuard, [AuthType.None]: AlwaysAllowGuard }`) and tries the guards for the route's `AuthType[]` (from `@Auth()` metadata, default `[AuthType.Bearer]`) in order, throwing the last `HttpException` if all fail.
 
 To add a new auth strategy (e.g. an API-key guard): add the enum member to `enums/auth-type.enum.ts`, implement a `CanActivate`, and register it in `authTypeGuardMap`. Don't bypass the guard map by checking auth ad hoc in a controller.
 
 ## RBAC — roles and authorization
 
-Authorization runs as a **second** `APP_GUARD` (`RolesGuard`, `guards/authorization/roles.guard.ts`), after `AuthenticationGuard`. The two guards are independent: authentication proves who you are, authorization decides what you can do.
+Authorization runs as a **third** `APP_GUARD` (`RolesGuard`, `guards/authorization/roles.guard.ts`), after `ThrottlerGuard` and `AuthenticationGuard`. The two guards are independent: authentication proves who you are, authorization decides what you can do.
 
 ### Roles
 

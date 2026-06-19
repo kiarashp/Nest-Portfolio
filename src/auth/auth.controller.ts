@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common'
 import type { ConfigType } from '@nestjs/config'
 import type { Request, Response } from 'express'
+import { Throttle } from '@nestjs/throttler'
 import { AuthService } from './providers/auth.service'
 import { SignInDto } from './dtos/signin.dto'
 import { Auth } from './decorators/auth.decorator'
@@ -48,6 +49,7 @@ export class AuthController {
   @Auth(AuthType.None)
   @Post('sign-in')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   public async signIn(
     @Body() signInDto: SignInDto,
     @Res({ passthrough: true }) res: Response,
@@ -110,6 +112,7 @@ export class AuthController {
   @Auth(AuthType.None)
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 300_000 } })
   public async resendVerification(@Body() dto: ResendVerificationDto) {
     return this.authService.resendVerificationEmail(dto.email)
   }
@@ -117,6 +120,7 @@ export class AuthController {
   @Auth(AuthType.None)
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 300_000 } })
   public async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email)
   }
@@ -124,6 +128,7 @@ export class AuthController {
   @Auth(AuthType.None)
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   public async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword)
   }

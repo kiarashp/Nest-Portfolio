@@ -16,6 +16,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 import { CreateUserDto } from './dtos/create-user.dtos'
@@ -67,6 +68,7 @@ export class UsersController {
    */
   @Auth(AuthType.None)
   @Post()
+  @Throttle({ default: { limit: 5, ttl: 600_000 } })
   public createUser(@Body() createUserDto: CreateUserDto) {
     return this.usersService.craeteUser(createUserDto)
   }
