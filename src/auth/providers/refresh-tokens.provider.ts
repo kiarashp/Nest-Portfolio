@@ -4,7 +4,6 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common'
-import { RefreshTokenDto } from '../dtos/refresh-token.dto'
 import { JwtService } from '@nestjs/jwt'
 import jwtConfig from '../config/jwt.config'
 import type { ConfigType } from '@nestjs/config'
@@ -37,12 +36,17 @@ export class RefreshTokensProvider {
     private readonly usersService: UsersService,
   ) {}
 
-  public async refreshTokens(refreshTokenDto: RefreshTokenDto) {
+  // Takes a plain { refreshToken: string } instead of RefreshTokenDto because
+  // the DTO's refreshToken field is optional (to let the ValidationPipe pass
+  // browser requests that carry the token in an HttpOnly cookie rather than the
+  // body). By the time the controller calls this method it has already resolved
+  // the token from whichever source was present and guaranteed it is a string.
+  public async refreshTokens({ refreshToken }: { refreshToken: string }) {
     let payload: RefreshTokenPayload
     // verify the refresh token using jwt service
     try {
       payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
-        refreshTokenDto.refreshToken,
+        refreshToken,
         {
           secret: this.jwtConfiguration.secret,
           audience: this.jwtConfiguration.audience,

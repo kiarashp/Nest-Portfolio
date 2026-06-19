@@ -53,7 +53,11 @@ createPost(...) {}
 
 `GenerateTokensProvider.generateTokens(user)` signs access + refresh JWTs **in parallel** via `Promise.all`. The access token payload includes `{ sub, email, role }`; the refresh token carries only `sub`. Both tokens come from `jwtConfig` (`auth/config/jwt.config.ts`), whose `registerAs` namespace key is `'jwt'` (not `'jwtConfig'` — note the inconsistency with `cloudinaryConfig`/`appConfig`). Errors during signing are wrapped as `InternalServerErrorException`.
 
-`RefreshTokensProvider.refreshTokens` throws `UnauthorizedException('Invalid refresh token')` on a bad/expired refresh JWT, re-derives the user via `usersService.findOneById(payload.sub)`, and re-issues both tokens (rotation — no revocation list exists yet).
+**Dual delivery:** `AuthController.signIn` and `AuthController.refreshTokens` set the refresh token as an `HttpOnly` cookie (`refreshToken`, `Path=/auth/refresh-tokens`, `SameSite=lax`, `maxAge` from `jwtConfiguration.refreshTokenTtl`) **and** return it in the JSON body. Browser clients (Svelte) use the cookie automatically; mobile clients (Flutter) read the body. `POST /auth/sign-out` clears the cookie — mobile clients can call it too, the absent cookie is a no-op.
+
+**`POST /auth/refresh-tokens` token resolution:** the controller reads `req.cookies.refreshToken` first; falls back to `refreshTokenDto.refreshToken` from the body if no cookie. Throws `UnauthorizedException` if neither is present. `RefreshTokenDto.refreshToken` is `@IsOptional()` so the `ValidationPipe` does not reject browser requests with no body — presence is enforced by the controller, not the pipe.
+
+**`RefreshTokensProvider.refreshTokens`** takes `{ refreshToken: string }` (not `RefreshTokenDto`) because by the time the controller calls it the token is already a guaranteed string. It throws `UnauthorizedException('Invalid refresh token')` on a bad/expired JWT, re-derives the user via `usersService.findOneById(payload.sub)`, and re-issues both tokens (rotation — no revocation list exists yet).
 
 ## Circular dependency: Auth ↔ Users
 

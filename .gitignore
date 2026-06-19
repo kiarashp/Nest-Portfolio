@@ -4,6 +4,10 @@
 /build
 /documentation
 
+# generated OpenAPI schema + types (regenerate with: pnpm run generate:types)
+openapi.json
+openapi-types.ts
+
 # Logs
 logs
 *.log

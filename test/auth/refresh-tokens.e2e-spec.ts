@@ -67,18 +67,24 @@ describe('POST /auth/refresh-tokens (e2e)', () => {
   // ── Sad paths ────────────────────────────────────────────────────────────
 
   it('returns 401 for an invalid refresh token', async () => {
-    // A token we made up — signature verification will fail.
+    // A properly-formatted JWT (passes @IsJWT() DTO validation) but with a
+    // wrong signature — verification fails in the service, returning 401.
     await request(app.getHttpServer())
       .post('/auth/refresh-tokens')
-      .send({ refreshToken: 'this.is.not.a.real.jwt' })
+      .send({
+        refreshToken:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjF9.invalidsignatureXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+      })
       .expect(401)
   })
 
-  it('returns 400 when the refreshToken field is missing', async () => {
-    // ValidationPipe rejects the request before it reaches the provider.
+  it('returns 401 when the refreshToken field is missing', async () => {
+    // The DTO field is optional so the ValidationPipe passes the request through.
+    // The controller enforces that at least one token source (body or cookie) is
+    // present and throws UnauthorizedException when neither is provided.
     await request(app.getHttpServer())
       .post('/auth/refresh-tokens')
       .send({})
-      .expect(400)
+      .expect(401)
   })
 })

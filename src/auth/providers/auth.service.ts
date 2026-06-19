@@ -2,7 +2,6 @@ import { Injectable, Inject, forwardRef } from '@nestjs/common'
 import { UsersService } from 'src/users/providers/users.service'
 import { SignInDto } from '../dtos/signin.dto'
 import { SignInProvider } from './sign-in.provider'
-import { RefreshTokenDto } from '../dtos/refresh-token.dto'
 import { RefreshTokensProvider } from './refresh-tokens.provider'
 
 @Injectable()
@@ -31,10 +30,13 @@ export class AuthService {
   }
 
   /**
-   * check refresh token and generates new access and refresh tokens.
+   * Verifies the refresh token and issues a new token pair.
+   * Accepts { refreshToken: string } rather than RefreshTokenDto because the
+   * controller resolves the token from either the HttpOnly cookie or the request
+   * body before calling here, so it is always a guaranteed string at this point.
    */
-  public async refreshTokens(refreshTokenDto: RefreshTokenDto) {
-    return await this.refreshTokensProvider.refreshTokens(refreshTokenDto)
+  public async refreshTokens(dto: { refreshToken: string }) {
+    return await this.refreshTokensProvider.refreshTokens(dto)
   }
 
   public async verifyEmail(token: string) {

@@ -30,4 +30,5 @@ export default Joi.object({
   MAIL_PASSWORD: Joi.string().required(),
   MAIL_FROM: Joi.string().required(),
   APP_URL: Joi.string().uri().default('http://localhost:3000'),
+  FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
 })
