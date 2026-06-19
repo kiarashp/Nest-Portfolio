@@ -18,6 +18,7 @@ describe('Users (e2e)', () => {
   let userToken: string
   let regularUserId: number
   let userToDeleteId: number
+  let patchTargetId: number
 
   const ADMIN_EMAIL = 'users-admin@e2e.test'
   const USER_EMAIL = 'users-user@e2e.test'
@@ -26,6 +27,9 @@ describe('Users (e2e)', () => {
 
   // Email used in the registration tests — must be cleaned up in afterAll.
   const REGISTER_EMAIL = 'new-user@e2e.test'
+  // User targeted by admin PATCH tests; second constant tracks the updated email.
+  const PATCH_TARGET_EMAIL = 'users-patch@e2e.test'
+  const PATCH_TARGET_UPDATED_EMAIL = 'users-patch-updated@e2e.test'
 
   beforeAll(async () => {
     // POST /users triggers sendVerificationMail; override with a no-op so no
@@ -64,17 +68,27 @@ describe('Users (e2e)', () => {
     })
     userToDeleteId = toDelete.id
 
+    const patchTarget = await seedUser(dataSource, {
+      email: PATCH_TARGET_EMAIL,
+      password: PASSWORD,
+      firstName: 'PatchTarget',
+    })
+    patchTargetId = patchTarget.id
+
     adminToken = await getAuthToken(app, ADMIN_EMAIL, PASSWORD)
     userToken = await getAuthToken(app, USER_EMAIL, PASSWORD)
   })
 
   afterAll(async () => {
     // DELETE_USER_EMAIL may already be gone (deleted in the DELETE test).
+    // PATCH_TARGET_UPDATED_EMAIL covers the row after the admin email-update test.
     await cleanupUsers(dataSource, [
       ADMIN_EMAIL,
       USER_EMAIL,
       DELETE_USER_EMAIL,
       REGISTER_EMAIL,
+      PATCH_TARGET_EMAIL,
+      PATCH_TARGET_UPDATED_EMAIL,
     ])
     await app.close()
   })
@@ -91,9 +105,13 @@ describe('Users (e2e)', () => {
     expect(user.id).toBeDefined()
     expect(user.firstName).toBe('NewUser')
     // password must be excluded by the @Exclude() decorator on the entity.
-    expect((user as Record<string, unknown>).password).toBeUndefined()
+    expect(
+      (user as unknown as Record<string, unknown>).password,
+    ).toBeUndefined()
     // googleId must also be excluded.
-    expect((user as Record<string, unknown>).googleId).toBeUndefined()
+    expect(
+      (user as unknown as Record<string, unknown>).googleId,
+    ).toBeUndefined()
   })
 
   it('POST /users (duplicate email) → 400', async () => {
@@ -166,6 +184,93 @@ describe('Users (e2e)', () => {
       .expect(200)
 
     expect((res.body as ApiResponse<User>).data.id).toBe(regularUserId)
+  })
+
+  // ── PATCH /users/me (any authenticated user) ─────────────────────────────
+
+  it('PATCH /users/me → 200 updates own firstName', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/users/me')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ firstName: 'Updated' })
+      .expect(200)
+
+    expect((res.body as ApiResponse<User>).data.firstName).toBe('Updated')
+  })
+
+  it('PATCH /users/me → 200 updates own lastName', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/users/me')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ lastName: 'Smith' })
+      .expect(200)
+
+    expect((res.body as ApiResponse<User>).data.lastName).toBe('Smith')
+  })
+
+  it('PATCH /users/me (email field in body) → 400 forbidden property', async () => {
+    // PatchUserProfileDto only allows firstName/lastName; email is not whitelisted.
+    await request(app.getHttpServer())
+      .patch('/users/me')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ email: 'takeover@e2e.test' })
+      .expect(400)
+  })
+
+  it('PATCH /users/me (no token) → 401', async () => {
+    await request(app.getHttpServer())
+      .patch('/users/me')
+      .send({ firstName: 'X' })
+      .expect(401)
+  })
+
+  // ── PATCH /users/:id (admin only) ────────────────────────────────────────
+
+  it('PATCH /users/:id (ADMIN) → 200 updates firstName', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/users/${patchTargetId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ firstName: 'Changed' })
+      .expect(200)
+
+    expect((res.body as ApiResponse<User>).data.firstName).toBe('Changed')
+  })
+
+  it('PATCH /users/:id (ADMIN) → 200 updates email', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/users/${patchTargetId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ email: PATCH_TARGET_UPDATED_EMAIL })
+      .expect(200)
+
+    expect((res.body as ApiResponse<User>).data.email).toBe(
+      PATCH_TARGET_UPDATED_EMAIL,
+    )
+  })
+
+  it('PATCH /users/:id (ADMIN, email already taken) → 400', async () => {
+    // USER_EMAIL already exists; the provider must reject the duplicate.
+    await request(app.getHttpServer())
+      .patch(`/users/${patchTargetId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ email: USER_EMAIL })
+      .expect(400)
+  })
+
+  it('PATCH /users/:id (USER role) → 403', async () => {
+    await request(app.getHttpServer())
+      .patch(`/users/${patchTargetId}`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ firstName: 'Hack' })
+      .expect(403)
+  })
+
+  it('PATCH /users/:id (non-existent id) → 404', async () => {
+    await request(app.getHttpServer())
+      .patch('/users/999999')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ firstName: 'Ghost' })
+      .expect(404)
   })
 
   // ── PATCH /users/:id/role (admin only) ────────────────────────────────────

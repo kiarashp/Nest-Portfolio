@@ -63,6 +63,8 @@ export class User {
   // only included in responses when the 'admin' serialization group is active
   @Expose({ groups: ['admin'] })
   role!: UserRole
+  // only included in responses when the 'admin' serialization group is active
+  @Expose({ groups: ['admin'] })
   @Column({ type: 'boolean', default: true })
   isEmailVerified!: boolean
   @Column({ type: 'varchar', length: 128, nullable: true, default: null })

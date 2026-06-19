@@ -18,6 +18,9 @@ import { UploadAvatarProvider } from './providers/upload-avatar.provider'
 import { ChangeUserRoleProvider } from './providers/change-user-role.provider'
 import { VerifyEmailProvider } from './providers/verify-email.provider'
 import { ResendVerificationProvider } from './providers/resend-verification.provider'
+import { PatchUserProvider } from './providers/patch-user.provider'
+import { PatchUserProfileProvider } from './providers/patch-user-profile.provider'
+import { SyncGoogleUserProvider } from './providers/sync-google-user.provider'
 import { UploadsModule } from 'src/uploads/uploads.module'
 import { MailModule } from 'src/mail/mail.module'
 
@@ -36,6 +39,9 @@ import { MailModule } from 'src/mail/mail.module'
     ChangeUserRoleProvider,
     VerifyEmailProvider,
     ResendVerificationProvider,
+    PatchUserProvider,
+    PatchUserProfileProvider,
+    SyncGoogleUserProvider,
   ],
   exports: [UsersService],
   imports: [

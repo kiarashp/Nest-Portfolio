@@ -36,6 +36,7 @@ import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 import { ChangeUserRoleDto } from './dtos/change-user-role.dto'
+import { PatchUserProfileDto } from './dtos/patch-user-profile.dto'
 import type { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 
 @Controller('users')
@@ -98,6 +99,24 @@ export class UsersController {
   }
 
   /**
+   * Update the currently authenticated user's own profile (firstName / lastName only).
+   * Must be declared before :id to prevent 'me' being parsed as an integer.
+   */
+  @Patch('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Update the current user's profile" })
+  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+  public updateMe(
+    @ActiveUser() activeUser: ActiveUserData,
+    @Body() patchUserProfileDto: PatchUserProfileDto,
+  ) {
+    return this.usersService.patchUserProfile(
+      activeUser.sub,
+      patchUserProfileDto,
+    )
+  }
+
+  /**
    * Upload or replace the avatar for the currently logged-in user.
    */
   @Patch('avatar')
@@ -146,7 +165,7 @@ export class UsersController {
     @Param('id', ParseIntPipe) id: number,
     @Body() patchUserDto: PatchUserDto,
   ) {
-    return `This action updates user`
+    return this.usersService.patchUser(id, patchUserDto)
   }
 
   /**

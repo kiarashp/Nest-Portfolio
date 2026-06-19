@@ -84,7 +84,14 @@ export class GoogleAuthenticationService implements OnModuleInit {
     const user = await this.usersService.findOneByGoogleId(googleId)
     //If google id exist in the database we generate access token and refresh token
     if (user) {
-      return this.generateTokensProvider.generateTokens(user)
+      // Update the stored name and email if Google is now returning different values.
+      // This keeps the account data fresh without the user having to do anything.
+      const synced = await this.usersService.syncGoogleUser(user, {
+        email: email,
+        firstName,
+        lastName,
+      })
+      return this.generateTokensProvider.generateTokens(synced)
     }
     //if not exist , create a new user and then generate both tokens
     const newUser = await this.usersService.createGoogleUser({

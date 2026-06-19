@@ -24,6 +24,11 @@ import { ChangeUserRoleProvider } from './change-user-role.provider'
 import { VerifyEmailProvider } from './verify-email.provider'
 import { ResendVerificationProvider } from './resend-verification.provider'
 import { UserRole } from 'src/auth/enums/user-role.enum'
+import { PatchUserProvider } from './patch-user.provider'
+import { PatchUserDto } from '../dtos/patch-user.dto'
+import { PatchUserProfileProvider } from './patch-user-profile.provider'
+import { PatchUserProfileDto } from '../dtos/patch-user-profile.dto'
+import { SyncGoogleUserProvider } from './sync-google-user.provider'
 
 @Injectable()
 export class UsersService {
@@ -83,6 +88,21 @@ export class UsersService {
      * inject resend verification provider
      */
     private readonly resendVerificationProvider: ResendVerificationProvider,
+
+    /**
+     * Inject patch user provider — used by the admin update route
+     */
+    private readonly patchUserProvider: PatchUserProvider,
+
+    /**
+     * Inject patch user profile provider — used when a user updates their own name
+     */
+    private readonly patchUserProfileProvider: PatchUserProfileProvider,
+
+    /**
+     * Inject sync google user provider — keeps the stored profile in sync with Google on each login
+     */
+    private readonly syncGoogleUserProvider: SyncGoogleUserProvider,
   ) {}
   /**
    * Find all users
@@ -156,5 +176,30 @@ export class UsersService {
 
   public async resendVerificationEmail(email: string) {
     return this.resendVerificationProvider.resend(email)
+  }
+
+  /**
+   * Update any field on a user. Only admins can call this.
+   */
+  public async patchUser(id: number, dto: PatchUserDto) {
+    return this.patchUserProvider.patchUser(id, dto)
+  }
+
+  /**
+   * Let a user update their own first and last name.
+   */
+  public async patchUserProfile(userId: number, dto: PatchUserProfileDto) {
+    return this.patchUserProfileProvider.patchUserProfile(userId, dto)
+  }
+
+  /**
+   * Sync a Google user's name and email with what Google is currently returning.
+   * Called on every Google login for existing accounts.
+   */
+  public async syncGoogleUser(
+    user: User,
+    googleFields: { email: string; firstName: string; lastName: string },
+  ) {
+    return this.syncGoogleUserProvider.sync(user, googleFields)
   }
 }
