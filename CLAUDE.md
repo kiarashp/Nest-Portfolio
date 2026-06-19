@@ -32,6 +32,42 @@ pnpm run seed:admin          # create or promote the first admin user (reads NOD
 Run a single unit test file: `pnpm jest path/to/file.spec.ts` (or `pnpm exec jest -t "test name"`).
 Run a single e2e test file: `pnpm jest --config ./test/jest-e2e.json path/to/file.e2e-spec.ts`.
 
+### Migrations (production/staging only)
+
+**Development** uses `DB_SYNC=true` — TypeORM auto-syncs the schema on startup, no migrations needed during normal development.
+
+**Production/staging** uses `DB_SYNC=false`. Migrations are always run **locally from this repo** against the production DB — never on the server. The server just runs the app; the schema is already up to date before it starts.
+
+**Solo-dev deploy workflow:**
+```bash
+# 1. Change an entity, then generate a migration (diffs entities vs dev DB)
+pnpm run typeorm migration:generate src/database/migrations/DescribeChange -d src/database/data-source.ts
+
+# 2. Review the generated file in src/database/migrations/
+
+# 3. Commit the migration file alongside the entity change, then push to GitHub
+
+# 4. Coolify / Railway deploys: runs prestart:prod (migrations) then starts the app
+```
+
+```bash
+# Other migration commands:
+pnpm run migrate:run    # run pending migrations against dev DB
+pnpm run migrate:revert # roll back last migration on dev DB
+```
+
+Infrastructure files:
+- `src/database/data-source.ts` — TypeORM DataSource; loads `.env.<NODE_ENV>` via dotenv (silently skips if file not found — prod env vars come from Coolify/Railway dashboard)
+- `tsconfig.typeorm.json` — tsconfig override (commonjs) used by migration CLI scripts
+- `src/database/migrations/` — generated migration files, always committed to git alongside the entity change
+
+Rules:
+- Never set `DB_SYNC=true` in production or staging
+- Always commit the migration file in the same commit/PR as the entity change
+- `prestart:prod` runs `node node_modules/typeorm/cli.js migration:run -d dist/database/data-source.js` — uses compiled JS, no ts-node needed on the server
+- Coolify/Railway start command must be `pnpm run start:prod` (not `node dist/main` directly) so the `prestart:prod` npm lifecycle fires
+- If a migration fails on the server, the app won't start — this is intentional (fail fast rather than boot with wrong schema)
+
 See `test/CLAUDE.md` for the e2e helper infrastructure and spec-writing conventions.
 
 Swagger/OpenAPI docs are served at `/api` once the app is running (see `main.ts`).
