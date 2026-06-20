@@ -1,10 +1,8 @@
 import { INestApplication } from '@nestjs/common'
-import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { App } from 'supertest/types'
 import { DataSource } from 'typeorm'
 import { UserRole } from '../../src/auth/enums/user-role.enum'
-import { AppModule } from '../../src/app.module'
 import { getAuthToken } from '../helpers/auth.helper'
 import { createApp } from '../helpers/create-app.helper'
 import { cleanupUsers, seedUser } from '../helpers/seed.helper'
@@ -21,11 +19,7 @@ describe('RBAC (e2e)', () => {
   const PASSWORD = 'Password123!'
 
   beforeAll(async () => {
-    const moduleFixture = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile()
-
-    ;({ app, dataSource } = await createApp(moduleFixture))
+    ;({ app, dataSource } = await createApp())
 
     // Seed a regular USER and an ADMIN directly — bypasses the chicken-and-egg
     // problem of needing an existing admin to elevate roles via the API.

@@ -1,9 +1,7 @@
 import { INestApplication } from '@nestjs/common'
-import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { App } from 'supertest/types'
 import { DataSource } from 'typeorm'
-import { AppModule } from '../../src/app.module'
 import { ApiResponse, getAuthToken } from '../helpers/auth.helper'
 import { createApp } from '../helpers/create-app.helper'
 import { cleanupUsers, seedUser } from '../helpers/seed.helper'
@@ -22,11 +20,7 @@ describe('POST /auth/sign-in (e2e)', () => {
   const TEST_PASSWORD = 'Password123!'
 
   beforeAll(async () => {
-    const moduleFixture = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile()
-
-    ;({ app, dataSource } = await createApp(moduleFixture))
+    ;({ app, dataSource } = await createApp())
 
     // seedUser does a direct DB insert + bcrypt — no mail service needed.
     await seedUser(dataSource, {

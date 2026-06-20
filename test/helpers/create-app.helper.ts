@@ -1,26 +1,72 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common'
-import { TestingModule } from '@nestjs/testing'
+import { Test } from '@nestjs/testing'
+import { ThrottlerStorage } from '@nestjs/throttler'
+import helmet from 'helmet'
 import { App } from 'supertest/types'
 import { DataSource } from 'typeorm'
+import { AppModule } from '../../src/app.module'
+import { MailService } from '../../src/mail/mail.service'
 
-// Minimal bootstrap helper shared by all e2e suites.
+// Per-method mail overrides. Unspecified methods receive a jest.fn() no-op.
+interface MailMock {
+  sendMail?: jest.Mock
+  sendWelcomeMail?: jest.Mock
+  sendVerificationMail?: jest.Mock
+  sendPasswordResetMail?: jest.Mock
+}
+
+interface CreateAppOptions {
+  // Pass individual mocks only for methods whose calls you need to assert on.
+  mailMock?: MailMock
+  // Mocks ThrottlerStorage so rate limits never fire. Default: true.
+  // Set to false only in throttle.e2e-spec.ts where real throttling is tested.
+  skipThrottle?: boolean
+}
+
+// Builds, compiles, and initialises the NestJS app for e2e tests.
 //
-// Usage:
-//   1. Build your module: const fixture = await Test.createTestingModule({...})
-//        .overrideProvider(...)   // add provider overrides before compile if needed
-//        .compile()
-//   2. const { app, dataSource } = await createApp(fixture)
+// Applies two defaults that every non-throttle spec needs:
+//  1. MailService is always mocked — prevents real SMTP connections.
+//  2. ThrottlerStorage is mocked (unless skipThrottle: false) — prevents
+//     429s when a spec hits the same route more times than the rate limit.
 //
-// This is intentionally separate from src/app.create.ts — production uses
-// NestFactory + app.listen() + Swagger + CORS; tests use TestingModule +
-// app.init() and need none of those extras.
+// ThrottlerGuard still runs; it just always sees "first hit, not blocked"
+// because overrideProvider(ThrottlerStorage) replaces the token that the
+// guard injects — overrideGuard / overrideProvider(ThrottlerGuard) both
+// fail silently because the guard lives under APP_GUARD, not ThrottlerGuard.
 export async function createApp(
-  moduleFixture: TestingModule,
+  options: CreateAppOptions = {},
 ): Promise<{ app: INestApplication<App>; dataSource: DataSource }> {
+  const { mailMock = {}, skipThrottle = true } = options
+
+  const noop = (): jest.Mock => jest.fn().mockResolvedValue(undefined)
+
+  let builder = Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(MailService)
+    .useValue({
+      sendMail: mailMock.sendMail ?? noop(),
+      sendWelcomeMail: mailMock.sendWelcomeMail ?? noop(),
+      sendVerificationMail: mailMock.sendVerificationMail ?? noop(),
+      sendPasswordResetMail: mailMock.sendPasswordResetMail ?? noop(),
+    })
+
+  if (skipThrottle) {
+    builder = builder.overrideProvider(ThrottlerStorage).useValue({
+      increment: jest.fn().mockResolvedValue({
+        totalHits: 1,
+        timeToExpire: 0,
+        isBlocked: false,
+        timeToBlockExpire: 0,
+      }),
+    })
+  }
+
+  const moduleFixture = await builder.compile()
   const app = moduleFixture.createNestApplication<INestApplication<App>>()
 
-  // Mirror the ValidationPipe from src/app.create.ts so DTO validation
-  // behaves exactly as it does in production.
+  // Mirror helmet from src/app.create.ts so security header assertions work in tests.
+  app.use(helmet())
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

@@ -1,10 +1,7 @@
 import { INestApplication } from '@nestjs/common'
-import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { App } from 'supertest/types'
 import { DataSource } from 'typeorm'
-import { AppModule } from '../../src/app.module'
-import { MailService } from '../../src/mail/mail.service'
 import { User } from '../../src/users/entities/user.entity'
 import { UserRole } from '../../src/auth/enums/user-role.enum'
 import { ApiResponse } from '../helpers/auth.helper'
@@ -25,19 +22,12 @@ describe('Password Reset Flow (e2e)', () => {
   beforeAll(async () => {
     sendPasswordResetMailMock = jest.fn().mockResolvedValue(undefined)
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(MailService)
-      .useValue({
-        sendMail: jest.fn().mockResolvedValue(undefined),
-        sendWelcomeMail: jest.fn().mockResolvedValue(undefined),
-        sendVerificationMail: jest.fn().mockResolvedValue(undefined),
-        sendPasswordResetMail: sendPasswordResetMailMock,
-      })
-      .compile()
-
-    ;({ app, dataSource } = await createApp(moduleFixture))
+    // Pass the tracked mock so call assertions work per-test via beforeEach.
+    // ThrottlerStorage is mocked by default (skipThrottle: true) so the many
+    // forgot-password calls in this suite never trigger 429.
+    ;({ app, dataSource } = await createApp({
+      mailMock: { sendPasswordResetMail: sendPasswordResetMailMock },
+    }))
 
     // Pre-cleanup to avoid unique-constraint conflicts on re-runs
     await cleanupUsers(dataSource, [EMAIL, GOOGLE_EMAIL])
@@ -133,8 +123,9 @@ describe('Password Reset Flow (e2e)', () => {
 
     // Read the token directly from the DB (it is excluded from HTTP responses)
     const userRepo = dataSource.getRepository(User)
-    const user = await userRepo.findOneBy({ id: userId })
-    const token = user!.passwordResetToken! as string
+    const user: User | null = await userRepo.findOneBy({ id: userId })
+
+    const token: string = user!.passwordResetToken!
 
     // Reset the password
     const res = await request(app.getHttpServer())
@@ -164,8 +155,9 @@ describe('Password Reset Flow (e2e)', () => {
       .send({ email: EMAIL })
       .expect(200)
 
-    const refreshed = await userRepo.findOneBy({ id: userId })
-    const restoreToken = refreshed!.passwordResetToken! as string
+    const refreshed: User | null = await userRepo.findOneBy({ id: userId })
+
+    const restoreToken = refreshed!.passwordResetToken!
 
     await request(app.getHttpServer())
       .post('/auth/reset-password')

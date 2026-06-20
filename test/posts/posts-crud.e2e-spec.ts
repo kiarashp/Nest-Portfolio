@@ -1,10 +1,8 @@
 import { INestApplication } from '@nestjs/common'
-import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { App } from 'supertest/types'
 import { DataSource } from 'typeorm'
 import { UserRole } from '../../src/auth/enums/user-role.enum'
-import { AppModule } from '../../src/app.module'
 import { Post } from '../../src/posts/entities/post.entity'
 import { Tag } from '../../src/tags/entities/tag.entity'
 import { ApiResponse, getAuthToken } from '../helpers/auth.helper'
@@ -48,11 +46,7 @@ describe('Posts CRUD (e2e)', () => {
   const PASSWORD = 'Password1!'
 
   beforeAll(async () => {
-    const moduleFixture = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile()
-
-    ;({ app, dataSource } = await createApp(moduleFixture))
+    ;({ app, dataSource } = await createApp())
 
     const postRepo = dataSource.getRepository(Post)
     const tagRepo = dataSource.getRepository(Tag)

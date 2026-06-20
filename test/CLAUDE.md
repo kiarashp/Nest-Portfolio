@@ -66,6 +66,9 @@ When calling `userRepo.update()` or `userRepo.save()` without capturing the retu
 
 ## Spec file pattern
 
+`createApp()` owns the full module build. Do not call `Test.createTestingModule` in specs.
+By default it mocks `MailService` (all methods no-op) and `ThrottlerStorage` (never blocks).
+
 ```ts
 describe('Feature (e2e)', () => {
   let app: INestApplication<App>
@@ -76,15 +79,7 @@ describe('Feature (e2e)', () => {
   const PASSWORD = 'Password1!'
 
   beforeAll(async () => {
-    const moduleFixture = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      // Only override providers that have real side-effects (mail, payment…).
-      .overrideProvider(MailService)
-      .useValue({ sendWelcomeMail: jest.fn() })
-      .compile()
-
-    ;({ app, dataSource } = await createApp(moduleFixture))
+    ;({ app, dataSource } = await createApp())
 
     // Pre-cleanup: delete rows left by a previous failed run so re-runs never
     // hit unique-constraint conflicts.
@@ -101,20 +96,47 @@ describe('Feature (e2e)', () => {
 })
 ```
 
-## When to override `MailService`
+## `createApp` options
 
-Any test that calls `POST /users` (registration) must override `MailService`, otherwise the test tries to open an SMTP connection:
+### Tracking mail calls
+
+Pass `mailMock` with only the methods you need to assert on. Unspecified methods get a
+silent no-op automatically:
 
 ```ts
-.overrideProvider(MailService)
-.useValue({
-  sendVerificationMail: jest.fn().mockResolvedValue(undefined),
-  sendWelcomeMail: jest.fn().mockResolvedValue(undefined),
-  sendMail: jest.fn().mockResolvedValue(undefined),
-})
+const sendPasswordResetMailMock = jest.fn().mockResolvedValue(undefined)
+
+;({ app, dataSource } = await createApp({
+  mailMock: { sendPasswordResetMail: sendPasswordResetMailMock },
+}))
+
+// In beforeEach — reset call count between tests:
+sendPasswordResetMailMock.mockClear()
 ```
 
-Tests that seed users via `seedUser()` (direct DB insert) do **not** need this override — the mail call only fires when the HTTP endpoint is hit.
+### Testing real throttling
+
+`ThrottlerStorage` is mocked by default so hit counts never accumulate. In
+`throttle.e2e-spec.ts` only, opt in to real throttling:
+
+```ts
+;({ app } = await createApp({ skipThrottle: false }))
+```
+
+**Why `ThrottlerStorage` and not `ThrottlerGuard`:** `ThrottlerGuard` is registered via
+`{ provide: APP_GUARD, useClass: ThrottlerGuard }` so NestJS tracks it under the `APP_GUARD`
+token, not `ThrottlerGuard`. Overriding `ThrottlerGuard` is silently ignored. Mocking
+`ThrottlerStorage` (which the guard injects) cuts throttling at the right point.
+
+Throttle limits that matter in tests:
+
+| Route | Limit |
+|---|---|
+| `POST /auth/forgot-password` | 3 / 300 s |
+| `POST /auth/resend-verification` | 3 / 300 s |
+| `POST /auth/sign-in` | 5 / 60 s |
+| `POST /auth/reset-password` | 5 / 60 s |
+| `POST /users` | 5 / 600 s |
 
 ## Naming and file layout
 

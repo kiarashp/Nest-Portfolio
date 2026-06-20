@@ -2,9 +2,10 @@ import { INestApplication, ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import cookieParser from 'cookie-parser'
+import helmet from 'helmet'
 
 // Full production setup extracted from bootstrap() so main.ts stays slim.
-// Configures the validation pipe, Swagger docs, CORS, then starts listening.
+// Applies helmet security headers, cookie parser, validation pipe, Swagger, CORS, then listens.
 export async function appCreate(app: INestApplication): Promise<void> {
   const configService = app.get(ConfigService)
   const port = configService.get<number>('appConfig.appPort') ?? 3000
@@ -18,6 +19,8 @@ export async function appCreate(app: INestApplication): Promise<void> {
     }),
   )
 
+  // helmet must run before cookie-parser so security headers are set on every response.
+  app.use(helmet())
   app.use(cookieParser())
 
   const swaggerConfig = new DocumentBuilder()

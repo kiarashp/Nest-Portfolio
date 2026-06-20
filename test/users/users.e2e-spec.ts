@@ -1,11 +1,8 @@
 import { INestApplication } from '@nestjs/common'
-import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { App } from 'supertest/types'
 import { DataSource } from 'typeorm'
 import { UserRole } from '../../src/auth/enums/user-role.enum'
-import { AppModule } from '../../src/app.module'
-import { MailService } from '../../src/mail/mail.service'
 import { User } from '../../src/users/entities/user.entity'
 import { ApiResponse, getAuthToken } from '../helpers/auth.helper'
 import { createApp } from '../helpers/create-app.helper'
@@ -32,20 +29,7 @@ describe('Users (e2e)', () => {
   const PATCH_TARGET_UPDATED_EMAIL = 'users-patch-updated@e2e.test'
 
   beforeAll(async () => {
-    // POST /users triggers sendVerificationMail; override with a no-op so no
-    // real SMTP connection is needed and the test stays self-contained.
-    const moduleFixture = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(MailService)
-      .useValue({
-        sendVerificationMail: jest.fn().mockResolvedValue(undefined),
-        sendWelcomeMail: jest.fn().mockResolvedValue(undefined),
-        sendMail: jest.fn().mockResolvedValue(undefined),
-      })
-      .compile()
-
-    ;({ app, dataSource } = await createApp(moduleFixture))
+    ;({ app, dataSource } = await createApp())
 
     await seedUser(dataSource, {
       email: ADMIN_EMAIL,
