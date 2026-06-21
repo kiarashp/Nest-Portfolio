@@ -1,4 +1,4 @@
-import * as bcrypt from 'bcrypt'
+import * as bcrypt from 'bcryptjs'
 import { DataSource } from 'typeorm'
 import { User } from '../../src/users/entities/user.entity'
 import { UserRole } from '../../src/auth/enums/user-role.enum'

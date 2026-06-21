@@ -17,7 +17,7 @@
 import { NestFactory } from '@nestjs/core'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import * as bcrypt from 'bcrypt'
+import * as bcrypt from 'bcryptjs'
 import { SeedModule } from './seed.module'
 import { User } from 'src/users/entities/user.entity'
 import { UserRole } from 'src/auth/enums/user-role.enum'
