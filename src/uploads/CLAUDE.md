@@ -35,14 +35,15 @@ Nothing else needs to change. Never import `CloudinaryProvider` from outside thi
 
 ## Reusing this module
 
-`UploadsModule` exports only `UploadsService`. Current consumers:
-- `UsersModule` — avatar upload via `UploadAvatarProvider` (folder: `users/<userId>/`)
+`UploadsModule` exports `UploadsService` and `StorageProvider`. Current consumers:
+- `UsersModule` — avatar pool management via `AvatarOptionsProvider`, which injects `StorageProvider` directly (no `UploadFile` rows created). `UploadsModule` is also imported so `StorageProvider` is available in the DI context.
 - `PostsModule` — post image upload via `UploadPostImageProvider` (folder: `posts/<postId>/`, with `postId` stored on the `UploadFile` row)
 
-To add a new consumer: add `imports: [UploadsModule]` to the feature module and inject `UploadsService`.
+To add a consumer that needs full upload tracking (creates `UploadFile` rows): inject `UploadsService`.
+To add a consumer that only needs raw Cloudinary access without DB tracking: inject `StorageProvider` directly.
 
 ## Known gotchas
 
 - `cloudinary` (v2.10.0) has no `"exports"` field in its `package.json`. Values derived from its SDK types can silently become `any` that `nest build` won't catch — only `pnpm exec tsc --noEmit` will. Keep explicit return types on anything that touches the Cloudinary SDK.
 - `FileInterceptor('file', { storage: memoryStorage() })` is required because `CloudinaryProvider.upload` reads `file.buffer` directly via `upload_stream` — there is no temp file on disk.
-- `FileTypeValidator` only checks the multipart-reported `mimetype` header. `UploadFileProvider` also checks the file's magic bytes (first few bytes of the buffer) as a second layer of validation — both checks must pass.
+- `FileTypeValidator` (from `@nestjs/common`) uses the `file-type` ESM package for magic-byte detection — it does NOT rely only on the multipart MIME header. In Jest e2e tests this requires `NODE_OPTIONS=--experimental-vm-modules` (already set in the `test:e2e` script) and a real magic-byte buffer (e.g. `JPEG_MAGIC`) in file attachments — a buffer of arbitrary bytes will fail validation.

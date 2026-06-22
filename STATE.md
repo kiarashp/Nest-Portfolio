@@ -49,61 +49,59 @@ One new nullable column on `User`: `bio` (PostgreSQL `text` type, nullable, defa
 
 ---
 
-### 2. Predefined avatar selection (Cloudinary-hosted)
+### 2. Predefined avatar selection (DB-driven, Cloudinary-hosted)
 
 **Why this exists:**
-The existing `PATCH /users/avatar` accepts a file upload (multipart), pushes it to Cloudinary, creates an `UploadFile` DB row, and stores the URL in `user.avatarUrl`. This is the right design for content editors managing post images, but wrong for regular users — it gives any USER-role account unlimited Cloudinary storage with no guardrails.
+The existing `PATCH /users/avatar` accepted a multipart file upload from any user, pushing it to Cloudinary with no guardrails. That is the right design for content editors managing post images, but wrong for regular users — it gave any USER-role account unlimited Cloudinary storage. The new design gives admins a managed set of avatar options; regular users just pick one by ID.
 
-The correct pattern for user accounts: pre-upload a fixed set of avatar illustrations to Cloudinary **once**, hardcode their URLs in a backend constants file, and let users pick one by key. The value stored in `avatarUrl` is still a Cloudinary URL — so both Svelte and Flutter just render `<img src={user.avatarUrl}>` with no local image mapping. Cloudinary CDN and transformations work automatically.
+**What was built (DB-driven approach):**
 
-**One-time developer setup (not automated):**
-Upload 8–12 avatar image files manually via the Cloudinary dashboard (numbered SVGs or illustrations). Copy each `secure_url` into the constants file. These assets are never touched by user actions.
+`AvatarOption` entity (`src/users/entities/avatar-option.entity.ts`) — columns: `id`, `url` (varchar 2048), `publicId` (varchar 256), `createdAt`. No `key` or `label` — the DB `id` is the stable identifier. Migration: `AddAvatarOptionsTable`.
 
-**What to build:**
+Three new admin routes manage the option pool:
+- `GET /users/avatar-options` — public, returns all `AvatarOption` rows from DB
+- `POST /users/avatar-options` — ADMIN only, accepts a multipart image (5MB cap, jpeg/png/webp), uploads to Cloudinary via `StorageProvider`, saves url+publicId to DB
+- `DELETE /users/avatar-options/:id` — ADMIN only, deletes from Cloudinary and removes the DB row
 
-1. **`src/users/constants/avatar-options.ts`**  
-   Exports `AVATAR_OPTIONS: { key: string, label: string, url: string }[]`.  
-   The `url` is the Cloudinary `secure_url` for that avatar. Keys are short strings like `'avatar-1'` through `'avatar-8'`. The frontend renders them directly as image sources.
+`PATCH /users/avatar` — rewritten from multipart to JSON body `{ avatarOptionId: number }`. Looks up the option by id, sets `user.avatarUrl = option.url`, saves. Returns 400 for an unknown id.
 
-2. **`GET /users/avatar-options`** — `@Auth(AuthType.None)` (public), no DB hit, returns `AVATAR_OPTIONS`. Both Svelte and Flutter call this to render the avatar picker — URLs are immediately usable as `<img src>`.
+`UploadsModule` is still imported in `UsersModule` because `AvatarOptionsProvider` injects `StorageProvider` (exported from `UploadsModule`) directly — no `UploadFile` rows are created for avatar pool management.
 
-3. **`PATCH /users/avatar`** — rewrite from multipart file upload to JSON body:
-   - Remove `@UseInterceptors(FileInterceptor)`, `@ApiConsumes('multipart/form-data')`, `ParseFilePipe`, and all file validators
-   - New DTO: `SelectAvatarDto { avatarKey: string }` — `@IsIn(AVATAR_OPTIONS.map(o => o.key))` rejects any unknown key
-   - New provider `SelectAvatarProvider`: find user, look up `AVATAR_OPTIONS` by key, set `user.avatarUrl = option.url`, save. No Cloudinary call at request time, no `UploadFile` row.
-   - The `avatarUrl` column is `varchar(2048)` — unchanged, still stores a Cloudinary URL
+**`FileTypeValidator` and Jest:** `POST /users/avatar-options` uses NestJS's `FileTypeValidator` which relies on the `file-type` ESM package for magic-byte detection. Jest's CJS VM blocks ESM dynamic imports unless `NODE_OPTIONS=--experimental-vm-modules` is set. This flag is now part of the `test:e2e` script in `package.json`. E2e tests use a `JPEG_MAGIC` buffer (SOI + APP0 JFIF header bytes) for the file attachment.
 
-4. **`UploadsModule` import in `UsersModule`:** After this change, avatars no longer go through `UploadsService`. Verify no other provider in `UsersModule` needs it, then remove the `UploadsModule` import to keep the dependency graph clean. (Email verification and password reset are in `UsersModule` too — confirm they don't use `UploadsService`.)
+**Files changed:**
+- `src/users/entities/avatar-option.entity.ts` — new entity
+- `src/users/dtos/select-avatar.dto.ts` — `@IsInt() @IsPositive() avatarOptionId`
+- `src/users/providers/avatar-options.provider.ts` — `create(file)` and `remove(id)` 
+- `src/users/providers/select-avatar.provider.ts` — looks up by id, sets `user.avatarUrl`
+- `src/users/providers/upload-avatar.provider.ts` — deleted
+- `src/users/providers/users.service.ts` — `createAvatarOption()`, `removeAvatarOption()`, `getAvatarOptions()`, `selectAvatar()`
+- `src/users/users.controller.ts` — three new avatar-options routes + rewritten `PATCH /users/avatar`
+- `src/users/users.module.ts` — `AvatarOption` in `TypeOrmModule.forFeature`, `AvatarOptionsProvider` registered
+- `src/uploads/uploads.module.ts` — `StorageProvider` added to exports
+- `src/database/data-source.ts` — `AvatarOption` added to entities array
+- `src/database/migrations/1782160421751-AddAvatarOptionsTable.ts` — generated and applied
+- `package.json` `test:e2e` — `NODE_OPTIONS=--experimental-vm-modules` added
+- `test/helpers/create-app.helper.ts` — `StorageProvider` always mocked; `StorageMock` interface added
+- `test/users/users-avatar-selection.e2e-spec.ts` — 9 tests (GET list, POST create/403, DELETE found/404, PATCH valid/unknown/unauth, GET /me after select)
+- `test/auth/rbac.e2e-spec.ts` — seeds `{ url, publicId }`, uses `avatarOptionId`
 
-**Files to touch:**
-- `src/users/constants/avatar-options.ts` — new file (fill `url` values after one-time Cloudinary upload)
-- `src/users/dtos/select-avatar.dto.ts` — new DTO
-- `src/users/providers/select-avatar.provider.ts` — new provider, replaces `UploadAvatarProvider` logic
-- `src/users/providers/upload-avatar.provider.ts` — delete or repurpose (no longer needed for USER avatar flow)
-- `src/users/providers/users.service.ts` — replace `uploadAvatar()` with `selectAvatar()`
-- `src/users/users.controller.ts` — rewrite `PATCH /users/avatar`, add `GET /users/avatar-options`
-- `src/users/users.module.ts` — register `SelectAvatarProvider`, remove `UploadAvatarProvider`, check if `UploadsModule` import can be removed
+**One-time developer action required:** Use `POST /users/avatar-options` (as admin) to upload avatar illustrations to Cloudinary. The DB starts empty — no hardcoded defaults.
 
-**E2E spec:** `test/users-avatar-selection.e2e-spec.ts`
-- GET /users/avatar-options (unauthenticated) → 200, array of `{ key, label, url }` with non-empty url strings
-- PATCH /users/avatar with valid `avatarKey` (authenticated) → 200, `user.avatarUrl` equals the Cloudinary URL for that key from `AVATAR_OPTIONS`
-- PATCH /users/avatar with unknown `avatarKey` → 400
-- PATCH /users/avatar (unauthenticated) → 401
-- GET /users/me after selection → `avatarUrl` reflects the selected Cloudinary URL
-
-**Note on mocks:** No new mocks needed in `create-app.helper.ts` — avatar selection makes no external calls at request time.
-
-- [x] Create `src/users/constants/avatar-options.ts` (8 entries, placeholder Cloudinary URLs)
-- [x] Create `src/users/dtos/select-avatar.dto.ts` with `@IsIn(AVATAR_OPTIONS.map(o => o.key))`
-- [x] Create `src/users/providers/select-avatar.provider.ts`
+- [x] Create `AvatarOption` entity (id, url, publicId, createdAt — no key/label)
+- [x] Generate + run migration: `AddAvatarOptionsTable`
+- [x] Create `src/users/dtos/select-avatar.dto.ts` with `@IsInt() @IsPositive() avatarOptionId`
+- [x] Create `src/users/providers/avatar-options.provider.ts` (create + remove)
+- [x] Create `src/users/providers/select-avatar.provider.ts` (lookup by id, update avatarUrl)
 - [x] Delete `src/users/providers/upload-avatar.provider.ts`
-- [x] Update `users.service.ts` — swap `UploadAvatarProvider` → `SelectAvatarProvider`, replace `uploadAvatar()` with `selectAvatar()`
-- [x] Update `users.controller.ts` — rewrite `PATCH /users/avatar` to JSON body, add `GET /users/avatar-options` public route
-- [x] Update `users.module.ts` — swap provider, remove `UploadsModule` import
-- [x] Fix pre-existing `bcrypt.provider.ts` TS errors (cast `data as string` in hash + compare calls)
-- [x] Build passes, lint clean
-- [x] Write + run e2e spec (`test/users/users-avatar-selection.e2e-spec.ts` — 5 tests passing)
-- [ ] **Developer action required:** Upload 8 avatar illustrations to Cloudinary and replace placeholder URLs in `src/users/constants/avatar-options.ts`
+- [x] Update `users.service.ts` — `createAvatarOption`, `removeAvatarOption`, `getAvatarOptions`, `selectAvatar`
+- [x] Update `users.controller.ts` — GET/POST/DELETE avatar-options routes + rewritten PATCH /users/avatar
+- [x] Update `users.module.ts` — register AvatarOptionsProvider, keep UploadsModule for StorageProvider
+- [x] Export `StorageProvider` from `UploadsModule`
+- [x] Add `AvatarOption` to `data-source.ts` entities
+- [x] Add `NODE_OPTIONS=--experimental-vm-modules` to `test:e2e` in `package.json`
+- [x] Mock `StorageProvider` in `create-app.helper.ts`
+- [x] Write + run e2e spec (`test/users/users-avatar-selection.e2e-spec.ts` — 9 tests passing)
 
 ---
 
@@ -168,17 +166,17 @@ The mail template (`contact.ejs`) is a simple HTML email showing the sender's na
 - POST /contact with invalid email format → 400
 - Verify ContactSubmission row exists in DB after successful submission
 
-- [ ] Create `ContactSubmission` entity
-- [ ] Generate + run migration: `AddContactSubmissionsTable`
-- [ ] Create `CreateContactDto` with validation
-- [ ] Create `ContactProvider` (save + call mailService)
-- [ ] Create `ContactController` with `POST /contact`, `@Auth(AuthType.None)`, `@Throttle({ default: { limit: 3, ttl: 300000 } })`
-- [ ] Create `ContactModule` and import into `AppModule`
-- [ ] Create `contact.ejs` mail template
-- [ ] Create `SendContactNotificationProvider` and register in `MailModule`
-- [ ] Expose `sendContactNotification()` on `MailService`
-- [ ] Add new env var to `environment.validation.ts` if needed
-- [ ] Write e2e spec
+- [x] Create `ContactSubmission` entity
+- [x] Generate + run migration: `AddContactSubmissionsTable`
+- [x] Create `CreateContactDto` with validation
+- [x] Create `ContactProvider` (save + call mailService)
+- [x] Create `ContactController` with `POST /contact`, `@Auth(AuthType.None)`, `@Throttle({ default: { limit: 3, ttl: 300000 } })`
+- [x] Create `ContactModule` and import into `AppModule`
+- [x] Create `contact.ejs` mail template
+- [x] Create `SendContactNotificationProvider` and register in `MailModule`
+- [x] Expose `sendContactNotification()` on `MailService`
+- [x] No new env var needed — reuses `MAIL_FROM` as recipient via `mail.defaultFrom`
+- [x] Write e2e spec (`test/contact/contact.e2e-spec.ts` — 5 tests passing)
 
 ---
 

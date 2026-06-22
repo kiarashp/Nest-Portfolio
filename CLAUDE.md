@@ -21,7 +21,8 @@ pnpm run format             # prettier --write on src/test
 pnpm run test                # jest unit tests (*.spec.ts colocated with source)
 pnpm run test:watch
 pnpm run test:cov
-pnpm run test:e2e            # jest using test/jest-e2e.json (test/**/*.e2e-spec.ts) — sets NODE_ENV=test automatically, requires .env.test pointing at a separate DB (DB_NAME=nest_portfolio_test)
+pnpm run test:e2e            # jest using test/jest-e2e.json (test/**/*.e2e-spec.ts) — sets NODE_ENV=test and NODE_OPTIONS=--experimental-vm-modules automatically, requires .env.test pointing at a separate DB (DB_NAME=nest_portfolio_test)
+                             # NODE_OPTIONS=--experimental-vm-modules is required so NestJS's FileTypeValidator can load the file-type ESM package inside Jest's CJS VM
 pnpm run test:debug          # node --inspect-brk for debugging a jest run
 
 pnpm run doc                 # compodoc, served on port 3001, output to ./documentation
@@ -117,6 +118,7 @@ Entity relations:
 - `Post` N—N `Tag` (eager, owning side with `@JoinTable`)
 - `Post` 1—N `UploadFile` (non-eager — only loaded explicitly, e.g. on post deletion for cleanup)
 - `User` 1—N `UploadFile` (non-nullable — every upload is tied to the uploading user)
+- `AvatarOption` — standalone entity (`src/users/entities/avatar-option.entity.ts`), no FK to `User`. Columns: `id`, `url`, `publicId`, `createdAt`. Admins populate the pool via `POST /users/avatar-options`; users pick one with `PATCH /users/avatar`.
 
 ### Request pipeline (global, wired in `app.module.ts`)
 
@@ -169,14 +171,18 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 | `POST /users` | None (public) | Registration — triggers email verification flow |
 | `GET /users` | ADMIN | Paginated list |
 | `GET /users/me` | Bearer (any role) | Returns the caller's own profile |
+| `GET /users/avatar-options` | None (public) | Lists all `AvatarOption` rows — frontend uses this to render the avatar picker |
+| `GET /users/:id/profile` | None (public) | Public author profile — 404 for USER-role accounts |
 | `GET /users/:id` | ADMIN | Lookup any user by ID — **not** accessible to regular users; use `/me` for self |
-| `PATCH /users/me` | Bearer (any role) | Updates the caller's own `firstName` and `lastName` only (`PatchUserProfileDto`) |
-| `PATCH /users/avatar` | Bearer (any role) | Uploads and replaces the caller's avatar |
+| `PATCH /users/me` | Bearer (any role) | Updates the caller's own `firstName`, `lastName`, `bio` (`PatchUserProfileDto`) |
+| `PATCH /users/avatar` | Bearer (any role) | Selects a predefined avatar — JSON body `{ avatarOptionId: number }`, sets `user.avatarUrl` to the option's Cloudinary URL |
 | `PATCH /users/:id/role` | ADMIN | Elevate or downgrade a user's role |
 | `PATCH /users/:id` | ADMIN | Full update — can change `firstName`, `lastName`, `email` (uniqueness checked), `password` (hashed) |
+| `POST /users/avatar-options` | ADMIN | Upload a new avatar image (multipart, 5MB, jpeg/png/webp) → saves to Cloudinary + DB |
+| `DELETE /users/avatar-options/:id` | ADMIN | Remove an avatar option — deletes from Cloudinary and the DB row |
 | `DELETE /users/:id` | ADMIN | Remove a user |
 
-`GET /users/me` and `PATCH /users/me` must each be declared before their `/:id` counterparts in the controller so NestJS routes the literal segment `me` before trying to parse it as an integer ID via `ParseIntPipe`.
+`GET /users/me`, `GET /users/avatar-options`, and `PATCH /users/me` must each be declared before their `/:id` counterparts in the controller so NestJS routes the literal segment before trying to parse it as an integer ID via `ParseIntPipe`.
 
 ### Posts — public routes and draft visibility
 
@@ -198,7 +204,7 @@ The status filter is applied in `FindAllPostsProvider` (via the `where` param on
 |---|---|---|
 | `password`, `googleId`, `emailVerificationToken`, `emailVerificationTokenExpiry` | `@Exclude()` | nobody |
 | `email`, `role`, `isEmailVerified` | `@Expose({ groups: ['admin'] })` | only when 'admin' group is active |
-| `id`, `firstName`, `lastName`, `avatarUrl` | none | everyone |
+| `id`, `firstName`, `lastName`, `avatarUrl`, `bio` | none | everyone |
 
 `UsersController` is decorated with `@SerializeOptions({ groups: ['admin'] })`, so all its responses include `email`, `role`, and `isEmailVerified`. `PostsController` has no `@SerializeOptions`, so the author object embedded in post responses only contains the public fields (`id`, `firstName`, `lastName`, `avatarUrl`).
 
@@ -241,7 +247,8 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 - `StorageProvider` is an abstract class (not an interface) so it can serve as a NestJS DI token at runtime. `CloudinaryProvider` is its only current implementation, registered via `{ provide: StorageProvider, useClass: CloudinaryProvider }` in `UploadsModule`. Swap backends by changing only that line.
 - Generic upload route: `POST /uploads` — requires `EDITOR / AUTHOR / ADMIN` role, multipart field `file`, 5MB cap, image types only.
 - Post image upload route: `POST /posts/:id/images` — requires `EDITOR / AUTHOR / ADMIN`. EDITORs can only upload to their own posts. Returns the `UploadFile` record; the client decides whether to use the URL as `featuredImage` via `PATCH /posts/:id`.
-- Avatar upload route: `PATCH /users/avatar` — any authenticated user, no role restriction.
+- Avatar pool management: `POST /users/avatar-options` — ADMIN only. Uploads an image to Cloudinary via `StorageProvider` and saves `{ url, publicId }` as an `AvatarOption` row. No `UploadFile` row is created — `StorageProvider` is injected directly by `AvatarOptionsProvider` rather than going through `UploadsService`.
+- `UploadsModule` exports `StorageProvider` so `UsersModule` can inject it without duplicating Cloudinary setup.
 
 ### TypeORM gotchas
 

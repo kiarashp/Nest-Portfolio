@@ -6,6 +6,7 @@ import { Tag } from 'src/tags/entities/tag.entity'
 import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { AvatarOption } from 'src/users/entities/avatar-option.entity'
+import { ContactSubmission } from 'src/contact/entities/contact-submission.entity'
 
 config({ path: `.env.${process.env.NODE_ENV ?? 'development'}` })
 
@@ -16,7 +17,15 @@ export default new DataSource({
   username: process.env.DB_USER ?? 'postgres',
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  entities: [User, Post, Tag, MetaOption, UploadFile, AvatarOption],
+  entities: [
+    User,
+    Post,
+    Tag,
+    MetaOption,
+    UploadFile,
+    AvatarOption,
+    ContactSubmission,
+  ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,
 })

@@ -3,6 +3,7 @@ import { SendMailProvider } from './providers/send-mail.provider'
 import { SendWelcomeMailProvider } from './providers/send-welcome-mail.provider'
 import { SendVerificationMailProvider } from './providers/send-verification-mail.provider'
 import { SendPasswordResetMailProvider } from './providers/send-password-reset-mail.provider'
+import { SendContactNotificationProvider } from './providers/send-contact-notification.provider'
 import { MailOptions } from './interfaces/mail-options.interface'
 
 @Injectable()
@@ -12,6 +13,8 @@ export class MailService {
     private readonly sendWelcomeMailProvider: SendWelcomeMailProvider,
     private readonly sendVerificationMailProvider: SendVerificationMailProvider,
     private readonly sendPasswordResetMailProvider: SendPasswordResetMailProvider,
+    // dedicated provider for contact form notifications
+    private readonly sendContactNotificationProvider: SendContactNotificationProvider,
   ) {}
 
   async sendMail(options: MailOptions): Promise<void> {
@@ -39,5 +42,15 @@ export class MailService {
     resetUrl: string
   }): Promise<void> {
     return this.sendPasswordResetMailProvider.sendPasswordReset(user)
+  }
+
+  /** Sends a contact form notification to the site owner. */
+  async sendContactNotification(submission: {
+    name: string
+    email: string
+    subject: string
+    message: string
+  }): Promise<void> {
+    return this.sendContactNotificationProvider.send(submission)
   }
 }
