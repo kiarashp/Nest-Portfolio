@@ -19,7 +19,7 @@ import { CreateGoogleUserProvider } from './create-google-user.provider'
 import { GoogleUser } from '../interfaces/google-user.interface'
 import { FindOneByIdProvider } from './find-one-by-id.provider'
 import { RemoveOneByIdProvider } from './remove-one-by-id.provider'
-import { UploadAvatarProvider } from './upload-avatar.provider'
+import { SelectAvatarProvider } from './select-avatar.provider'
 import { ChangeUserRoleProvider } from './change-user-role.provider'
 import { VerifyEmailProvider } from './verify-email.provider'
 import { ResendVerificationProvider } from './resend-verification.provider'
@@ -75,9 +75,9 @@ export class UsersService {
      */
     private readonly removeOneByIdProvider: RemoveOneByIdProvider,
     /**
-     * inject upload avatar provider
+     * inject select avatar provider
      */
-    private readonly uploadAvatarProvider: UploadAvatarProvider,
+    private readonly selectAvatarProvider: SelectAvatarProvider,
     /**
      * inject change user role provider
      */
@@ -169,10 +169,10 @@ export class UsersService {
   }
 
   /**
-   * Upload and set the avatar for the authenticated user.
+   * Set the user's avatar to one of the predefined Cloudinary-hosted options.
    */
-  public async uploadAvatar(file: Express.Multer.File, userId: number) {
-    return await this.uploadAvatarProvider.uploadAvatar(file, userId)
+  public async selectAvatar(avatarKey: string, userId: number) {
+    return await this.selectAvatarProvider.selectAvatar(avatarKey, userId)
   }
 
   /**

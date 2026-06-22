@@ -93,6 +93,18 @@ Upload 8–12 avatar image files manually via the Cloudinary dashboard (numbered
 
 **Note on mocks:** No new mocks needed in `create-app.helper.ts` — avatar selection makes no external calls at request time.
 
+- [x] Create `src/users/constants/avatar-options.ts` (8 entries, placeholder Cloudinary URLs)
+- [x] Create `src/users/dtos/select-avatar.dto.ts` with `@IsIn(AVATAR_OPTIONS.map(o => o.key))`
+- [x] Create `src/users/providers/select-avatar.provider.ts`
+- [x] Delete `src/users/providers/upload-avatar.provider.ts`
+- [x] Update `users.service.ts` — swap `UploadAvatarProvider` → `SelectAvatarProvider`, replace `uploadAvatar()` with `selectAvatar()`
+- [x] Update `users.controller.ts` — rewrite `PATCH /users/avatar` to JSON body, add `GET /users/avatar-options` public route
+- [x] Update `users.module.ts` — swap provider, remove `UploadsModule` import
+- [x] Fix pre-existing `bcrypt.provider.ts` TS errors (cast `data as string` in hash + compare calls)
+- [x] Build passes, lint clean
+- [x] Write + run e2e spec (`test/users/users-avatar-selection.e2e-spec.ts` — 5 tests passing)
+- [ ] **Developer action required:** Upload 8 avatar illustrations to Cloudinary and replace placeholder URLs in `src/users/constants/avatar-options.ts`
+
 ---
 
 ### 3. Public author profile endpoint

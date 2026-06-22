@@ -3,6 +3,7 @@ import request from 'supertest'
 import { App } from 'supertest/types'
 import { DataSource } from 'typeorm'
 import { UserRole } from '../../src/auth/enums/user-role.enum'
+import { AVATAR_OPTIONS } from '../../src/users/constants/avatar-options'
 import { getAuthToken } from '../helpers/auth.helper'
 import { createApp } from '../helpers/create-app.helper'
 import { cleanupUsers, seedUser } from '../helpers/seed.helper'
@@ -97,5 +98,42 @@ describe('RBAC (e2e)', () => {
       .get(`/users/${userId}`)
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200)
+  })
+
+  // ── Self-service routes (USER role allowed) ──────────────────────────────
+
+  it('USER can call PATCH /users/me → 200', async () => {
+    // Self-service profile update — no @Roles restriction, any authenticated user can call this.
+    await request(app.getHttpServer())
+      .patch('/users/me')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ firstName: 'Updated' })
+      .expect(200)
+  })
+
+  it('USER can call PATCH /users/avatar → 200', async () => {
+    // Avatar selection — no @Roles restriction, any authenticated user can pick an avatar.
+    await request(app.getHttpServer())
+      .patch('/users/avatar')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ avatarKey: AVATAR_OPTIONS[0].key })
+      .expect(200)
+  })
+
+  // ── Admin-only routes (USER role blocked) ────────────────────────────────
+
+  it('USER cannot call DELETE /users/:id → 403', async () => {
+    await request(app.getHttpServer())
+      .delete(`/users/${userId}`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(403)
+  })
+
+  it('USER cannot call PATCH /users/:id/role → 403', async () => {
+    await request(app.getHttpServer())
+      .patch(`/users/${userId}/role`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ role: UserRole.ADMIN })
+      .expect(403)
   })
 })

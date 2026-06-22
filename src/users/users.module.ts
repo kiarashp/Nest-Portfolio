@@ -14,7 +14,7 @@ import { FindOneByGoogleIdProvider } from './providers/find-one-by-google-id.pro
 import { CreateGoogleUserProvider } from './providers/create-google-user.provider'
 import { RemoveOneByIdProvider } from './providers/remove-one-by-id.provider'
 import { FindOneByIdProvider } from './providers/find-one-by-id.provider'
-import { UploadAvatarProvider } from './providers/upload-avatar.provider'
+import { SelectAvatarProvider } from './providers/select-avatar.provider'
 import { ChangeUserRoleProvider } from './providers/change-user-role.provider'
 import { VerifyEmailProvider } from './providers/verify-email.provider'
 import { ResendVerificationProvider } from './providers/resend-verification.provider'
@@ -23,7 +23,6 @@ import { PatchUserProfileProvider } from './providers/patch-user-profile.provide
 import { SyncGoogleUserProvider } from './providers/sync-google-user.provider'
 import { ForgotPasswordProvider } from './providers/forgot-password.provider'
 import { ResetPasswordProvider } from './providers/reset-password.provider'
-import { UploadsModule } from 'src/uploads/uploads.module'
 import { MailModule } from 'src/mail/mail.module'
 
 @Module({
@@ -37,7 +36,7 @@ import { MailModule } from 'src/mail/mail.module'
     CreateGoogleUserProvider,
     RemoveOneByIdProvider,
     FindOneByIdProvider,
-    UploadAvatarProvider,
+    SelectAvatarProvider,
     ChangeUserRoleProvider,
     VerifyEmailProvider,
     ResendVerificationProvider,
@@ -53,7 +52,6 @@ import { MailModule } from 'src/mail/mail.module'
     TypeOrmModule.forFeature([User]),
     ConfigModule.forFeature(jwtConfig),
     JwtModule.registerAsync(jwtConfig.asProvider()),
-    UploadsModule,
     MailModule,
   ],
 })

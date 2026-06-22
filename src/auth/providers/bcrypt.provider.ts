@@ -4,15 +4,12 @@ import * as bcrypt from 'bcryptjs'
 
 @Injectable()
 export class BcryptProvider implements HashingProvider {
-  public async hashPassword(data: string | Buffer): Promise<string> {
+  public async hashPassword(data: string): Promise<string> {
     // Generate salt
     const salt = await bcrypt.genSalt()
     return bcrypt.hash(data, salt)
   }
-  public comparePassword(
-    data: string | Buffer,
-    hash: string,
-  ): Promise<boolean> {
+  public comparePassword(data: string, hash: string): Promise<boolean> {
     return bcrypt.compare(data, hash)
   }
 }

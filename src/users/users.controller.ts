@@ -1,9 +1,6 @@
 import {
   Controller,
-  FileTypeValidator,
   Get,
-  MaxFileSizeValidator,
-  ParseFilePipe,
   Post,
   Param,
   Body,
@@ -13,18 +10,13 @@ import {
   Patch,
   Delete,
   SerializeOptions,
-  UploadedFile,
-  UseInterceptors,
 } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
-import { FileInterceptor } from '@nestjs/platform-express'
-import { memoryStorage } from 'multer'
 import { CreateUserDto } from './dtos/create-user.dtos'
 import { PatchUserDto } from './dtos/patch-user.dto'
 import { UsersService } from './providers/users.service'
 import {
   ApiBearerAuth,
-  ApiConsumes,
   ApiOperation,
   ApiQuery,
   ApiResponse,
@@ -38,6 +30,8 @@ import { Roles } from 'src/auth/decorators/roles.decorator'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 import { ChangeUserRoleDto } from './dtos/change-user-role.dto'
 import { PatchUserProfileDto } from './dtos/patch-user-profile.dto'
+import { SelectAvatarDto } from './dtos/select-avatar.dto'
+import { AVATAR_OPTIONS } from './constants/avatar-options'
 import type { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 
 @Controller('users')
@@ -92,6 +86,18 @@ export class UsersController {
   }
 
   /**
+   * List all available predefined avatars — public, no auth required.
+   * Frontend and Flutter (or mobile app) use this to render the avatar picker.
+   */
+  @Get('avatar-options')
+  @Auth(AuthType.None)
+  @ApiOperation({ summary: 'List available predefined avatar options' })
+  @ApiResponse({ status: 200, description: 'Array of avatar options' })
+  public getAvatarOptions() {
+    return AVATAR_OPTIONS
+  }
+
+  /**
    * Get a single user by id — admin only
    */
   @Roles(UserRole.ADMIN)
@@ -101,7 +107,7 @@ export class UsersController {
   }
 
   /**
-   * Update the currently authenticated user's own profile (firstName / lastName only).
+   * Update the currently authenticated user's own profile (firstName / lastName / bio).
    * Must be declared before :id to prevent 'me' being parsed as an integer.
    */
   @Patch('me')
@@ -119,31 +125,18 @@ export class UsersController {
   }
 
   /**
-   * Upload or replace the avatar for the currently logged-in user.
+   * Select a predefined avatar for the currently logged-in user.
    */
   @Patch('avatar')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Upload user avatar' })
-  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Select a predefined avatar' })
   @ApiResponse({ status: 200, description: 'Avatar updated successfully' })
-  @ApiResponse({
-    status: 400,
-    description: 'File is missing, too large, or not a supported image type',
-  })
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
-  public async uploadAvatar(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
-          new FileTypeValidator({ fileType: /^image\/(jpeg|png|webp|gif)$/ }),
-        ],
-      }),
-    )
-    file: Express.Multer.File,
+  @ApiResponse({ status: 400, description: 'Unknown avatar key' })
+  public async selectAvatar(
+    @Body() dto: SelectAvatarDto,
     @ActiveUser('sub') userId: number,
   ) {
-    return await this.usersService.uploadAvatar(file, userId)
+    return await this.usersService.selectAvatar(dto.avatarKey, userId)
   }
 
   /**
