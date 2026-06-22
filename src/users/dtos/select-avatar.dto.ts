@@ -1,13 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsIn } from 'class-validator'
-import { AVATAR_OPTIONS } from '../constants/avatar-options'
+import { IsInt, IsPositive } from 'class-validator'
 
 export class SelectAvatarDto {
   @ApiProperty({
-    description: 'Key of the chosen avatar from the available options',
-    example: 'avatar-1',
-    enum: AVATAR_OPTIONS.map((o) => o.key),
+    description:
+      'ID of the chosen avatar option from GET /users/avatar-options',
+    example: 1,
   })
-  @IsIn(AVATAR_OPTIONS.map((o) => o.key))
-  avatarKey!: string
+  @IsInt()
+  @IsPositive()
+  avatarOptionId!: number
 }

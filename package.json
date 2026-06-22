@@ -19,7 +19,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "cross-env NODE_ENV=test jest --config ./test/jest-e2e.json",
+    "test:e2e": "cross-env NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-e2e.json",
     "doc": "pnpm compodoc -p tsconfig.json -s --port 3001 --watch -d ./documentation",
     "seed:admin": "ts-node -r tsconfig-paths/register src/database/seeds/admin.seed.ts",
     "typeorm": "cross-env NODE_ENV=development ts-node -P tsconfig.typeorm.json -r tsconfig-paths/register node_modules/typeorm/cli.js",

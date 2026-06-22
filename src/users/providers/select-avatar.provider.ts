@@ -1,7 +1,11 @@
-import { ConflictException, Injectable } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { AVATAR_OPTIONS } from '../constants/avatar-options'
+import { AvatarOption } from '../entities/avatar-option.entity'
 import { User } from '../entities/user.entity'
 import { FindOneByIdProvider } from './find-one-by-id.provider'
 
@@ -15,20 +19,31 @@ export class SelectAvatarProvider {
     private readonly usersRepository: Repository<User>,
 
     /**
+     * Inject AvatarOption repository to look up the option by id
+     */
+    @InjectRepository(AvatarOption)
+    private readonly avatarOptionRepo: Repository<AvatarOption>,
+
+    /**
      * Inject FindOneByIdProvider to look up the user before updating
      */
     private readonly findOneByIdProvider: FindOneByIdProvider,
   ) {}
 
   /**
-   * Sets the user's avatar to the Cloudinary URL matching the given key.
-   * The key is already validated by SelectAvatarDto before this runs.
+   * Sets the user's avatar to the Cloudinary URL for the given avatar option id.
+   * Throws BadRequestException if the id does not match any active avatar option.
    */
-  public async selectAvatar(avatarKey: string, userId: number): Promise<User> {
-    const user = await this.findOneByIdProvider.findOneById(userId)
+  public async selectAvatar(
+    avatarOptionId: number,
+    userId: number,
+  ): Promise<User> {
+    const option = await this.avatarOptionRepo.findOne({
+      where: { id: avatarOptionId },
+    })
+    if (!option) throw new BadRequestException('Invalid avatar option')
 
-    // Safe to assert non-null — dto validation already confirmed the key exists
-    const option = AVATAR_OPTIONS.find((o) => o.key === avatarKey)!
+    const user = await this.findOneByIdProvider.findOneById(userId)
     user.avatarUrl = option.url
 
     try {

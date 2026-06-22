@@ -24,6 +24,9 @@ import { SyncGoogleUserProvider } from './providers/sync-google-user.provider'
 import { ForgotPasswordProvider } from './providers/forgot-password.provider'
 import { ResetPasswordProvider } from './providers/reset-password.provider'
 import { MailModule } from 'src/mail/mail.module'
+import { UploadsModule } from 'src/uploads/uploads.module'
+import { AvatarOptionsProvider } from './providers/avatar-options.provider'
+import { AvatarOption } from './entities/avatar-option.entity'
 
 @Module({
   controllers: [UsersController],
@@ -45,11 +48,13 @@ import { MailModule } from 'src/mail/mail.module'
     SyncGoogleUserProvider,
     ForgotPasswordProvider,
     ResetPasswordProvider,
+    AvatarOptionsProvider,
   ],
   exports: [UsersService],
   imports: [
     forwardRef(() => AuthModule),
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, AvatarOption]),
+    UploadsModule,
     ConfigModule.forFeature(jwtConfig),
     JwtModule.registerAsync(jwtConfig.asProvider()),
     MailModule,

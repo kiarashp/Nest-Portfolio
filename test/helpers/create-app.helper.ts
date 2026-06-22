@@ -6,6 +6,7 @@ import { App } from 'supertest/types'
 import { DataSource } from 'typeorm'
 import { AppModule } from '../../src/app.module'
 import { MailService } from '../../src/mail/mail.service'
+import { StorageProvider } from '../../src/uploads/providers/storage.provider'
 
 // Per-method mail overrides. Unspecified methods receive a jest.fn() no-op.
 interface MailMock {
@@ -15,9 +16,17 @@ interface MailMock {
   sendPasswordResetMail?: jest.Mock
 }
 
+// Per-method storage overrides. Unspecified methods get a sensible default mock.
+interface StorageMock {
+  upload?: jest.Mock
+  delete?: jest.Mock
+}
+
 interface CreateAppOptions {
   // Pass individual mocks only for methods whose calls you need to assert on.
   mailMock?: MailMock
+  // Override specific StorageProvider methods to capture calls or change return values.
+  storageMock?: StorageMock
   // Mocks ThrottlerStorage so rate limits never fire. Default: true.
   // Set to false only in throttle.e2e-spec.ts where real throttling is tested.
   skipThrottle?: boolean
@@ -37,7 +46,7 @@ interface CreateAppOptions {
 export async function createApp(
   options: CreateAppOptions = {},
 ): Promise<{ app: INestApplication<App>; dataSource: DataSource }> {
-  const { mailMock = {}, skipThrottle = true } = options
+  const { mailMock = {}, storageMock = {}, skipThrottle = true } = options
 
   const noop = (): jest.Mock => jest.fn().mockResolvedValue(undefined)
 
@@ -48,6 +57,18 @@ export async function createApp(
       sendWelcomeMail: mailMock.sendWelcomeMail ?? noop(),
       sendVerificationMail: mailMock.sendVerificationMail ?? noop(),
       sendPasswordResetMail: mailMock.sendPasswordResetMail ?? noop(),
+    })
+    // Always mock StorageProvider — prevents any spec from hitting Cloudinary.
+    // Default upload returns a stable mock URL and publicId.
+    .overrideProvider(StorageProvider)
+    .useValue({
+      upload:
+        storageMock.upload ??
+        jest.fn().mockResolvedValue({
+          url: 'https://res.cloudinary.com/mock/image/upload/v1/avatars/test.jpg',
+          publicId: 'avatars/test',
+        }),
+      delete: storageMock.delete ?? noop(),
     })
 
   if (skipThrottle) {

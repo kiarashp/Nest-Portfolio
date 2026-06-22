@@ -23,6 +23,8 @@ import cloudinaryConfig from 'src/config/cloudinary.config'
     // To swap storage backends, change `useClass` here — nothing else needs to change.
     { provide: StorageProvider, useClass: CloudinaryProvider },
   ],
-  exports: [UploadsService],
+  // StorageProvider is exported so other modules (e.g. UsersModule for avatar options)
+  // can upload/delete directly without going through UploadsService or creating UploadFile rows.
+  exports: [UploadsService, StorageProvider],
 })
 export class UploadsModule {}

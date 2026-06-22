@@ -20,6 +20,7 @@ import { GoogleUser } from '../interfaces/google-user.interface'
 import { FindOneByIdProvider } from './find-one-by-id.provider'
 import { RemoveOneByIdProvider } from './remove-one-by-id.provider'
 import { SelectAvatarProvider } from './select-avatar.provider'
+import { AvatarOptionsProvider } from './avatar-options.provider'
 import { ChangeUserRoleProvider } from './change-user-role.provider'
 import { VerifyEmailProvider } from './verify-email.provider'
 import { ResendVerificationProvider } from './resend-verification.provider'
@@ -115,6 +116,11 @@ export class UsersService {
      * Inject reset password provider
      */
     private readonly resetPasswordProviderInstance: ResetPasswordProvider,
+
+    /**
+     * Inject avatar options provider — handles admin CRUD for avatar choices
+     */
+    private readonly avatarOptionsProvider: AvatarOptionsProvider,
   ) {}
   /**
    * Find all users
@@ -169,10 +175,10 @@ export class UsersService {
   }
 
   /**
-   * Set the user's avatar to one of the predefined Cloudinary-hosted options.
+   * Set the user's avatar to one of the Cloudinary-hosted options by its DB id.
    */
-  public async selectAvatar(avatarKey: string, userId: number) {
-    return await this.selectAvatarProvider.selectAvatar(avatarKey, userId)
+  public async selectAvatar(avatarOptionId: number, userId: number) {
+    return await this.selectAvatarProvider.selectAvatar(avatarOptionId, userId)
   }
 
   /**
@@ -231,5 +237,26 @@ export class UsersService {
     newPassword: string,
   ): Promise<{ message: string }> {
     return this.resetPasswordProviderInstance.resetPassword(token, newPassword)
+  }
+
+  /**
+   * Returns all available avatar options from the database.
+   */
+  public async getAvatarOptions() {
+    return this.avatarOptionsProvider.findAll()
+  }
+
+  /**
+   * Uploads a new avatar image to Cloudinary and saves the option to the DB.
+   */
+  public async createAvatarOption(file: Express.Multer.File) {
+    return this.avatarOptionsProvider.create(file)
+  }
+
+  /**
+   * Deletes the Cloudinary asset and removes the avatar option row from the DB.
+   */
+  public async removeAvatarOption(id: number) {
+    return this.avatarOptionsProvider.remove(id)
   }
 }

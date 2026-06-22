@@ -1,9 +1,9 @@
 import { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 import { App } from 'supertest/types'
-import { DataSource } from 'typeorm'
+import { DataSource, Repository } from 'typeorm'
 import { UserRole } from '../../src/auth/enums/user-role.enum'
-import { AVATAR_OPTIONS } from '../../src/users/constants/avatar-options'
+import { AvatarOption } from '../../src/users/entities/avatar-option.entity'
 import { getAuthToken } from '../helpers/auth.helper'
 import { createApp } from '../helpers/create-app.helper'
 import { cleanupUsers, seedUser } from '../helpers/seed.helper'
@@ -16,11 +16,15 @@ describe('RBAC (e2e)', () => {
   let adminToken: string
   // ID of the regular user — needed to verify ADMIN can fetch any profile by ID.
   let userId: number
+  let avatarOptionRepo: Repository<AvatarOption>
+  // One avatar option seeded in the DB for the PATCH /users/avatar test.
+  let rbacAvatarOptionId: number
 
   const PASSWORD = 'Password123!'
 
   beforeAll(async () => {
     ;({ app, dataSource } = await createApp())
+    avatarOptionRepo = dataSource.getRepository(AvatarOption)
 
     // Seed a regular USER and an ADMIN directly — bypasses the chicken-and-egg
     // problem of needing an existing admin to elevate roles via the API.
@@ -41,9 +45,17 @@ describe('RBAC (e2e)', () => {
 
     userToken = await getAuthToken(app, 'rbac-user@example.com', PASSWORD)
     adminToken = await getAuthToken(app, 'rbac-admin@example.com', PASSWORD)
+
+    // Seed one avatar option so the PATCH /users/avatar test has a valid id.
+    const opt = await avatarOptionRepo.save({
+      url: 'https://res.cloudinary.com/test/rbac-avatar.jpg',
+      publicId: 'avatars/rbac-test',
+    })
+    rbacAvatarOptionId = opt.id
   })
 
   afterAll(async () => {
+    await avatarOptionRepo.delete(rbacAvatarOptionId)
     await cleanupUsers(dataSource, [
       'rbac-user@example.com',
       'rbac-admin@example.com',
@@ -116,7 +128,7 @@ describe('RBAC (e2e)', () => {
     await request(app.getHttpServer())
       .patch('/users/avatar')
       .set('Authorization', `Bearer ${userToken}`)
-      .send({ avatarKey: AVATAR_OPTIONS[0].key })
+      .send({ avatarOptionId: rbacAvatarOptionId })
       .expect(200)
   })
 
