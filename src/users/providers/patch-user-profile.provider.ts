@@ -33,6 +33,7 @@ export class PatchUserProfileProvider {
 
     if (dto.firstName !== undefined) user.firstName = dto.firstName
     if (dto.lastName !== undefined) user.lastName = dto.lastName
+    if (dto.bio !== undefined) user.bio = dto.bio
 
     return this.usersRepository.save(user)
   }

@@ -5,10 +5,10 @@ export class AddPasswordResetTokenFields1781902378291 implements MigrationInterf
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "user" ADD "passwordResetToken" character varying(128)`,
+      `ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "passwordResetToken" character varying(128)`,
     )
     await queryRunner.query(
-      `ALTER TABLE "user" ADD "passwordResetTokenExpiry" TIMESTAMP WITH TIME ZONE`,
+      `ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "passwordResetTokenExpiry" TIMESTAMP WITH TIME ZONE`,
     )
     await queryRunner.query(
       `ALTER TABLE "user" ALTER COLUMN "isEmailVerified" SET DEFAULT false`,

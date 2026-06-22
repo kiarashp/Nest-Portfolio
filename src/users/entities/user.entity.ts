@@ -54,6 +54,9 @@ export class User {
     nullable: true,
   })
   avatarUrl?: string
+  // short plain-text bio shown on author cards and the about page
+  @Column({ type: 'text', nullable: true, default: null })
+  bio?: string | null
   // role — controls what the user is allowed to do
   @Column({
     type: 'enum',
