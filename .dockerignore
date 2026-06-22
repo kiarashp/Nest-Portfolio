@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+coverage
+documentation
+test
+**/*.spec.ts
+**/*.e2e-spec.ts
+.env*
+openapi.json
+openapi-types.ts
