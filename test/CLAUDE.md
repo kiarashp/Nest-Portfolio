@@ -21,7 +21,7 @@ Direct DB inserts — bypasses the HTTP layer and the email side-effect of `POST
 ```ts
 await seedUser(dataSource, {
   email: 'test@e2e.test',
-  password: 'Password1!',   // plain-text — hashed internally with bcrypt
+  password: 'Password1!',   // plain-text — hashed internally with bcryptjs
   firstName: 'Test',        // default: 'Test'
   role: UserRole.ADMIN,     // default: UserRole.USER
   isEmailVerified: true,    // default: true

@@ -9,6 +9,8 @@ import helmet from 'helmet'
 export async function appCreate(app: INestApplication): Promise<void> {
   const configService = app.get(ConfigService)
   const port = configService.get<number>('appConfig.appPort') ?? 3000
+  const appUrl =
+    configService.get<string>('appConfig.appUrl') ?? 'http://localhost:3000'
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -23,23 +25,25 @@ export async function appCreate(app: INestApplication): Promise<void> {
   app.use(helmet())
   app.use(cookieParser())
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('NestJS API - BlogApp')
-    .setDescription('Use the base API URL as http://localhost:3000')
-    .setTermsOfService('http://localhost:3000/terms-of-service')
-    .setLicense('MIT License', 'https://opensource.org/licenses/MIT')
-    .addServer('http://localhost:3000')
-    .setVersion('1.0')
-    .build()
-  const document = SwaggerModule.createDocument(app, swaggerConfig)
-  SwaggerModule.setup('api', app, document)
+  if (configService.get<string>('appConfig.environments') !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('NestJS API - BlogApp')
+      .setDescription(`Base API URL: ${appUrl}`)
+      .setTermsOfService(`${appUrl}/terms-of-service`)
+      .setLicense('MIT License', 'https://opensource.org/licenses/MIT')
+      .addServer(appUrl)
+      .setVersion('1.0')
+      .build()
+    const document = SwaggerModule.createDocument(app, swaggerConfig)
+    SwaggerModule.setup('api', app, document)
+  }
 
   const frontendUrl =
     configService.get<string>('appConfig.frontendUrl') ??
     'http://localhost:5173'
 
   app.enableCors({
-    origin: [frontendUrl, 'http://localhost:5173'],
+    origin: frontendUrl,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

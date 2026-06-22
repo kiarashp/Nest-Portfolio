@@ -26,4 +26,13 @@ describe('App (e2e)', () => {
     // handled by some catch-all.
     await request(app.getHttpServer()).get('/this-does-not-exist').expect(404)
   })
+
+  it('GET /health returns 200 without auth', async () => {
+    await request(app.getHttpServer()).get('/health').expect(200)
+  })
+
+  it('GET /health returns { status: "ok" } in the data envelope', async () => {
+    const res = await request(app.getHttpServer()).get('/health').expect(200)
+    expect((res.body as { data: { status: string } }).data.status).toBe('ok')
+  })
 })

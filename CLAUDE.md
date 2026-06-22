@@ -77,7 +77,7 @@ Rules:
 
 See `test/CLAUDE.md` for the e2e helper infrastructure and spec-writing conventions.
 
-Swagger/OpenAPI docs are served at `/api` once the app is running (see `main.ts`).
+Swagger/OpenAPI docs are served at `/api` in development only (`NODE_ENV !== 'production'`). In production the endpoint returns 404 — Swagger is disabled at startup in `app.create.ts`.
 
 `src/app.create.ts` (beside `main.ts`) contains all post-creation setup: global pipes, `cookie-parser` middleware, Swagger, CORS, and `app.listen()`. `main.ts` just calls `NestFactory.create(AppModule)` then delegates to `appCreate(app)`. Change global middleware or port config there, not in `main.ts`.
 
@@ -146,7 +146,7 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 
 ### Auth
 
-- Local sign-in: `auth/providers/sign-in.provider.ts` + `bcrypt.provider.ts` (implements `HashingProvider` abstract class via DI token).
+- Local sign-in: `auth/providers/sign-in.provider.ts` + `bcrypt.provider.ts` (implements `HashingProvider` abstract class via DI token). Uses `bcryptjs` (pure-JS port — no native build tools required).
 - Tokens: `generate-tokens.provider.ts` issues access+refresh JWTs. The access token payload includes `sub` (userId), `email`, and `role`. The refresh token carries only `sub`.
 - Google OAuth: `auth/social/google-authentication.controller.ts` + `social/providers/google-authentication.service.ts` verify Google ID tokens, then create/find a local user. Both local and Google users are always created with `role: UserRole.USER` — roles must be elevated explicitly by an admin.
 - `AuthModule` uses `forwardRef(() => UsersModule)` because of a circular dependency — keep that in mind if you touch either module's imports/exports. See `src/auth/CLAUDE.md` for details.
@@ -155,6 +155,12 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 **Refresh token dual delivery (browser + mobile):** On sign-in and token refresh, the refresh token is returned in both the JSON body AND set as an `HttpOnly` cookie (`Path=/auth/refresh-tokens`, `SameSite=lax`). Browser clients (Svelte) rely on the cookie; mobile clients (Flutter) read the body. `POST /auth/refresh-tokens` accepts the token from either source — cookie takes precedence, body is the fallback. `POST /auth/sign-out` clears the cookie (mobile clients can ignore it).
 
 **`RefreshTokenDto` optional field pattern:** `refreshToken` in `RefreshTokenDto` is `@IsOptional()` so the global `ValidationPipe` does not reject browser requests that send no body. The controller enforces presence — if neither cookie nor body provides a token it throws `UnauthorizedException`. Downstream (`AuthService.refreshTokens`, `RefreshTokensProvider.refreshTokens`) take `{ refreshToken: string }` (not the DTO) because by that point the controller has already resolved and guaranteed the string.
+
+### App routes
+
+| Route | Auth | Notes |
+|---|---|---|
+| `GET /health` | None (public) | Health check — returns `{ status: 'ok' }` wrapped in the data envelope. Used by Coolify container health polling. |
 
 ### Users routes
 
