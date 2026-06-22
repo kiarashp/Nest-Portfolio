@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  NotFoundException,
   Post,
   Param,
   Body,
@@ -95,6 +96,30 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Array of avatar options' })
   public getAvatarOptions() {
     return AVATAR_OPTIONS
+  }
+
+  /**
+   * Public profile for a content author, editor, or admin.
+   * Returns 404 for USER-role accounts so regular sign-ups are not publicly discoverable.
+   * Uses the 'public' group to override the class-level 'admin' group, hiding email/role/isEmailVerified.
+   */
+  @Get(':id/profile')
+  @Auth(AuthType.None)
+  @SerializeOptions({ groups: ['public'] })
+  @ApiOperation({
+    summary: 'Get public profile for a content author or editor',
+  })
+  @ApiResponse({ status: 200, description: 'Public profile' })
+  @ApiResponse({
+    status: 404,
+    description: 'Not found or user is not a content author',
+  })
+  public async getPublicProfile(@Param('id', ParseIntPipe) id: number) {
+    const user = await this.usersService.findOneById(id)
+    // Return 404 for USER-role accounts — don't reveal regular user accounts exist
+    if (user.role === UserRole.USER)
+      throw new NotFoundException('User not found')
+    return user
   }
 
   /**

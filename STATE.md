@@ -127,9 +127,10 @@ The Svelte frontend will have public-facing author pages (e.g. `/authors/1`) and
 - GET /users/1/profile → does NOT contain email, role, isEmailVerified, password (check explicitly)
 - GET /users/999/profile → 404
 
-- [ ] Create `PublicUserProfileDto` with only the five safe `@Expose()` fields
-- [ ] Add `GET /users/:id/profile` to `UsersController` with `@Auth(AuthType.None)` and `@SerializeOptions({ excludeExtraneousValues: true })`
-- [ ] Write e2e spec
+**Revised approach (implemented):** No DTO needed. `@SerializeOptions({ groups: ['public'] })` on the handler overrides the class-level `{ groups: ['admin'] }`. Un-decorated fields (id, firstName, lastName, avatarUrl, bio) appear normally. Admin-gated fields (email, role, isEmailVerified) are hidden. `@Exclude()` fields (password, tokens) are always hidden. Role check: `if (user.role === UserRole.USER) throw NotFoundException` — regular accounts are not publicly discoverable.
+
+- [x] Add `GET /users/:id/profile` to `UsersController` with `@Auth(AuthType.None)` and `@SerializeOptions({ groups: ['public'] })`
+- [x] Write e2e spec (`test/users/users-public-profile.e2e-spec.ts` — 5 tests passing)
 
 ---
 
