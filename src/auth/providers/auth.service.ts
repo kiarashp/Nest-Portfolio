@@ -3,6 +3,8 @@ import { UsersService } from 'src/users/providers/users.service'
 import { SignInDto } from '../dtos/signin.dto'
 import { SignInProvider } from './sign-in.provider'
 import { RefreshTokensProvider } from './refresh-tokens.provider'
+import { ChangePasswordProvider } from './change-password.provider'
+import { ChangePasswordDto } from '../dtos/change-password.dto'
 
 @Injectable()
 export class AuthService {
@@ -20,6 +22,10 @@ export class AuthService {
      * inject refresh tokens provider
      */
     private readonly refreshTokensProvider: RefreshTokensProvider,
+    /**
+     * inject change password provider
+     */
+    private readonly changePasswordProvider: ChangePasswordProvider,
   ) {}
 
   /**
@@ -59,5 +65,12 @@ export class AuthService {
    */
   public async resetPassword(token: string, newPassword: string) {
     return this.usersService.resetPassword(token, newPassword)
+  }
+
+  /**
+   * Change the password for a logged-in user after verifying the current password.
+   */
+  public async changePassword(userId: number, dto: ChangePasswordDto) {
+    return this.changePasswordProvider.changePassword(userId, dto)
   }
 }

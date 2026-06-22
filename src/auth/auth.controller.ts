@@ -23,6 +23,9 @@ import { VerifyEmailDto } from './dtos/verify-email.dto'
 import { ResendVerificationDto } from './dtos/resend-verification.dto'
 import { ForgotPasswordDto } from './dtos/forgot-password.dto'
 import { ResetPasswordDto } from './dtos/reset-password.dto'
+import { ChangePasswordDto } from './dtos/change-password.dto'
+import { ActiveUser } from './decorators/active-user.decorator'
+import type { ActiveUserData } from './interfaces/active-user-data.interface'
 import jwtConfig from './config/jwt.config'
 
 @Controller('auth')
@@ -131,5 +134,19 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   public async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword)
+  }
+
+  /**
+   * Change the password for the currently authenticated user.
+   * Requires a valid Bearer token. Google-only accounts are rejected.
+   */
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  public async changePassword(
+    @Body() dto: ChangePasswordDto,
+    @ActiveUser() activeUser: ActiveUserData,
+  ) {
+    return this.authService.changePassword(activeUser.sub, dto)
   }
 }

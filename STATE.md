@@ -160,15 +160,34 @@ The mail template (`contact.ejs`) is a simple HTML email showing the sender's na
 - `src/mail/mail.service.ts` — expose `sendContactNotification()`
 - `src/config/environment.validation.ts` — add new var if needed
 
-**E2E spec:** `test/contact.e2e-spec.ts`
-- POST /contact with valid name/email/subject/message → 201
-- POST /contact with missing required field → 400
-- POST /contact with invalid email format → 400
-- Verify ContactSubmission row exists in DB after successful submission
+**What was built:**
+
+`ContactSubmission` entity — columns: `id`, `name` (varchar 100), `email` (varchar 254), `subject` (varchar 200), `message` (text), `createdAt`. Migration: `AddContactSubmissionsTable`.
+
+`CreateContactDto` — all four fields required. `name`, `subject`, and `message` have `@Transform(trim)` before `@IsNotEmpty()` so whitespace-only strings are rejected (not just empty strings). `email` uses `@IsEmail()`.
+
+`ContactProvider` — saves the submission row, then calls `mailService.sendContactNotification()`. The notification goes to `MAIL_FROM` (owner's address) via `mail.defaultFrom` from config — no new env var added.
+
+`SendContactNotificationProvider` — in `src/mail/providers/`. Injects `SendMailProvider` and `ConfigService`. Sends to `mailConfig.defaultFrom` with subject `[Contact] <subject>` and template `contact`.
+
+`contact.ejs` — styled HTML template matching the look of `welcome.ejs`. Shows sender name, email, subject, and message body.
+
+`MailService.sendContactNotification()` — new facade method delegating to `SendContactNotificationProvider`.
+
+No new env var — `MAIL_FROM` doubles as the notification recipient.
+
+**E2E spec:** `test/contact/contact.e2e-spec.ts` — 7 tests:
+- POST /contact valid payload (unauthenticated) → 201, fields returned
+- POST /contact valid payload → row persisted in DB (verified by ID lookup)
+- POST /contact successful → `sendContactNotification` mock called with correct args
+- POST /contact missing message → 400
+- POST /contact invalid email → 400
+- POST /contact message > 2000 chars → 400
+- POST /contact whitespace-only name → 400 (trim + @IsNotEmpty catches it)
 
 - [x] Create `ContactSubmission` entity
 - [x] Generate + run migration: `AddContactSubmissionsTable`
-- [x] Create `CreateContactDto` with validation
+- [x] Create `CreateContactDto` with `@Transform(trim)` on name/subject/message
 - [x] Create `ContactProvider` (save + call mailService)
 - [x] Create `ContactController` with `POST /contact`, `@Auth(AuthType.None)`, `@Throttle({ default: { limit: 3, ttl: 300000 } })`
 - [x] Create `ContactModule` and import into `AppModule`
@@ -176,7 +195,7 @@ The mail template (`contact.ejs`) is a simple HTML email showing the sender's na
 - [x] Create `SendContactNotificationProvider` and register in `MailModule`
 - [x] Expose `sendContactNotification()` on `MailService`
 - [x] No new env var needed — reuses `MAIL_FROM` as recipient via `mail.defaultFrom`
-- [x] Write e2e spec (`test/contact/contact.e2e-spec.ts` — 5 tests passing)
+- [x] Write e2e spec (`test/contact/contact.e2e-spec.ts` — 7 tests passing)
 
 ---
 
@@ -208,11 +227,11 @@ Currently, an authenticated user who wants to change their password has no way t
 - POST /auth/change-password with weak newPassword (no special char) → 400
 - POST /auth/sign-in with the newPassword after a successful change → 200 (confirms password actually changed)
 
-- [ ] Create `ChangePasswordDto`
-- [ ] Create `ChangePasswordProvider`
-- [ ] Add `POST /auth/change-password` to `AuthController` with `@Throttle({ default: { limit: 5, ttl: 60000 } })`
-- [ ] Register provider in `AuthModule`
-- [ ] Write e2e spec
+- [x] Create `ChangePasswordDto`
+- [x] Create `ChangePasswordProvider`
+- [x] Add `POST /auth/change-password` to `AuthController` with `@Throttle({ default: { limit: 5, ttl: 60000 } })`
+- [x] Register provider in `AuthModule`
+- [x] Write e2e spec (`test/auth/auth-change-password.e2e-spec.ts` — 6 tests passing)
 
 ---
 

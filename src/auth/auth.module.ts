@@ -12,6 +12,7 @@ import { GenerateTokensProvider } from './providers/generate-tokens.provider'
 import { RefreshTokensProvider } from './providers/refresh-tokens.provider'
 import { GoogleAuthenticationController } from './social/google-authentication.controller'
 import { GoogleAuthenticationService } from './social/providers/google-authentication.service'
+import { ChangePasswordProvider } from './providers/change-password.provider'
 import jwtConfig from './config/jwt.config'
 @Module({
   controllers: [AuthController, GoogleAuthenticationController],
@@ -26,6 +27,7 @@ import jwtConfig from './config/jwt.config'
     GenerateTokensProvider,
     RefreshTokensProvider,
     GoogleAuthenticationService,
+    ChangePasswordProvider,
   ],
   imports: [
     forwardRef(() => UsersModule),

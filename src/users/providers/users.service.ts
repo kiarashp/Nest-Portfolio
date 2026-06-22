@@ -259,4 +259,15 @@ export class UsersService {
   public async removeAvatarOption(id: number) {
     return this.avatarOptionsProvider.remove(id)
   }
+
+  /**
+   * Saves a pre-hashed password to the user row. Called by ChangePasswordProvider
+   * after it has already verified the current password and hashed the new one.
+   */
+  public async updatePassword(
+    userId: number,
+    hashedPassword: string,
+  ): Promise<void> {
+    await this.userRepository.save({ id: userId, password: hashedPassword })
+  }
 }

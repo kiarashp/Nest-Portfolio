@@ -119,6 +119,7 @@ Entity relations:
 - `Post` 1—N `UploadFile` (non-eager — only loaded explicitly, e.g. on post deletion for cleanup)
 - `User` 1—N `UploadFile` (non-nullable — every upload is tied to the uploading user)
 - `AvatarOption` — standalone entity (`src/users/entities/avatar-option.entity.ts`), no FK to `User`. Columns: `id`, `url`, `publicId`, `createdAt`. Admins populate the pool via `POST /users/avatar-options`; users pick one with `PATCH /users/avatar`.
+- `ContactSubmission` — standalone entity (`src/contact/entities/contact-submission.entity.ts`), no FK to any other table. Columns: `id`, `name`, `email`, `subject`, `message`, `createdAt`. Every submission is persisted permanently so the owner can review them even if an email notification is missed.
 
 ### Request pipeline (global, wired in `app.module.ts`)
 
@@ -143,6 +144,7 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 | `POST /auth/resend-verification` | 3 / 300s |
 | `POST /auth/forgot-password` | 3 / 300s |
 | `POST /users` (register) | 5 / 600s |
+| `POST /contact` | 3 / 300s |
 
 `ttl` is in milliseconds. To skip throttling on a route entirely, use `@SkipThrottle()`. To tighten limits on a new sensitive endpoint, add `@Throttle({ default: { limit, ttl } })` directly on the handler — no module changes needed.
 
@@ -163,6 +165,12 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 | Route | Auth | Notes |
 |---|---|---|
 | `GET /health` | None (public) | Health check — returns `{ status: 'ok' }` wrapped in the data envelope. Used by Coolify container health polling. |
+
+### Contact routes
+
+| Route | Auth | Notes |
+|---|---|---|
+| `POST /contact` | None (public) | Saves submission to DB, emails owner notification. Throttled 3 / 300s. All fields required; `name`, `subject`, `message` are trimmed before `@IsNotEmpty` so whitespace-only strings are rejected. |
 
 ### Users routes
 
@@ -222,9 +230,12 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 - `mail.config.ts` — `registerAs('mail', ...)` namespace; reads `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` from env.
 - `providers/nodemailer.provider.ts` — custom DI token `NODEMAILER_TRANSPORTER`; creates the nodemailer transporter once via `useFactory`.
 - `providers/send-mail.provider.ts` — core send logic: renders an EJS template then calls `transporter.sendMail()`. Template path resolves to `dist/mail/templates/<name>.ejs` at runtime.
-- `providers/send-welcome-mail.provider.ts` — dedicated provider for the welcome email; calls `SendMailProvider` with `template: 'welcome'`.
-- `mail.service.ts` — thin facade; currently exposes `sendMail(options)` and `sendWelcomeMail({ email, firstName })`.
-- `templates/` — EJS files; one per email type (e.g. `welcome.ejs`). Variables are injected via the `context` field of `MailOptions`.
+- `providers/send-welcome-mail.provider.ts` — welcome email.
+- `providers/send-verification-mail.provider.ts` — email address verification.
+- `providers/send-password-reset-mail.provider.ts` — password reset link.
+- `providers/send-contact-notification.provider.ts` — contact form notification to the site owner; reads recipient address from `mail.defaultFrom` (same as `MAIL_FROM` env var — no separate env var needed).
+- `mail.service.ts` — thin facade; exposes `sendMail`, `sendWelcomeMail`, `sendVerificationMail`, `sendPasswordResetMail`, `sendContactNotification`.
+- `templates/` — EJS files; one per email type (`welcome.ejs`, `verification.ejs`, `password-reset.ejs`, `contact.ejs`). Variables injected via the `context` field of `MailOptions`.
 
 **Adding a new email type:**
 1. Add a `<name>.ejs` file in `src/mail/templates/`.
@@ -236,7 +247,9 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 
 **Dev testing:** Use [Mailtrap](https://mailtrap.io) sandbox — set `MAIL_HOST=sandbox.smtp.mailtrap.io`, `MAIL_PORT=2525`, `MAIL_SECURE=false` and your Mailtrap credentials in `.env.development`. Sent emails appear in the Mailtrap inbox without reaching real recipients.
 
-**Current wiring:** `UsersModule` imports `MailModule`. `CreateUserProvider` calls `mailService.sendWelcomeMail()` after saving a new user.
+**Current wiring:**
+- `UsersModule` imports `MailModule`. `CreateUserProvider` calls `mailService.sendWelcomeMail()` after saving a new user.
+- `ContactModule` imports `MailModule`. `ContactProvider` calls `mailService.sendContactNotification()` after persisting each submission.
 
 ### Uploads
 

@@ -100,8 +100,17 @@ describe('Feature (e2e)', () => {
 
 ### Tracking mail calls
 
-Pass `mailMock` with only the methods you need to assert on. Unspecified methods get a
-silent no-op automatically:
+`MailService` is always fully mocked — all methods are silent no-ops unless overridden. Available mock keys in `MailMock`:
+
+| Key | Triggered by |
+|---|---|
+| `sendMail` | raw `mailService.sendMail()` calls |
+| `sendWelcomeMail` | `POST /users` (registration) |
+| `sendVerificationMail` | `POST /auth/resend-verification` |
+| `sendPasswordResetMail` | `POST /auth/forgot-password` |
+| `sendContactNotification` | `POST /contact` |
+
+Pass only the methods you need to assert on. Unspecified methods get a silent no-op automatically:
 
 ```ts
 const sendPasswordResetMailMock = jest.fn().mockResolvedValue(undefined)
@@ -134,6 +143,7 @@ Throttle limits that matter in tests:
 |---|---|
 | `POST /auth/forgot-password` | 3 / 300 s |
 | `POST /auth/resend-verification` | 3 / 300 s |
+| `POST /contact` | 3 / 300 s |
 | `POST /auth/sign-in` | 5 / 60 s |
 | `POST /auth/reset-password` | 5 / 60 s |
 | `POST /users` | 5 / 600 s |
