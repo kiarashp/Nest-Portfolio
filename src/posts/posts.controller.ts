@@ -27,6 +27,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 import { GetPostsDto } from './dto/get-posts.dto'
+import { PostTagsDto } from './dto/post-tags.dto'
 import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
 import type { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { Roles } from 'src/auth/decorators/roles.decorator'
@@ -110,6 +111,43 @@ export class PostsController {
     @ActiveUser() activeUser: ActiveUserData,
   ) {
     return this.postsService.update(id, patchPostDto, activeUser)
+  }
+
+  /**
+   * add tags to a post without replacing the existing tag set
+   */
+  @ApiOperation({ summary: 'Add tags to a post' })
+  @ApiResponse({ status: 200, description: 'Tags added successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid tag IDs' })
+  @ApiResponse({ status: 403, description: 'Not the post author' })
+  @ApiResponse({ status: 404, description: 'Post not found' })
+  @ApiBearerAuth()
+  @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
+  @Post(':id/tags')
+  addTags(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: PostTagsDto,
+    @ActiveUser() activeUser: ActiveUserData,
+  ) {
+    return this.postsService.addTags(id, dto, activeUser)
+  }
+
+  /**
+   * remove tags from a post — idempotent if tag is not currently on the post
+   */
+  @ApiOperation({ summary: 'Remove tags from a post' })
+  @ApiResponse({ status: 200, description: 'Tags removed successfully' })
+  @ApiResponse({ status: 403, description: 'Not the post author' })
+  @ApiResponse({ status: 404, description: 'Post not found' })
+  @ApiBearerAuth()
+  @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
+  @Delete(':id/tags')
+  removeTags(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: PostTagsDto,
+    @ActiveUser() activeUser: ActiveUserData,
+  ) {
+    return this.postsService.removeTags(id, dto, activeUser)
   }
 
   /**

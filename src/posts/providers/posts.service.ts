@@ -14,6 +14,8 @@ import { UpdatePostProvider } from './update-post.provider'
 import { RemovePostProvider } from './remove-post.provider'
 import { UploadPostImageProvider } from './upload-post-image.provider'
 import { FindMyPostsProvider } from './find-my-posts.provider'
+import { ManagePostTagsProvider } from './manage-post-tags.provider'
+import { PostTagsDto } from '../dto/post-tags.dto'
 
 @Injectable()
 export class PostsService {
@@ -50,6 +52,10 @@ export class PostsService {
      * inject find my posts provider
      */
     private readonly findMyPostsProvider: FindMyPostsProvider,
+    /**
+     * inject manage post tags provider
+     */
+    private readonly managePostTagsProvider: ManagePostTagsProvider,
   ) {}
 
   public async create(
@@ -99,6 +105,32 @@ export class PostsService {
     return await this.uploadPostImageProvider.uploadPostImage(
       file,
       postId,
+      activeUser,
+    )
+  }
+
+  /** Adds tags to a post without replacing existing ones. */
+  public async addTags(
+    postId: number,
+    dto: PostTagsDto,
+    activeUser: ActiveUserData,
+  ): Promise<Post> {
+    return await this.managePostTagsProvider.addTags(
+      postId,
+      dto.tagIds,
+      activeUser,
+    )
+  }
+
+  /** Removes tags from a post. Idempotent — removing a tag not on the post is a no-op. */
+  public async removeTags(
+    postId: number,
+    dto: PostTagsDto,
+    activeUser: ActiveUserData,
+  ): Promise<Post> {
+    return await this.managePostTagsProvider.removeTags(
+      postId,
+      dto.tagIds,
       activeUser,
     )
   }

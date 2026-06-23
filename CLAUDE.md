@@ -211,12 +211,14 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 
 | Route | Auth | Notes |
 |---|---|---|
-| `GET /posts` | None (public) | Paginated list of published posts only. Accepts `?limit`, `?page`. |
+| `GET /posts` | None (public) | Paginated list of published posts only. Accepts `?limit`, `?page`, `?tagIds[]=<id>` (repeat for OR logic), `?authorId=<id>`. |
 | `GET /posts/my` | Bearer (any role) | Paginated list of the caller's own posts — all statuses (draft, review, scheduled, published). Optional `?status=draft\|review\|scheduled\|published` to filter to one. Declared before `/:id` to avoid `ParseIntPipe` collision. |
 | `GET /posts/slug/:slug` | None (public) | Single published post by slug. 404 if draft. |
 | `GET /posts/:id` | None (public) | Single published post by DB ID. 404 if draft. |
 | `POST /posts` | EDITOR / AUTHOR / ADMIN | Create a post. |
 | `PATCH /posts/:id` | EDITOR / AUTHOR / ADMIN | Update a post. EDITORs restricted to own posts. |
+| `POST /posts/:id/tags` | EDITOR / AUTHOR / ADMIN | Add tags to a post without replacing existing ones — body `{ tagIds: number[] }`. Idempotent. EDITORs restricted to own posts. |
+| `DELETE /posts/:id/tags` | EDITOR / AUTHOR / ADMIN | Remove tags from a post — body `{ tagIds: number[] }`. Idempotent. EDITORs restricted to own posts. |
 | `POST /posts/:id/images` | EDITOR / AUTHOR / ADMIN | Upload an image for a post. EDITORs restricted to own posts. |
 | `DELETE /posts/:id` | EDITOR / AUTHOR / ADMIN | Delete a post. EDITORs restricted to own posts. |
 
@@ -232,6 +234,8 @@ Authenticated write routes (`PATCH`, `DELETE`, `POST /images`) use `FindOnePostP
 - `limit` / `page` — pagination (via `PaginationQueryDto`)
 - `startDate` / `endDate` — declared but not yet wired in `FindAllPostsProvider` (dead code)
 - `status` — used only by `GET /posts/my`; ignored by `FindAllPostsProvider` (which hardcodes PUBLISHED)
+- `tagIds` — array of tag IDs, OR logic (`?tagIds=1&tagIds=2` returns posts with tag 1 OR tag 2). Used only by `GET /posts`; ignored by `GET /posts/my`. Transform converts string scalars to `number[]` before validation.
+- `authorId` — filter by author user ID. Used only by `GET /posts`.
 
 ### Serialization
 
@@ -303,5 +307,5 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 - No semicolons, single quotes, `trailingComma: "all"` (`.prettierrc`); ESLint extends `typescript-eslint` recommendedTypeChecked + prettier. `no-explicit-any` and `no-unused-vars` are off; `no-floating-promises`/`no-unsafe-argument` are warnings only.
 - After making edits, always run `pnpm run lint` — it runs `eslint --fix` which auto-applies all Prettier formatting. The only expected unfixable error is the stale `src/app.controller.spec.ts`.
 - Path aliasing: imports use the `src/...` absolute form (e.g. `src/users/users.module`) rather than deep relative paths, per `tsconfig.json` `baseUrl: "./"`.
-- **Comments:** Add comments to providers, service methods, and constructor injections. Write in plain English — short, clear, no technical jargon, no analogies. Say what the code does and why, not how. Match the style already in the codebase (single-line `// ...` for injections, JSDoc `/** ... */` for public methods).
+- **Comments:** Add comments to providers, service methods, and constructor injections. Use single-line `// ...` for injections and JSDoc `/** ... */` for public methods. Write in plain English — full sentences, say what the code does and why, not how. No analogies. Before writing a comment, ask: would any developer on the team understand every word without looking it up? If not, rewrite it in simpler terms.
 - **TypeScript build config:** Treat `tsconfig.build.json` as the source of truth for NestJS compilation. For build-only issues (such as generated files interfering with `rootDir`), fix `tsconfig.build.json` by excluding those files instead of modifying `tsconfig.json`. Only change `tsconfig.json` when the setting should apply to the entire TypeScript project — path aliases, strict mode, `target`, `moduleResolution`, `types`, etc. If the problem is `nest build` → check `tsconfig.build.json` first. If the problem is the IDE, `tsc`, or path aliases → check `tsconfig.json`.

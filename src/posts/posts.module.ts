@@ -15,6 +15,7 @@ import { UpdatePostProvider } from './providers/update-post.provider'
 import { RemovePostProvider } from './providers/remove-post.provider'
 import { UploadPostImageProvider } from './providers/upload-post-image.provider'
 import { FindMyPostsProvider } from './providers/find-my-posts.provider'
+import { ManagePostTagsProvider } from './providers/manage-post-tags.provider'
 import { UploadsModule } from 'src/uploads/uploads.module'
 
 @Module({
@@ -29,6 +30,7 @@ import { UploadsModule } from 'src/uploads/uploads.module'
     RemovePostProvider,
     UploadPostImageProvider,
     FindMyPostsProvider,
+    ManagePostTagsProvider,
   ],
   imports: [
     UsersModule,
