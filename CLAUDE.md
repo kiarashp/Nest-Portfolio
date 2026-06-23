@@ -207,15 +207,31 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 
 `GET /users/me`, `GET /users/avatar-options`, and `PATCH /users/me` must each be declared before their `/:id` counterparts in the controller so NestJS routes the literal segment before trying to parse it as an integer ID via `ParseIntPipe`.
 
-### Posts — public routes and draft visibility
+### Posts routes
 
-Public blog routes are decorated with `@Auth(AuthType.None)` and only return posts with `status = published`. Draft, scheduled, and review posts are never exposed to unauthenticated callers — they appear as 404.
+| Route | Auth | Notes |
+|---|---|---|
+| `GET /posts` | None (public) | Paginated list of published posts only. Accepts `?limit`, `?page`. |
+| `GET /posts/my` | Bearer (any role) | Paginated list of the caller's own posts — all statuses (draft, review, scheduled, published). Optional `?status=draft\|review\|scheduled\|published` to filter to one. Declared before `/:id` to avoid `ParseIntPipe` collision. |
+| `GET /posts/slug/:slug` | None (public) | Single published post by slug. 404 if draft. |
+| `GET /posts/:id` | None (public) | Single published post by DB ID. 404 if draft. |
+| `POST /posts` | EDITOR / AUTHOR / ADMIN | Create a post. |
+| `PATCH /posts/:id` | EDITOR / AUTHOR / ADMIN | Update a post. EDITORs restricted to own posts. |
+| `POST /posts/:id/images` | EDITOR / AUTHOR / ADMIN | Upload an image for a post. EDITORs restricted to own posts. |
+| `DELETE /posts/:id` | EDITOR / AUTHOR / ADMIN | Delete a post. EDITORs restricted to own posts. |
 
-- `GET /posts` — paginated list of published posts
-- `GET /posts/:id` — single published post by database ID
-- `GET /posts/slug/:slug` — single published post by slug (via `FindPostBySlugProvider`)
+**Draft visibility rules:**
 
-The status filter is applied in `FindAllPostsProvider` (via the `where` param on `paginateQuery`) and `FindOnePostProvider.findOnePublishedByIdOrFail`. The internal `findOneByIdOrFail` method (used by update/delete/image-upload providers) is unchanged and returns any status — authenticated operations need to see drafts.
+Public routes (`GET /posts`, `GET /posts/:id`, `GET /posts/slug/:slug`) enforce `status = PUBLISHED` at the DB level — drafts are invisible and return 404, not 403. The filter is hardcoded inside `FindAllPostsProvider` and `FindOnePostProvider.findOnePublishedByIdOrFail`; callers cannot override it.
+
+`GET /posts/my` bypasses the published-only filter intentionally so CMS users can see their unpublished work. It is gated behind Bearer auth — unauthenticated callers get 401.
+
+Authenticated write routes (`PATCH`, `DELETE`, `POST /images`) use `FindOnePostProvider.findOneByIdOrFail` internally, which returns any status — authors need to edit drafts.
+
+**`GetPostsDto` query params** (shared by `GET /posts` and `GET /posts/my`):
+- `limit` / `page` — pagination (via `PaginationQueryDto`)
+- `startDate` / `endDate` — declared but not yet wired in `FindAllPostsProvider` (dead code)
+- `status` — used only by `GET /posts/my`; ignored by `FindAllPostsProvider` (which hardcodes PUBLISHED)
 
 ### Serialization
 
