@@ -7,7 +7,6 @@ import {
   Body,
   ParseIntPipe,
   Query,
-  DefaultValuePipe,
   Patch,
   Delete,
   SerializeOptions,
@@ -41,6 +40,7 @@ import { ChangeUserRoleDto } from './dtos/change-user-role.dto'
 import { PatchUserProfileDto } from './dtos/patch-user-profile.dto'
 import { SelectAvatarDto } from './dtos/select-avatar.dto'
 import type { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
+import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.dto'
 
 @Controller('users')
 @ApiTags('Users')
@@ -58,11 +58,8 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Users fetched successfully' })
   @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
   @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
-  public getAllUsers(
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-  ) {
-    return this.usersService.findAll(limit, page)
+  public getAllUsers(@Query() paginationQuery: PaginationQueryDto) {
+    return this.usersService.findAll(paginationQuery)
   }
 
   /**

@@ -108,7 +108,7 @@ pnpm run seed:admin   # uses NODE_ENV=development → .env.development
 
 ## Architecture
 
-NestJS (v11) + TypeORM + PostgreSQL blog/portfolio API. Module-per-domain layout: `users`, `posts`, `tags`, `meta-options`, `auth` (with a nested `social` sub-feature for Google), plus cross-cutting `common` and `config` directories.
+NestJS (v11) + TypeORM + PostgreSQL blog/portfolio API. Module-per-domain layout: `users`, `posts`, `tags`, `meta-options`, `auth` (with a nested `social` sub-feature for Google), plus cross-cutting `common`, `config`, and `crypto` directories. `CryptoModule` (`src/crypto/`) is a standalone utility module that provides `HashingProvider` (abstract) and `BcryptProvider` (concrete); both `AuthModule` and `UsersModule` import it — this is how password hashing is shared without a circular dependency between those two modules.
 
 Within each domain module the convention is: `*.module.ts` → `*.controller.ts` → `providers/*.service.ts`, where the service is a **thin facade** that delegates to single-purpose provider classes for individual operations. Each provider handles exactly one responsibility (e.g. `create-post.provider.ts`, `find-one-post.provider.ts`, `remove-post.provider.ts`). DTOs live in `dto(s)/`, TypeORM entities in `entities/`.
 
@@ -151,10 +151,10 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 
 ### Auth
 
-- Local sign-in: `auth/providers/sign-in.provider.ts` + `bcrypt.provider.ts` (implements `HashingProvider` abstract class via DI token). Uses `bcryptjs` (pure-JS port — no native build tools required).
+- Local sign-in: `auth/providers/sign-in.provider.ts` + `src/crypto/providers/bcrypt.provider.ts` (implements the `HashingProvider` abstract class from `src/crypto/providers/hashing.provider.ts`). Both live in `CryptoModule` (`src/crypto/crypto.module.ts`), which is imported by both `AuthModule` and `UsersModule`. Uses `bcryptjs` (pure-JS port — no native build tools required).
 - Tokens: `generate-tokens.provider.ts` issues access+refresh JWTs. The access token payload includes `sub` (userId), `email`, and `role`. The refresh token carries only `sub`.
 - Google OAuth: `auth/social/google-authentication.controller.ts` + `social/providers/google-authentication.service.ts` verify Google ID tokens, then create/find a local user. Both local and Google users are always created with `role: UserRole.USER` — roles must be elevated explicitly by an admin.
-- `AuthModule` uses `forwardRef(() => UsersModule)` because of a circular dependency — keep that in mind if you touch either module's imports/exports. See `src/auth/CLAUDE.md` for details.
+- `AuthModule` imports `UsersModule` (one-way only). `UsersModule` does not import `AuthModule` — there is no circular dependency and no `forwardRef()` in either module. See `src/auth/CLAUDE.md` for details.
 - RBAC: four roles (`USER`, `EDITOR`, `AUTHOR`, `ADMIN`) defined in `src/auth/enums/user-role.enum.ts`. See `src/auth/CLAUDE.md` for the full access control rules.
 
 **Refresh token dual delivery (browser + mobile):** On sign-in and token refresh, the refresh token is returned in both the JSON body AND set as an `HttpOnly` cookie (`Path=/auth/refresh-tokens`, `SameSite=lax`). Browser clients (Svelte) rely on the cookie; mobile clients (Flutter) read the body. `POST /auth/refresh-tokens` accepts the token from either source — cookie takes precedence, body is the fallback. `POST /auth/sign-out` clears the cookie (mobile clients can ignore it).

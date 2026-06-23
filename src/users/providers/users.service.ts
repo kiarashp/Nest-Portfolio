@@ -29,6 +29,8 @@ import { PatchUserProfileDto } from '../dtos/patch-user-profile.dto'
 import { SyncGoogleUserProvider } from './sync-google-user.provider'
 import { ForgotPasswordProvider } from './forgot-password.provider'
 import { ResetPasswordProvider } from './reset-password.provider'
+import { FindAllUsersProvider } from './find-all-users.provider'
+import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.dto'
 
 @Injectable()
 export class UsersService {
@@ -112,12 +114,16 @@ export class UsersService {
      * Inject avatar options provider — handles admin CRUD for avatar choices
      */
     private readonly avatarOptionsProvider: AvatarOptionsProvider,
+    /**
+     * Inject find all users provider — handles paginated listing of users
+     */
+    private readonly findAllUsersProvider: FindAllUsersProvider,
   ) {}
   /**
-   * Find all users
+   * Returns a paginated list of all users.
    */
-  public findAll(limit: number, page: number) {
-    return this.userRepository.find()
+  public findAll(paginationQuery: PaginationQueryDto) {
+    return this.findAllUsersProvider.findAll(paginationQuery)
   }
   /**
    * Find user by id

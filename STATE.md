@@ -12,31 +12,6 @@ The gaps below are features that either a portfolio site inherently needs (conta
 
 ## Priority 2 — Bugs & correctness (fix before frontend starts)
 
-### 13. Fix `UsersService.findAll()` — pagination params are silently ignored
-
-**Why this exists:**
-`GET /users` accepts `?limit` and `?page` query params and the controller passes them to `UsersService.findAll(limit, page)`. But the service implementation ignores both:
-
-```typescript
-public findAll(limit: number, page: number) {
-  return this.userRepository.find()  // no take/skip
-}
-```
-
-Every call returns all users with no cap, regardless of what pagination values are sent. This is inconsistent with how posts, tags, and every other collection endpoint works (all use `PaginationProvider`).
-
-**What to do:**
-Wire `findAll()` through `PaginationProvider` the same way posts do it. Inject `PaginationProvider` into `UsersService` (or a new `FindAllUsersProvider`) and call `paginateQuery({ limit, page }, userRepository)`.
-
-**Files to touch:**
-- `src/users/providers/users.service.ts` — pass limit/page to a real paginated query
-- Optionally extract `src/users/providers/find-all-users.provider.ts` (follows existing pattern)
-
-- [ ] Replace `userRepository.find()` with a paginated query using `PaginationProvider`
-- [ ] Ensure response shape matches other paginated endpoints (`data`, `meta`, `links`)
-
----
-
 ### 14. Terminus health check
 
 **Why this exists:**

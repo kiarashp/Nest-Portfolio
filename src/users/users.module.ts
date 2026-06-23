@@ -27,11 +27,14 @@ import { UploadsModule } from 'src/uploads/uploads.module'
 import { AvatarOptionsProvider } from './providers/avatar-options.provider'
 import { AvatarOption } from './entities/avatar-option.entity'
 import { CryptoModule } from 'src/crypto/crypto.module'
+import { PaginationModule } from 'src/common/pagination/pagination.module'
+import { FindAllUsersProvider } from './providers/find-all-users.provider'
 
 @Module({
   controllers: [UsersController],
   providers: [
     UsersService,
+    FindAllUsersProvider,
     UserCreateManyProvider,
     CreateUserProvider,
     FindOneUserByEmailProvider,
@@ -53,6 +56,7 @@ import { CryptoModule } from 'src/crypto/crypto.module'
   exports: [UsersService],
   imports: [
     CryptoModule,
+    PaginationModule,
     TypeOrmModule.forFeature([User, AvatarOption]),
     UploadsModule,
     ConfigModule.forFeature(jwtConfig),

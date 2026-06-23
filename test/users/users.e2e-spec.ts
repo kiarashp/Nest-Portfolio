@@ -4,6 +4,7 @@ import { App } from 'supertest/types'
 import { DataSource } from 'typeorm'
 import { UserRole } from '../../src/auth/enums/user-role.enum'
 import { User } from '../../src/users/entities/user.entity'
+import { Paginated } from '../../src/common/pagination/interfaces/paginated.interface'
 import { ApiResponse, getAuthToken } from '../helpers/auth.helper'
 import { createApp } from '../helpers/create-app.helper'
 import { cleanupUsers, seedUser } from '../helpers/seed.helper'
@@ -127,7 +128,8 @@ describe('Users (e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200)
 
-    expect(Array.isArray((res.body as ApiResponse<User[]>).data)).toBe(true)
+    const body = (res.body as ApiResponse<Paginated<User>>).data
+    expect(Array.isArray(body.data)).toBe(true)
   })
 
   it('GET /users (USER role) → 403', async () => {
