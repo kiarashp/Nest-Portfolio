@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { BcryptProvider } from './bcrypt.provider'
+import { BcryptProvider } from 'src/crypto/providers/bcrypt.provider'
 
 // BcryptProvider wraps the bcrypt library to hash and compare passwords.
 // These tests use real bcrypt (no mocks) because the whole point is to verify

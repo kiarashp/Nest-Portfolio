@@ -1,12 +1,11 @@
 import {
   BadRequestException,
-  forwardRef,
   Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common'
 import { UsersService } from 'src/users/providers/users.service'
-import { HashingProvider } from './hashing.provider'
+import { HashingProvider } from 'src/crypto/providers/hashing.provider'
 import { ChangePasswordDto } from '../dtos/change-password.dto'
 
 @Injectable()
@@ -15,7 +14,6 @@ export class ChangePasswordProvider {
     /**
      * Inject users service to load the user and persist the new password
      */
-    @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
 
     /**

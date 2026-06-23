@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  forwardRef,
   Inject,
   Injectable,
   RequestTimeoutException,
@@ -8,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { User } from '../entities/user.entity'
-import { HashingProvider } from 'src/auth/providers/hashing.provider'
+import { HashingProvider } from 'src/crypto/providers/hashing.provider'
 
 @Injectable()
 export class ResetPasswordProvider {
@@ -18,7 +17,7 @@ export class ResetPasswordProvider {
     private readonly userRepository: Repository<User>,
 
     // hash the new password before saving
-    @Inject(forwardRef(() => HashingProvider))
+    @Inject(HashingProvider)
     private readonly hashingProvider: HashingProvider,
   ) {}
 

@@ -1,11 +1,8 @@
 import {
   Injectable,
-  Inject,
-  forwardRef,
   RequestTimeoutException,
   NotFoundException,
 } from '@nestjs/common'
-import { AuthService } from 'src/auth/providers/auth.service'
 import { Repository } from 'typeorm'
 import { User } from '../entities/user.entity'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -36,12 +33,6 @@ import { ResetPasswordProvider } from './reset-password.provider'
 @Injectable()
 export class UsersService {
   constructor(
-    /**
-     * Injecting Auth Service
-     */
-    @Inject(forwardRef(() => AuthService))
-    private readonly authService: AuthService,
-
     /**
      * Injecting UserRepository
      */

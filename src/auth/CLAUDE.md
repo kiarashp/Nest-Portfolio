@@ -68,13 +68,11 @@ This stricter model is intentional: MetaOption holds per-post SEO metadata and t
 
 **`RefreshTokensProvider.refreshTokens`** takes `{ refreshToken: string }` (not `RefreshTokenDto`) because by the time the controller calls it the token is already a guaranteed string. It throws `UnauthorizedException('Invalid refresh token')` on a bad/expired JWT, re-derives the user via `usersService.findOneById(payload.sub)`, and re-issues both tokens (rotation — no revocation list exists yet).
 
-## Circular dependency: Auth ↔ Users
+## Module dependency: Auth → Users (one-way, no cycle)
 
-`AuthModule` and `UsersModule` depend on each other. Both sides use `forwardRef()`:
-- `UsersModule` imports `forwardRef(() => AuthModule)`; `UsersService` injects `@Inject(forwardRef(() => AuthService)) authService`.
-- Individual auth providers (`SignInProvider`, `RefreshTokensProvider`, `GoogleAuthenticationService`, `ChangePasswordProvider`) inject `@Inject(forwardRef(() => UsersService)) usersService`.
+`AuthModule` imports `UsersModule` and `CryptoModule`. `UsersModule` imports only `CryptoModule` — it does not import `AuthModule`. There is no circular dependency and no `forwardRef()` anywhere in these two modules.
 
-If you add a new provider that crosses this boundary, it also needs `forwardRef()` on whichever side closes the cycle.
+`HashingProvider` and `BcryptProvider` live in `src/crypto/`. Both modules import `CryptoModule` to access `HashingProvider`. Auth providers (`SignInProvider`, `RefreshTokensProvider`, `GoogleAuthenticationService`, `ChangePasswordProvider`) inject `UsersService` directly using constructor parameter types — no `@Inject()` or `forwardRef()` needed.
 
 ## Local vs. Google accounts
 

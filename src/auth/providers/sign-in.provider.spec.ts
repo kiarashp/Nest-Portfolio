@@ -2,7 +2,7 @@ import { RequestTimeoutException, UnauthorizedException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { SignInProvider } from './sign-in.provider'
 import { UsersService } from 'src/users/providers/users.service'
-import { HashingProvider } from './hashing.provider'
+import { HashingProvider } from 'src/crypto/providers/hashing.provider'
 import { GenerateTokensProvider } from './generate-tokens.provider'
 import { User } from 'src/users/entities/user.entity'
 import { UserRole } from '../enums/user-role.enum'
@@ -38,8 +38,6 @@ describe('SignInProvider', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SignInProvider,
-        // UsersService normally uses forwardRef because of the circular
-        // Auth <-> Users dependency, but in unit tests we just provide a plain mock.
         { provide: UsersService, useValue: usersService },
         { provide: HashingProvider, useValue: hashingProvider },
         { provide: GenerateTokensProvider, useValue: generateTokensProvider },

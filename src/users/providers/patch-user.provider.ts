@@ -1,15 +1,10 @@
-import {
-  BadRequestException,
-  forwardRef,
-  Inject,
-  Injectable,
-} from '@nestjs/common'
+import { BadRequestException, Inject, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { User } from '../entities/user.entity'
 import { PatchUserDto } from '../dtos/patch-user.dto'
 import { FindOneByIdProvider } from './find-one-by-id.provider'
-import { HashingProvider } from 'src/auth/providers/hashing.provider'
+import { HashingProvider } from 'src/crypto/providers/hashing.provider'
 
 @Injectable()
 export class PatchUserProvider {
@@ -25,12 +20,8 @@ export class PatchUserProvider {
      */
     private readonly findOneByIdProvider: FindOneByIdProvider,
 
-    /**
-     * forwardRef is needed here because HashingProvider belongs to AuthModule,
-     * which in turn imports UsersModule — without it NestJS cannot resolve
-     * the dependency at startup due to the circular reference between the two modules
-     */
-    @Inject(forwardRef(() => HashingProvider))
+    // Hashes the new password when the admin supplies one in the patch body
+    @Inject(HashingProvider)
     private readonly hashingProvider: HashingProvider,
   ) {}
 

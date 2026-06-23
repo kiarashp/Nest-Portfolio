@@ -1,13 +1,11 @@
 import {
-  forwardRef,
-  Inject,
   Injectable,
   RequestTimeoutException,
   UnauthorizedException,
 } from '@nestjs/common'
 import { SignInDto } from '../dtos/signin.dto'
 import { UsersService } from 'src/users/providers/users.service'
-import { HashingProvider } from './hashing.provider'
+import { HashingProvider } from 'src/crypto/providers/hashing.provider'
 import { GenerateTokensProvider } from './generate-tokens.provider'
 
 @Injectable()
@@ -16,7 +14,6 @@ export class SignInProvider {
     /**
      * injec user service
      */
-    @Inject(forwardRef(() => UsersService))
     private readonly userService: UsersService,
     /**
      * inject hashing provider

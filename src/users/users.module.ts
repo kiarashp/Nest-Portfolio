@@ -1,7 +1,6 @@
-import { Module, forwardRef } from '@nestjs/common'
+import { Module } from '@nestjs/common'
 import { UsersController } from './users.controller'
 import { UsersService } from './providers/users.service'
-import { AuthModule } from 'src/auth/auth.module'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { User } from './entities/user.entity'
 import { UserCreateManyProvider } from './providers/user-create-many.provider'
@@ -27,6 +26,7 @@ import { MailModule } from 'src/mail/mail.module'
 import { UploadsModule } from 'src/uploads/uploads.module'
 import { AvatarOptionsProvider } from './providers/avatar-options.provider'
 import { AvatarOption } from './entities/avatar-option.entity'
+import { CryptoModule } from 'src/crypto/crypto.module'
 
 @Module({
   controllers: [UsersController],
@@ -52,7 +52,7 @@ import { AvatarOption } from './entities/avatar-option.entity'
   ],
   exports: [UsersService],
   imports: [
-    forwardRef(() => AuthModule),
+    CryptoModule,
     TypeOrmModule.forFeature([User, AvatarOption]),
     UploadsModule,
     ConfigModule.forFeature(jwtConfig),

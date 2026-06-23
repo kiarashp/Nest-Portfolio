@@ -41,7 +41,6 @@ describe('RefreshTokensProvider', () => {
         { provide: JwtService, useValue: jwtService },
         { provide: jwtConfig.KEY, useValue: mockJwtConfig },
         { provide: GenerateTokensProvider, useValue: generateTokensProvider },
-        // UsersService also needs forwardRef in production; plain mock is fine here.
         { provide: UsersService, useValue: usersService },
       ],
     }).compile()

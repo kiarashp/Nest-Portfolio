@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  forwardRef,
   Inject,
   Injectable,
   RequestTimeoutException,
@@ -10,7 +9,7 @@ import { CreateUserDto } from '../dtos/create-user.dtos'
 import { Repository } from 'typeorm'
 import { InjectRepository } from '@nestjs/typeorm'
 import { User } from '../entities/user.entity'
-import { HashingProvider } from 'src/auth/providers/hashing.provider'
+import { HashingProvider } from 'src/crypto/providers/hashing.provider'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 import { MailService } from 'src/mail/mail.service'
 import { ConfigService } from '@nestjs/config'
@@ -27,7 +26,7 @@ export class CreateUserProvider {
     /**
      * Inject Hashing provider
      */
-    @Inject(forwardRef(() => HashingProvider))
+    @Inject(HashingProvider)
     private readonly hashingProvider: HashingProvider,
 
     private readonly mailService: MailService,

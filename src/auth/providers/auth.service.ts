@@ -1,4 +1,4 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { UsersService } from 'src/users/providers/users.service'
 import { SignInDto } from '../dtos/signin.dto'
 import { SignInProvider } from './sign-in.provider'
@@ -12,7 +12,6 @@ export class AuthService {
     /**
      * inject user service
      */
-    @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     /**
      * inject sign in provider

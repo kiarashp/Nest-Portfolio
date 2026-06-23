@@ -4,7 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm'
 import { ConfigService } from '@nestjs/config'
 import { CreateUserProvider } from './create-user.provider'
 import { User } from '../entities/user.entity'
-import { HashingProvider } from 'src/auth/providers/hashing.provider'
+import { HashingProvider } from 'src/crypto/providers/hashing.provider'
 import { MailService } from 'src/mail/mail.service'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 

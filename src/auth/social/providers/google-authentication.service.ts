@@ -1,5 +1,4 @@
 import {
-  forwardRef,
   Inject,
   Injectable,
   OnModuleInit,
@@ -25,7 +24,6 @@ export class GoogleAuthenticationService implements OnModuleInit {
     /**
      * inject user service
      */
-    @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     /**
      * Inject generateTokens provider
