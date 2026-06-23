@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common'
 import { CreateTagDto } from '../dto/create-tag.dto'
+import { UpdateTagDto } from '../dto/update-tag.dto'
 import { In, Repository } from 'typeorm'
 import { Tag } from '../entities/tag.entity'
 import { InjectRepository } from '@nestjs/typeorm'
+import { UpdateTagProvider } from './update-tag.provider'
 
 @Injectable()
 export class TagsService {
@@ -12,7 +14,18 @@ export class TagsService {
      */
     @InjectRepository(Tag)
     private readonly tagsRepository: Repository<Tag>,
+    /**
+     * inject update tag provider
+     */
+    private readonly updateTagProvider: UpdateTagProvider,
   ) {}
+
+  /**
+   * Updates an existing tag by ID with the provided partial fields.
+   */
+  public async update(id: number, updateTagDto: UpdateTagDto): Promise<Tag> {
+    return this.updateTagProvider.update(id, updateTagDto)
+  }
 
   /**
    * Creates a new tag

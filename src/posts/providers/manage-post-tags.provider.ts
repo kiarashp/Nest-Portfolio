@@ -66,7 +66,8 @@ export class ManagePostTagsProvider {
 
     // Only add tags that are not already on the post
     const tagsToAdd = newTags.filter(
-      (newTag) => !(post.tags ?? []).some((existing) => existing.id === newTag.id),
+      (newTag) =>
+        !(post.tags ?? []).some((existing) => existing.id === newTag.id),
     )
     post.tags = [...(post.tags ?? []), ...tagsToAdd]
 

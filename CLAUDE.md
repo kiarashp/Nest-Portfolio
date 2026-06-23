@@ -217,8 +217,8 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 | `GET /posts/:id` | None (public) | Single published post by DB ID. 404 if draft. |
 | `POST /posts` | EDITOR / AUTHOR / ADMIN | Create a post. |
 | `PATCH /posts/:id` | EDITOR / AUTHOR / ADMIN | Update a post. EDITORs restricted to own posts. |
-| `POST /posts/:id/tags` | EDITOR / AUTHOR / ADMIN | Add tags to a post without replacing existing ones — body `{ tagIds: number[] }`. Idempotent. EDITORs restricted to own posts. |
-| `DELETE /posts/:id/tags` | EDITOR / AUTHOR / ADMIN | Remove tags from a post — body `{ tagIds: number[] }`. Idempotent. EDITORs restricted to own posts. |
+| `POST /posts/:id/tags` | EDITOR / AUTHOR / ADMIN | Add tags to a post without replacing existing ones — body `{ tagIds: number[] }`. Tags already on the post are skipped. EDITORs restricted to own posts. |
+| `DELETE /posts/:id/tags` | EDITOR / AUTHOR / ADMIN | Remove tags from a post — body `{ tagIds: number[] }`. Tags not on the post are simply skipped. EDITORs restricted to own posts. |
 | `POST /posts/:id/images` | EDITOR / AUTHOR / ADMIN | Upload an image for a post. EDITORs restricted to own posts. |
 | `DELETE /posts/:id` | EDITOR / AUTHOR / ADMIN | Delete a post. EDITORs restricted to own posts. |
 
@@ -255,7 +255,7 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 
 ### Pagination
 
-`common/pagination` exports a request-scoped `PaginationProvider` (injects `REQUEST` to build absolute `first/last/current/next/prev` links). Domain services call `paginationProvider.paginateQuery(paginationQueryDto, repository, where?)` rather than reimplementing pagination per module. The optional `where` parameter filters both the result set and the total count used for page calculations.
+`common/pagination` exports a request-scoped `PaginationProvider` (injects `REQUEST` to build absolute `first/last/current/next/prev` links). Domain services call `paginationProvider.paginateQuery(paginationQueryDto, repository, where?)` rather than reimplementing pagination per module. The optional `where` parameter filters both the result set and the total count used for page calculations. It accepts either a single condition object or an array of condition objects — when an array is passed, TypeORM treats each element as an OR branch (a row is returned if it matches any one of them).
 
 ### Mail
 

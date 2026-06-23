@@ -12,36 +12,6 @@ The gaps below are features that either a portfolio site inherently needs (conta
 
 ## Priority 2 — CMS completeness
 
-### 7. Filter posts by tag and/or author
-
-**Why this exists:**
-The public `GET /posts` currently supports only `startDate`/`endDate` query filters. The Svelte frontend will need tag pages (`/tags/javascript` showing all posts tagged `javascript`) and author pages showing all posts by a specific author. Without server-side filters, the frontend would have to fetch all posts and filter client-side — not viable with pagination.
-
-**Current state:**
-`src/posts/providers/find-all-posts.provider.ts` calls `paginationProvider.paginateQuery(dto, repository, where)` with a simple `where` object `{ status: PostStatus.PUBLISHED }`. The `PaginationProvider` supports a `where` param typed as `FindOptionsWhere<T>` which works for simple conditions. For tag filtering, a many-to-many join is needed — TypeORM's `FindOptionsWhere` supports relation filters with `{ tags: { id: tagId } }` syntax, which TypeORM translates into a JOIN under the hood. This avoids needing a raw QueryBuilder for the simple case.
-
-**What to build:**
-Add optional `tagId?: number` and `authorId?: number` to `GetPostsDto`. In `FindAllPostsProvider`, build the `where` object conditionally: always include `{ status: PostStatus.PUBLISHED }`, add `{ tags: { id: tagId } }` if `tagId` is provided, add `{ author: { id: authorId } }` if `authorId` is provided. All are combined with TypeORM's `AND` (default when keys are merged in one object). A non-existent `tagId` or `authorId` returns an empty array, not a 404 — consistent with how pagination works everywhere else.
-
-**Files to touch:**
-- `src/posts/dto/get-posts.dto.ts` — add `tagId` and `authorId` optional fields
-- `src/posts/providers/find-all-posts.provider.ts` — conditionally build `where` object
-
-**E2E spec:** `test/posts-filter.e2e-spec.ts`
-- GET /posts?tagId=1 → only published posts with that tag
-- GET /posts?authorId=1 → only published posts by that author
-- GET /posts?tagId=1&authorId=1 → intersection of both filters
-- GET /posts?tagId=999 (non-existent) → 200, empty data array
-
-- [x] Add optional `tagIds?: number[]` and `authorId?: number` to `GetPostsDto` (array for multi-tag OR filtering)
-- [x] Update `FindAllPostsProvider` to apply conditional `where` filters
-- [x] Add `POST /posts/:id/tags` and `DELETE /posts/:id/tags` — add/remove tags without full replacement (EDITOR/AUTHOR/ADMIN, EDITOR restricted to own posts)
-- [x] Create `ManagePostTagsProvider` + `PostTagsDto`, register in `PostsModule`
-- [x] Write e2e specs (`test/posts/posts-filter.e2e-spec.ts` — 6 tests passing, `test/posts/posts-tags.e2e-spec.ts` — 15 tests passing)
-- [x] Widen `PaginationProvider.paginateQuery` to accept `FindOptionsWhere<T> | FindOptionsWhere<T>[]`
-
----
-
 ### 8. Tag PATCH (update)
 
 **Why this exists:**
@@ -66,12 +36,12 @@ Tags can be created and (soft/hard) deleted but not edited. If a tag name has a 
 - PATCH /tags/999 → 404
 - PATCH /tags/1 with a name already taken by another tag → 409
 
-- [ ] Create `UpdateTagDto = PartialType(CreateTagDto)`
-- [ ] Create `UpdateTagProvider`
-- [ ] Expose `update()` on `TagsService`
-- [ ] Add `PATCH /tags/:id` to `TagsController` with `@Roles(UserRole.AUTHOR, UserRole.ADMIN)`
-- [ ] Register provider in `TagsModule`
-- [ ] Write e2e spec
+- [x] Create `UpdateTagDto = PartialType(CreateTagDto)`
+- [x] Create `UpdateTagProvider`
+- [x] Expose `update()` on `TagsService`
+- [x] Add `PATCH /tags/:id` to `TagsController` with `@Roles(UserRole.AUTHOR, UserRole.ADMIN)`
+- [x] Register provider in `TagsModule`
+- [x] Write e2e spec (extended `test/tags/tags.e2e-spec.ts`)
 
 ---
 

@@ -17,6 +17,10 @@ describe('Tags (e2e)', () => {
   // Track IDs of tags created during tests so afterAll can clean them up.
   const createdTagIds: number[] = []
 
+  // Two tags seeded for PATCH conflict test.
+  let patchTagId: number
+  let conflictTagId: number
+
   const AUTHOR_EMAIL = 'tags-author@e2e.test'
   const USER_EMAIL = 'tags-user@e2e.test'
   const PASSWORD = 'Password1!'
@@ -40,6 +44,21 @@ describe('Tags (e2e)', () => {
 
     authorToken = await getAuthToken(app, AUTHOR_EMAIL, PASSWORD)
     userToken = await getAuthToken(app, USER_EMAIL, PASSWORD)
+
+    // Seed two tags used by the PATCH tests.
+    const tagRepo = dataSource.getRepository(Tag)
+    const patchTag: Tag = await tagRepo.save(
+      tagRepo.create({ name: 'e2e-patch-target', slug: 'e2e-patch-target' }),
+    )
+    const conflictTag: Tag = await tagRepo.save(
+      tagRepo.create({
+        name: 'e2e-patch-conflict',
+        slug: 'e2e-patch-conflict',
+      }),
+    )
+    patchTagId = patchTag.id
+    conflictTagId = conflictTag.id
+    createdTagIds.push(patchTagId, conflictTagId)
   })
 
   afterAll(async () => {
@@ -140,6 +159,58 @@ describe('Tags (e2e)', () => {
       .delete(`/tags/${id}`)
       .set('Authorization', `Bearer ${userToken}`)
       .expect(403)
+  })
+
+  // ── PATCH /tags/:id ───────────────────────────────────────────────────────
+
+  it('PATCH /tags/:id (AUTHOR) → 200 with updated name', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/tags/${patchTagId}`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({ name: 'e2e-patch-updated' })
+      .expect(200)
+
+    const tag = (res.body as ApiResponse<Tag>).data
+    expect(tag.name).toBe('e2e-patch-updated')
+    // Slug should be unchanged since we only sent `name`.
+    expect(tag.slug).toBe('e2e-patch-target')
+  })
+
+  it('PATCH /tags/:id with empty body → 200, tag unchanged', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/tags/${patchTagId}`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({})
+      .expect(200)
+
+    // Name was already updated in the previous test — verify it is still there.
+    const tag = (res.body as ApiResponse<Tag>).data
+    expect(tag.id).toBe(patchTagId)
+  })
+
+  it('PATCH /tags/:id (USER role) → 403', async () => {
+    await request(app.getHttpServer())
+      .patch(`/tags/${patchTagId}`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ name: 'should-fail' })
+      .expect(403)
+  })
+
+  it('PATCH /tags/99999 (non-existent) → 404', async () => {
+    await request(app.getHttpServer())
+      .patch('/tags/99999')
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({ name: 'ghost' })
+      .expect(404)
+  })
+
+  it('PATCH /tags/:id with a name taken by another tag → 409', async () => {
+    // Attempt to rename patchTag to conflictTag's name — unique constraint must fire.
+    await request(app.getHttpServer())
+      .patch(`/tags/${patchTagId}`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({ name: 'e2e-patch-conflict', slug: 'e2e-patch-conflict' })
+      .expect(409)
   })
 
   // ── DELETE /tags/soft/:id (soft delete) ───────────────────────────────────
