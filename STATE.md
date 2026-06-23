@@ -214,18 +214,33 @@ Currently, an authenticated user who wants to change their password has no way t
 - `ChangePasswordProvider` — injects `UsersService` (to load user with password), `HashingProvider` (to compare and hash), `InjectRepository(User)` (to save). Verifies `currentPassword`, rejects if Google-only, hashes `newPassword`, saves.
 - Handler in `AuthController`: `POST /auth/change-password`, requires Bearer auth (default, no `@Auth` override needed), throttle 5/60s.
 
-**Files to touch:**
+**What was built:**
+
+`ChangePasswordDto` — `currentPassword` (required string) + `newPassword` (MinLength 8, MaxLength 96). No special-char regex — matches the same constraints as `ResetPasswordDto`.
+
+`ChangePasswordProvider` (`src/auth/providers/change-password.provider.ts`) — injects `UsersService` (via `forwardRef`) and `HashingProvider`. Steps: load user by `userId`, check `if (!user.password)` → `BadRequestException` (Google-only account), `comparePassword` → `UnauthorizedException` if wrong, `hashPassword` new password, delegate save to `usersService.updatePassword()`.
+
+`UsersService.updatePassword(userId, hashedPassword)` — thin wrapper added to `src/users/providers/users.service.ts`. Uses `userRepository.save({ id: userId, password: hashedPassword })`. Lives in `UsersModule` so `AuthModule` does not need its own `TypeOrmModule.forFeature([User])`.
+
+`POST /auth/change-password` — Bearer auth (default, no `@Auth` override), throttled 5 / 60s. No `@Roles()` restriction — any authenticated role can change their password.
+
+Google-only account handling: `ChangePasswordProvider` throws `BadRequestException` (400) when `user.password` is null. This is distinct from `SignInProvider` which throws `UnauthorizedException` (401) — the semantics differ because the user is already authenticated at this point.
+
+**Files changed:**
 - `src/auth/dtos/change-password.dto.ts` — new DTO
 - `src/auth/providers/change-password.provider.ts` — new provider
-- `src/auth/auth.controller.ts` — new route
-- `src/auth/auth.module.ts` — register new provider
+- `src/auth/providers/auth.service.ts` — `changePassword()` facade method + `ChangePasswordProvider` injection
+- `src/auth/auth.controller.ts` — `POST /auth/change-password` route
+- `src/auth/auth.module.ts` — `ChangePasswordProvider` registered in `providers`
+- `src/users/providers/users.service.ts` — `updatePassword()` helper added
 
-**E2E spec:** `test/auth-change-password.e2e-spec.ts`
-- POST /auth/change-password (authenticated) with correct currentPassword and strong newPassword → 200
+**E2E spec:** `test/auth/auth-change-password.e2e-spec.ts` — 6 tests:
+- POST /auth/change-password unauthenticated → 401
+- POST /auth/change-password with short newPassword → 400
 - POST /auth/change-password with wrong currentPassword → 401
-- POST /auth/change-password on a Google-only account → 400
-- POST /auth/change-password with weak newPassword (no special char) → 400
-- POST /auth/sign-in with the newPassword after a successful change → 200 (confirms password actually changed)
+- POST /auth/change-password on Google-only account → 400 (token minted via `app.get(GenerateTokensProvider).generateTokens()`)
+- POST /auth/change-password with correct credentials → 200
+- POST /auth/sign-in with new password after change → 200 (confirms DB was updated); old password → 401
 
 - [x] Create `ChangePasswordDto`
 - [x] Create `ChangePasswordProvider`
@@ -263,12 +278,12 @@ Important: this route must be declared **before** `GET /posts/:id` in the contro
 - GET /posts/my (unauthenticated) → 401
 - Create two users, each with posts; GET /posts/my as user A → does not include user B's posts
 
-- [ ] Add optional `status?: PostStatus` to `GetPostsDto`
-- [ ] Create `FindMyPostsProvider`
-- [ ] Expose `findMyPosts()` on `PostsService`
-- [ ] Add `GET /posts/my` to `PostsController` (before `/:id`)
-- [ ] Register provider in `PostsModule`
-- [ ] Write e2e spec
+- [x] Add optional `status?: PostStatus` to `GetPostsDto`
+- [x] Create `FindMyPostsProvider`
+- [x] Expose `findMyPosts()` on `PostsService`
+- [x] Add `GET /posts/my` to `PostsController` (before `/:id`)
+- [x] Register provider in `PostsModule`
+- [x] Write e2e spec (`test/posts/posts-my.e2e-spec.ts` — 5 tests passing)
 
 ---
 
@@ -401,6 +416,7 @@ These are real features but out of scope until the frontend is running and real 
 - **Newsletter subscribers** — A subscriber list entity and a subscribe/unsubscribe endpoint. Not needed until there is content to send.
 - **Refresh token revocation** — Right now old refresh tokens remain valid until they expire (24h). A revocation list (Redis or DB table) would enable logout-all-devices. Deferred because it adds a Redis dependency.
 - **Audit logging** — No trail of who did what. Nice for admin dashboards but not needed to launch.
+- **`startDate`/`endDate` filters on `GET /posts`** — `GetPostsDto` declares these two optional fields (validated, Swagger-visible) but `FindAllPostsProvider` never reads them — only `page` and `limit` are passed to `paginateQuery`. The filters silently do nothing. Wire them up when date-range filtering is actually needed by the frontend.
 
 ---
 

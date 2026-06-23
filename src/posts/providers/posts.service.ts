@@ -13,6 +13,7 @@ import { FindPostBySlugProvider } from './find-post-by-slug.provider'
 import { UpdatePostProvider } from './update-post.provider'
 import { RemovePostProvider } from './remove-post.provider'
 import { UploadPostImageProvider } from './upload-post-image.provider'
+import { FindMyPostsProvider } from './find-my-posts.provider'
 
 @Injectable()
 export class PostsService {
@@ -45,6 +46,10 @@ export class PostsService {
      * inject find post by slug provider
      */
     private readonly findPostBySlugProvider: FindPostBySlugProvider,
+    /**
+     * inject find my posts provider
+     */
+    private readonly findMyPostsProvider: FindMyPostsProvider,
   ) {}
 
   public async create(
@@ -56,6 +61,14 @@ export class PostsService {
 
   public async findAll(getPostsDto: GetPostsDto): Promise<Paginated<Post>> {
     return await this.findAllPostsProvider.findAll(getPostsDto)
+  }
+
+  /** Returns the caller's own posts across all statuses, with an optional status filter. */
+  public async findMyPosts(
+    userId: number,
+    getPostsDto: GetPostsDto,
+  ): Promise<Paginated<Post>> {
+    return await this.findMyPostsProvider.findMyPosts(userId, getPostsDto)
   }
 
   public async findOne(id: number): Promise<Post> {

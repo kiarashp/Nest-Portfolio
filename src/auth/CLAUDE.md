@@ -63,13 +63,17 @@ createPost(...) {}
 
 `AuthModule` and `UsersModule` depend on each other. Both sides use `forwardRef()`:
 - `UsersModule` imports `forwardRef(() => AuthModule)`; `UsersService` injects `@Inject(forwardRef(() => AuthService)) authService`.
-- Individual auth providers (`SignInProvider`, `RefreshTokensProvider`, `GoogleAuthenticationService`) inject `@Inject(forwardRef(() => UsersService)) usersService`.
+- Individual auth providers (`SignInProvider`, `RefreshTokensProvider`, `GoogleAuthenticationService`, `ChangePasswordProvider`) inject `@Inject(forwardRef(() => UsersService)) usersService`.
 
 If you add a new provider that crosses this boundary, it also needs `forwardRef()` on whichever side closes the cycle.
 
 ## Local vs. Google accounts
 
-A `User` row can exist without a `password` (Google-only signup). `SignInProvider.signIn` checks for this and throws `UnauthorizedException('This account uses Google Sign-In')` — keep this check if you touch sign-in.
+A `User` row can exist without a `password` (Google-only signup). Two places enforce this boundary:
+- `SignInProvider.signIn` — throws `UnauthorizedException('This account uses Google Sign-In')` if `user.password` is null. Keep this check if you touch sign-in.
+- `ChangePasswordProvider.changePassword` — throws `BadRequestException('This account uses Google Sign-In. Use account settings to manage your password.')` for the same reason. The distinction (401 vs 400) is intentional: sign-in is an authentication failure, change-password is a precondition failure for an already-authenticated user.
+
+**`ChangePasswordProvider`** (`src/auth/providers/change-password.provider.ts`) handles `POST /auth/change-password` (Bearer-auth required, throttled 5 / 60s). It loads the user via `usersService.findOneById()`, verifies the current password with `hashingProvider.comparePassword()`, hashes the new password, then delegates the DB write to `usersService.updatePassword()`. The `updatePassword()` method on `UsersService` is a thin wrapper around `userRepository.save({ id, password })` — it lives in `UsersModule` to avoid `AuthModule` needing its own `TypeOrmModule.forFeature([User])`.
 
 `google-authentication.service.ts` implements `OnModuleInit` to construct its `OAuth2Client` lazily — needed because config values must be resolved after DI is ready. It verifies the ID token, requires `email_verified`, then does find-or-create by Google ID, not by email. Both `CreateUserProvider` and `CreateGoogleUserProvider` explicitly set `role: UserRole.USER` — the DTO's `whitelist: true` pipe and the explicit assignment together prevent a malicious user from injecting a higher role at registration.
 

@@ -146,7 +146,32 @@ Throttle limits that matter in tests:
 | `POST /contact` | 3 / 300 s |
 | `POST /auth/sign-in` | 5 / 60 s |
 | `POST /auth/reset-password` | 5 / 60 s |
+| `POST /auth/change-password` | 5 / 60 s |
 | `POST /users` | 5 / 600 s |
+
+## Minting tokens for Google-only users
+
+`getAuthToken()` calls `POST /auth/sign-in` which requires a local password — it cannot be used for users created via Google OAuth (no `password` field). To get a bearer token for a Google-only user in tests, retrieve `GenerateTokensProvider` directly from the app and call `generateTokens()`:
+
+```ts
+import { GenerateTokensProvider } from '../../src/auth/providers/generate-tokens.provider'
+
+// Seed the Google user directly (no password)
+const userRepo = dataSource.getRepository(User)
+const googleUser: User = await userRepo.save({
+  firstName: 'Google',
+  email: GOOGLE_EMAIL,
+  isEmailVerified: true,
+  role: UserRole.USER,
+})
+
+// Mint a real JWT without going through sign-in
+const generateTokens = app.get(GenerateTokensProvider)
+const tokens = await generateTokens.generateTokens(googleUser)
+googleToken = tokens.accessToken
+```
+
+This produces a real signed JWT (not a forged one) and is the correct pattern for testing authenticated routes against Google-only accounts. See `test/auth/auth-change-password.e2e-spec.ts` for a working example.
 
 ## Naming and file layout
 

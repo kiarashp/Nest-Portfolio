@@ -141,6 +141,7 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 |---|---|
 | `POST /auth/sign-in` | 5 / 60s |
 | `POST /auth/reset-password` | 5 / 60s |
+| `POST /auth/change-password` | 5 / 60s |
 | `POST /auth/resend-verification` | 3 / 300s |
 | `POST /auth/forgot-password` | 3 / 300s |
 | `POST /users` (register) | 5 / 600s |
@@ -165,6 +166,20 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 | Route | Auth | Notes |
 |---|---|---|
 | `GET /health` | None (public) | Health check — returns `{ status: 'ok' }` wrapped in the data envelope. Used by Coolify container health polling. |
+
+### Auth routes
+
+| Route | Auth | Notes |
+|---|---|---|
+| `POST /auth/sign-in` | None (public) | Returns `{ accessToken, refreshToken }` + sets HttpOnly refresh cookie. Throttled 5 / 60s. |
+| `POST /auth/refresh-tokens` | None (public) | Accepts refresh token from cookie (browser) or body (mobile). Rotates both tokens. |
+| `POST /auth/sign-out` | None (public) | Clears the HttpOnly refresh cookie. |
+| `GET /auth/verify-email` | None (public) | Verifies email address via token from verification email. |
+| `POST /auth/resend-verification` | None (public) | Re-sends the verification email. Throttled 3 / 300s. |
+| `POST /auth/forgot-password` | None (public) | Sends a password reset email. Always returns the same message to prevent enumeration. Throttled 3 / 300s. |
+| `POST /auth/reset-password` | None (public) | Sets a new password using the token from the reset email. Throttled 5 / 60s. |
+| `POST /auth/change-password` | Bearer (any role) | Changes the password for the logged-in user after verifying the current one. Rejects Google-only accounts. Throttled 5 / 60s. |
+| `POST /auth/google` | None (public) | Google OAuth sign-in — accepts a Google ID token, creates or finds the local user, issues tokens. |
 
 ### Contact routes
 

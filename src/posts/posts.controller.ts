@@ -75,6 +75,17 @@ export class PostsController {
   }
 
   /**
+   * get all posts by the authenticated user (all statuses)
+   */
+  @Get('my')
+  findMyPosts(
+    @ActiveUser() activeUser: ActiveUserData,
+    @Query() getPostsDto: GetPostsDto,
+  ) {
+    return this.postsService.findMyPosts(activeUser.sub, getPostsDto)
+  }
+
+  /**
    * get a single published post by id (public)
    */
   @Auth(AuthType.None)
