@@ -1,25 +1,45 @@
 import { Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { MetaOption } from '../entities/meta-option.entity'
-import { CreatePostMetaOptionsDto } from '../dto/create-post-meta-options.dto'
+import { UpdateMetaOptionDto } from '../dto/update-meta-option.dto'
+import { FindOneMetaOptionProvider } from '../providers/find-one-meta-option.provider'
+import { UpdateMetaOptionProvider } from '../providers/update-meta-option.provider'
+import { DeleteMetaOptionProvider } from '../providers/delete-meta-option.provider'
 
 @Injectable()
 export class MetaOptionsService {
   constructor(
-    /**
-     * injecting meta options repository
-     */
-    @InjectRepository(MetaOption)
-    private readonly metaOptionsRepository: Repository<MetaOption>,
+    /** inject find-one provider */
+    private readonly findOneMetaOptionProvider: FindOneMetaOptionProvider,
+    /** inject update provider */
+    private readonly updateMetaOptionProvider: UpdateMetaOptionProvider,
+    /** inject delete provider */
+    private readonly deleteMetaOptionProvider: DeleteMetaOptionProvider,
   ) {}
-  /**
-   * create a new meta option
-   */
-  public async create(createPostMetaOptionsDto: CreatePostMetaOptionsDto) {
-    const metaOption = this.metaOptionsRepository.create(
-      createPostMetaOptionsDto,
+
+  /** Returns a MetaOption by ID. Throws 404 if not found. */
+  public findOne(id: number): Promise<MetaOption> {
+    return this.findOneMetaOptionProvider.findOneById(id)
+  }
+
+  /** Updates a MetaOption. Throws 403 if the caller does not own the linked post. */
+  public update(
+    id: number,
+    updateMetaOptionDto: UpdateMetaOptionDto,
+    activeUser: ActiveUserData,
+  ): Promise<MetaOption> {
+    return this.updateMetaOptionProvider.update(
+      id,
+      updateMetaOptionDto,
+      activeUser,
     )
-    return await this.metaOptionsRepository.save(metaOption)
+  }
+
+  /** Deletes a MetaOption. Throws 403 if the caller does not own the linked post. */
+  public delete(
+    id: number,
+    activeUser: ActiveUserData,
+  ): Promise<{ deleted: boolean; id: number }> {
+    return this.deleteMetaOptionProvider.delete(id, activeUser)
   }
 }

@@ -10,33 +10,29 @@ The gaps below are features that either a portfolio site inherently needs (conta
 
 ---
 
-## Completed
-
-- **#8 — Tag PATCH (update):** `PATCH /tags/:id` — `UpdateTagDto` (PartialType), `UpdateTagProvider` with explicit 409 on unique constraint, `TagsService.update()` facade, registered in `TagsModule`. Tests extended in `test/tags/tags.e2e-spec.ts` (happy path, empty body, 403, 404, 409).
-- **#9 — Delete standalone upload:** Retired. `POST /uploads` was the only route that created `UploadFile` rows with `postId = null`. Since avatars bypass `UploadFile` entirely (they use `AvatarOption` via `StorageProvider` directly) and post images always set `postId` via `POST /posts/:id/images`, removing `POST /uploads` from `UploadsController` eliminates orphaned uploads at the source. No delete endpoint needed.
-
----
-
 ## Priority 2 — Bugs & correctness (fix before frontend starts)
 
-### 11. Remove `POST /meta-options` endpoint
+### 11. Replace `POST /meta-options` with proper CRUD ✓
 
-**Why this exists:**
-`MetaOptionsController` exposes `POST /meta-options` which calls `MetaOptionsService.create()` and saves a `MetaOption` row with no `post` FK — creating permanently orphaned rows in the DB. The TypeORM `@JoinColumn()` default leaves the FK nullable, so the insert succeeds silently.
+**What was done:**
+`POST /meta-options` accepted only `metaValue` with no `postId`, creating orphaned rows that could never be assigned to a post (there is no "assign existing MetaOption to Post" API — MetaOptions are cascade-created through `Post`). Removed.
 
-Meta options are already handled correctly: `CreatePostDto.metaOptions` is a nested DTO and the `Post` entity has `cascade: true` on the `metaOptions` relation — so meta options are created automatically when a post is created or updated. The standalone `/meta-options` endpoint is a leftover from early development.
+In its place, `MetaOptionsController` now exposes `GET /:id`, `PATCH /:id`, and `DELETE /:id` so the CMS can read and manage MetaOptions that were created via `POST /posts`. Creation still happens only through the Post cascade. `PATCH` and `DELETE` enforce ownership — only the post's author or ADMIN may write.
 
-**What to do:**
-Remove `MetaOptionsController` and `MetaOptionsService` (or at minimum remove the controller from `MetaOptionsModule` providers and delete the route). The module itself can stay since it exports the entity. Verify no existing tests or providers call `POST /meta-options` directly.
+**Files changed:**
+- `src/meta-options/meta-options.controller.ts` — replaced POST with GET/PATCH/DELETE
+- `src/meta-options/provieders/meta-options.service.ts` — new facade for find/update/delete
+- `src/meta-options/meta-options.module.ts` — registered three new providers
+- `src/meta-options/dto/update-meta-option.dto.ts` — new DTO (PartialType of CreatePostMetaOptionsDto)
+- `src/meta-options/providers/find-one-meta-option.provider.ts` — new
+- `src/meta-options/providers/update-meta-option.provider.ts` — new
+- `src/meta-options/providers/delete-meta-option.provider.ts` — new
+- `test/meta-options/meta-options.e2e-spec.ts` — new e2e spec
 
-**Files to touch:**
-- `src/meta-options/meta-options.controller.ts` — delete file
-- `src/meta-options/meta-options.module.ts` — remove controller from `controllers: []`
-- `src/meta-options/provieders/meta-options.service.ts` — delete file (or keep if there are other usages)
-
-- [ ] Remove `MetaOptionsController` from the module
-- [ ] Delete or archive the controller and service files
-- [ ] Verify no provider or test imports them
+- [x] Remove `POST /meta-options`
+- [x] Add `GET /meta-options/:id`, `PATCH /meta-options/:id`, `DELETE /meta-options/:id`
+- [x] Ownership check on write operations
+- [x] E2E tests
 
 ---
 
