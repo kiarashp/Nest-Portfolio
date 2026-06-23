@@ -10,71 +10,103 @@ The gaps below are features that either a portfolio site inherently needs (conta
 
 ---
 
-## Priority 2 — CMS completeness
+## Completed
 
-### 8. Tag PATCH (update)
+- **#8 — Tag PATCH (update):** `PATCH /tags/:id` — `UpdateTagDto` (PartialType), `UpdateTagProvider` with explicit 409 on unique constraint, `TagsService.update()` facade, registered in `TagsModule`. Tests extended in `test/tags/tags.e2e-spec.ts` (happy path, empty body, 403, 404, 409).
+- **#9 — Delete standalone upload:** Retired. `POST /uploads` was the only route that created `UploadFile` rows with `postId = null`. Since avatars bypass `UploadFile` entirely (they use `AvatarOption` via `StorageProvider` directly) and post images always set `postId` via `POST /posts/:id/images`, removing `POST /uploads` from `UploadsController` eliminates orphaned uploads at the source. No delete endpoint needed.
+
+---
+
+## Priority 2 — Bugs & correctness (fix before frontend starts)
+
+### 11. Remove `POST /meta-options` endpoint
 
 **Why this exists:**
-Tags can be created and (soft/hard) deleted but not edited. If a tag name has a typo, or the slug needs to change, the only option right now is to delete and recreate — which breaks any existing post associations because the tag ID changes. A simple PATCH endpoint prevents this data loss.
+`MetaOptionsController` exposes `POST /meta-options` which calls `MetaOptionsService.create()` and saves a `MetaOption` row with no `post` FK — creating permanently orphaned rows in the DB. The TypeORM `@JoinColumn()` default leaves the FK nullable, so the insert succeeds silently.
 
-**Current state:**
-`src/tags/tags.controller.ts` has `POST /tags` (create), `DELETE /tags/soft/:id` and `DELETE /tags/:id` (delete). `src/tags/providers/tags.service.ts` only has `create()`, `findAll()`, and both delete methods. There is no `update()` method anywhere. The existing `CreateTagDto` has all the right fields — we just need a `PartialType` wrapper to make them all optional for PATCH.
+Meta options are already handled correctly: `CreatePostDto.metaOptions` is a nested DTO and the `Post` entity has `cascade: true` on the `metaOptions` relation — so meta options are created automatically when a post is created or updated. The standalone `/meta-options` endpoint is a leftover from early development.
 
-**What to build:**
-`PATCH /tags/:id` — roles: AUTHOR, ADMIN (same as create/delete). DTO is `UpdateTagDto = PartialType(CreateTagDto)`. Provider looks up the tag by ID, applies the partial update, saves, and returns the updated entity. Returns 404 if the tag is not found. If a name or slug that's already taken is submitted, the DB unique constraint will throw — let TypeORM's error bubble up as a 409 or catch it explicitly and throw `ConflictException`.
+**What to do:**
+Remove `MetaOptionsController` and `MetaOptionsService` (or at minimum remove the controller from `MetaOptionsModule` providers and delete the route). The module itself can stay since it exports the entity. Verify no existing tests or providers call `POST /meta-options` directly.
 
 **Files to touch:**
-- `src/tags/dto/update-tag.dto.ts` — new DTO, `PartialType(CreateTagDto)`
-- `src/tags/providers/update-tag.provider.ts` — new provider
-- `src/tags/providers/tags.service.ts` — expose `update()` delegating to new provider
-- `src/tags/tags.controller.ts` — add `PATCH /tags/:id`
-- `src/tags/tags.module.ts` — register new provider
+- `src/meta-options/meta-options.controller.ts` — delete file
+- `src/meta-options/meta-options.module.ts` — remove controller from `controllers: []`
+- `src/meta-options/provieders/meta-options.service.ts` — delete file (or keep if there are other usages)
 
-**E2E spec:** `test/tags-update.e2e-spec.ts`
-- PATCH /tags/1 (as ADMIN) with `{ name: 'New Name' }` → 200, name updated
-- PATCH /tags/1 (as USER) → 403
-- PATCH /tags/999 → 404
-- PATCH /tags/1 with a name already taken by another tag → 409
+- [ ] Remove `MetaOptionsController` from the module
+- [ ] Delete or archive the controller and service files
+- [ ] Verify no provider or test imports them
 
-- [x] Create `UpdateTagDto = PartialType(CreateTagDto)`
-- [x] Create `UpdateTagProvider`
-- [x] Expose `update()` on `TagsService`
-- [x] Add `PATCH /tags/:id` to `TagsController` with `@Roles(UserRole.AUTHOR, UserRole.ADMIN)`
-- [x] Register provider in `TagsModule`
-- [x] Write e2e spec (extended `test/tags/tags.e2e-spec.ts`)
+---
+
+### 12. Fix `publishOn` column to use `timestamptz`
+
+**Why this exists:**
+`Post.publishOn` is declared as `type: 'timestamp'` (timezone-naive). The comment in the entity even notes "equal to datetime in mysql" — it was written with MySQL in mind. In PostgreSQL, `timestamp` stores the wall-clock time at the server's local timezone. If the server TZ ever shifts (DST, container restart, region change), scheduled posts will publish at the wrong time.
+
+The User entity uses `timestamptz` correctly for all token expiry columns. `publishOn` must match before any scheduled-publishing cron is built.
+
+**What to do:**
+Change the column type to `timestamptz` in the entity and generate a migration.
+
+**Files to touch:**
+- `src/posts/entities/post.entity.ts` — change `type: 'timestamp'` to `type: 'timestamptz'`
+- Generate migration: `pnpm run typeorm migration:generate src/database/migrations/PublishOnTimestamptz -d src/database/data-source.ts`
+
+- [ ] Update `Post.publishOn` column type to `timestamptz`
+- [ ] Generate and commit migration
+
+---
+
+### 13. Fix `UsersService.findAll()` — pagination params are silently ignored
+
+**Why this exists:**
+`GET /users` accepts `?limit` and `?page` query params and the controller passes them to `UsersService.findAll(limit, page)`. But the service implementation ignores both:
+
+```typescript
+public findAll(limit: number, page: number) {
+  return this.userRepository.find()  // no take/skip
+}
+```
+
+Every call returns all users with no cap, regardless of what pagination values are sent. This is inconsistent with how posts, tags, and every other collection endpoint works (all use `PaginationProvider`).
+
+**What to do:**
+Wire `findAll()` through `PaginationProvider` the same way posts do it. Inject `PaginationProvider` into `UsersService` (or a new `FindAllUsersProvider`) and call `paginateQuery({ limit, page }, userRepository)`.
+
+**Files to touch:**
+- `src/users/providers/users.service.ts` — pass limit/page to a real paginated query
+- Optionally extract `src/users/providers/find-all-users.provider.ts` (follows existing pattern)
+
+- [ ] Replace `userRepository.find()` with a paginated query using `PaginationProvider`
+- [ ] Ensure response shape matches other paginated endpoints (`data`, `meta`, `links`)
+
+---
+
+### 14. Terminus health check
+
+**Why this exists:**
+`GET /health` returns `{ status: 'ok' }` unconditionally. Coolify uses this endpoint for container health polling, but it will report the container as healthy even if PostgreSQL is unreachable.
+
+**What to do:**
+Install `@nestjs/terminus` and replace the health controller with one that runs a TypeORM ping. A DB failure should return HTTP 503 so Coolify restarts the container instead of routing traffic to it.
+
+```bash
+pnpm add @nestjs/terminus
+```
+
+**Files to touch:**
+- `src/app.controller.ts` — replace the current `GET /health` with Terminus `HealthCheckService` + `TypeOrmHealthIndicator`
+- `src/app.module.ts` — import `TerminusModule`
+
+- [ ] Install `@nestjs/terminus`
+- [ ] Replace health endpoint with TypeORM ping
+- [ ] Verify Coolify health poll still hits `GET /health`
 
 ---
 
 ## Priority 3 — Upload management
-
-### 9. Delete standalone upload
-
-**Why this exists:**
-Currently, uploads are only deleted when the post they are linked to is deleted (via the cascade in `RemovePostProvider` which calls `DeleteFileProvider`). But uploads made via `POST /uploads` (the generic upload endpoint, not the post-image one) are standalone — their `postId` is null and they are never automatically cleaned up. An EDITOR or AUTHOR who uploaded a wrong file has no way to delete it. Over time this creates orphaned Cloudinary assets and cluttered DB rows.
-
-**Current state:**
-`src/uploads/providers/delete-file.provider.ts` already exists and handles both the Cloudinary deletion (`cloudinary.uploader.destroy(publicId)`) and the DB row removal. It's used by `RemovePostProvider`. We just need to expose it through a new controller route with an ownership check.
-
-**Ownership rule:** EDITOR can only delete uploads they own (`userId === activeUser.sub`). AUTHOR and ADMIN can delete any upload. This mirrors the same ownership pattern used in `UpdatePostProvider` for posts.
-
-**Files to touch:**
-- `src/uploads/providers/find-one-upload.provider.ts` — new provider to look up a single UploadFile by ID (needed for ownership check before deletion)
-- `src/uploads/uploads.controller.ts` — add `DELETE /uploads/:id`
-- `src/uploads/uploads.service.ts` (or equivalent facade) — expose `deleteById()` method
-- `src/uploads/uploads.module.ts` — register new provider if needed
-
-**E2E spec:** `test/uploads-delete.e2e-spec.ts`
-- DELETE /uploads/:id (as ADMIN) → 200, upload gone from DB
-- DELETE /uploads/:id (as EDITOR, own upload) → 200
-- DELETE /uploads/:id (as EDITOR, upload owned by another user) → 403
-- DELETE /uploads/999 (non-existent) → 404
-
-- [ ] Create `FindOneUploadProvider` (lookup by ID)
-- [ ] Add `deleteById()` method to uploads service/facade
-- [ ] Add `DELETE /uploads/:id` to `UploadsController` with EDITOR/AUTHOR/ADMIN roles and ownership check
-- [ ] Write e2e spec
-
----
 
 ### 10. List own uploads
 
@@ -112,9 +144,12 @@ These are real features but out of scope until the frontend is running and real 
 - **Comments** — No entity, no routes. Significant scope — needs moderation, notifications, threading.
 - **Post likes/reactions** — No engagement tracking at all. Needs its own entity and auth-aware endpoints.
 - **Newsletter subscribers** — A subscriber list entity and a subscribe/unsubscribe endpoint. Not needed until there is content to send.
-- **Refresh token revocation** — Right now old refresh tokens remain valid until they expire (24h). A revocation list (Redis or DB table) would enable logout-all-devices. Deferred because it adds a Redis dependency.
+- **Refresh token revocation** — Right now old refresh tokens remain valid until they expire (24h). A revocation list (Redis or DB table) would enable logout-all-devices. The no-Redis approach: a `refresh_token_revocations` DB table `(jti, expiresAt)`, a `jti` claim added to refresh tokens in `GenerateTokensProvider`, and a lookup in `RefreshTokensProvider` before issuing new tokens. A daily cron cleans up expired rows. Deferred for now, but prioritise before real employee accounts exist on a production company site.
 - **Audit logging** — No trail of who did what. Nice for admin dashboards but not needed to launch.
-- **`startDate`/`endDate` filters on `GET /posts`** — `GetPostsDto` declares these two optional fields (validated, Swagger-visible) but `FindAllPostsProvider` never reads them — only `page` and `limit` are passed to `paginateQuery`. The filters silently do nothing. Wire them up when date-range filtering is actually needed by the frontend.
+- **`startDate`/`endDate` filters on `GET /posts`** — `GetPostsDto` declares these two optional fields (validated, Swagger-visible) but `FindAllPostsProvider` never reads them. The filters silently do nothing, which is a misleading API contract. Either wire them into the `where` clause (`Between(startDate, endDate)` on a `createdAt` or `publishOn` column) or remove them from the DTO entirely. Leaving them half-declared is the worst option.
+- **Async email** — `CreateUserProvider` and `ContactProvider` send email synchronously, blocking the HTTP response until the SMTP handshake completes. If the mail server is slow or down, requests hang. The lightweight fix is `@nestjs/event-emitter`: providers emit events (`user.created`, `contact.submitted`) and listeners handle mail out-of-band. No Redis or Bull queue needed. Deferred because Mailtrap is reliable enough in dev, but should be wired before production launch.
+- **`GET /tags` response cap** — `TagsService.findAll()` runs `repository.find()` with no limit, returning all tags in one query. Safe for now, worth adding a simple `take: 200` cap before launch.
+- **Full-text search** — No `GET /posts?q=keyword` endpoint exists. PostgreSQL supports full-text search natively via `tsvector`/`tsquery` — no Elasticsearch needed at this scale. A `GIN`-indexed generated column on `title + content` would support fast keyword queries. Deferred until there is enough content for search to be useful.
 
 ---
 
@@ -127,4 +162,4 @@ Run these after finishing all features above:
 - [ ] `pnpm run test` — all unit tests green
 - [ ] `pnpm run test:e2e` — all new e2e specs pass (requires `.env.test` pointing at the test DB `nest_portfolio_test`)
 - [ ] `pnpm run generate:types` — regenerate `openapi-types.ts`; open it and confirm the new endpoints appear with correct request/response types
-- [ ] Manually smoke-test via Swagger at `/api`: tag update, upload list, upload delete, post filters
+- [ ] Manually smoke-test via Swagger at `/api`: tag update, upload list, post filters

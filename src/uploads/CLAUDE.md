@@ -13,14 +13,14 @@ Guidance specific to this module. See the root `CLAUDE.md` for the high-level su
 
 ## The `postId` field
 
-`UploadFile` has a nullable `postId` foreign key linking to `Post`. Set it when uploading images for a post so they can be cleaned up when the post is deleted. `RemovePostProvider` loads the post with its `uploadFiles` relation and calls `uploadsService.deleteFile()` for each before deleting the post row.
+`UploadFile` has a nullable `postId` foreign key linking to `Post`. Every `UploadFile` row is created through `POST /posts/:id/images` (via `UploadPostImageProvider`), which always passes `postId`, so there are no orphaned rows. `RemovePostProvider` loads the post with its `uploadFiles` relation and calls `uploadsService.deleteFile()` for each before deleting the post row.
 
-Avatars and other non-post uploads leave `postId` as `null`.
+Avatars bypass `UploadFile` entirely — `AvatarOptionsProvider` injects `StorageProvider` directly and writes to `AvatarOption`, a separate table with no `postId`.
 
 ## Extending `FileType`
 
 `enums/file-type.enum.ts` currently only has `IMAGE = 'image'`. If you add a new type:
-- `UploadsController.uploadFile`'s `FileTypeValidator` regex and `CloudinaryProvider.upload`'s `resource_type: 'image'` are both image-specific — a non-image type needs its own controller method/validator and a different Cloudinary `resource_type` (`'video'`, `'raw'`).
+- `PostsController`'s `POST /posts/:id/images` handler uses `FileTypeValidator` (image-only regex) and `CloudinaryProvider.upload` uses `resource_type: 'image'` — a non-image type needs its own controller handler/validator and a different Cloudinary `resource_type` (`'video'`, `'raw'`).
 - `UploadFileProvider.uploadFile` hardcodes `type: FileType.IMAGE` when creating the row — this needs to become a parameter once a second type exists.
 
 ## Swapping the storage backend

@@ -207,6 +207,20 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 
 `GET /users/me`, `GET /users/avatar-options`, and `PATCH /users/me` must each be declared before their `/:id` counterparts in the controller so NestJS routes the literal segment before trying to parse it as an integer ID via `ParseIntPipe`.
 
+### Tags routes
+
+| Route | Auth | Notes |
+|---|---|---|
+| `GET /tags` | None (public) | Returns all tags as a flat array (no pagination). |
+| `POST /tags` | AUTHOR / ADMIN | Create a tag — `name` and `slug` required, both unique. |
+| `PATCH /tags/:id` | AUTHOR / ADMIN | Partial update — any subset of `name`, `slug`, `description`, `schema`, `featuredImage`. Returns 404 if not found, 409 if `name` or `slug` collides with an existing tag. |
+| `DELETE /tags/soft/:id` | AUTHOR / ADMIN | Soft delete — sets `deletedAt`, row stays in DB. |
+| `DELETE /tags/:id` | AUTHOR / ADMIN | Hard delete — row is permanently removed. |
+
+`DELETE /tags/soft/:id` must be declared before `DELETE /tags/:id` in the controller so NestJS matches the literal `soft` segment before attempting `ParseIntPipe` on it.
+
+**Conflict handling in `UpdateTagProvider`:** unique constraint violations (`PostgreSQL error 23505`) are caught explicitly as `ConflictException`. All other save errors are surfaced as `RequestTimeoutException`.
+
 ### Posts routes
 
 | Route | Auth | Notes |
@@ -293,8 +307,7 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 - `UploadFile` entity (`src/uploads/entities/upload-file.entity.ts`) records every upload: `name`, `path` (Cloudinary `secure_url`), `publicId`, `type` (`FileType` enum), `mime`, `size`, `userId`, and optional `postId`. When `postId` is set, the upload is linked to that post and will be deleted from Cloudinary when the post is deleted.
 - `UploadsService` is split into two providers: `UploadFileProvider` (validates buffer magic bytes, uploads to storage, persists the row) and `DeleteFileProvider` (looks up by URL, deletes from Cloudinary, removes the DB row).
 - `StorageProvider` is an abstract class (not an interface) so it can serve as a NestJS DI token at runtime. `CloudinaryProvider` is its only current implementation, registered via `{ provide: StorageProvider, useClass: CloudinaryProvider }` in `UploadsModule`. Swap backends by changing only that line.
-- Generic upload route: `POST /uploads` — requires `EDITOR / AUTHOR / ADMIN` role, multipart field `file`, 5MB cap, image types only.
-- Post image upload route: `POST /posts/:id/images` — requires `EDITOR / AUTHOR / ADMIN`. EDITORs can only upload to their own posts. Returns the `UploadFile` record; the client decides whether to use the URL as `featuredImage` via `PATCH /posts/:id`.
+- Post image upload route: `POST /posts/:id/images` — requires `EDITOR / AUTHOR / ADMIN`. EDITORs can only upload to their own posts. Returns the `UploadFile` record; the client decides whether to use the URL as `featuredImage` via `PATCH /posts/:id`. All `UploadFile` rows are created through this route, so every row always has a `postId` and is cascade-deleted when the post is removed — there are no orphaned uploads.
 - Avatar pool management: `POST /users/avatar-options` — ADMIN only. Uploads an image to Cloudinary via `StorageProvider` and saves `{ url, publicId }` as an `AvatarOption` row. No `UploadFile` row is created — `StorageProvider` is injected directly by `AvatarOptionsProvider` rather than going through `UploadsService`.
 - `UploadsModule` exports `StorageProvider` so `UsersModule` can inject it without duplicating Cloudinary setup.
 
