@@ -26,6 +26,12 @@ describe('RBAC (e2e)', () => {
     ;({ app, dataSource } = await createApp())
     avatarOptionRepo = dataSource.getRepository(AvatarOption)
 
+    // Pre-cleanup guards against stale rows left by a previously interrupted run.
+    await cleanupUsers(dataSource, [
+      'rbac-user@example.com',
+      'rbac-admin@example.com',
+    ])
+
     // Seed a regular USER and an ADMIN directly — bypasses the chicken-and-egg
     // problem of needing an existing admin to elevate roles via the API.
     const savedUser = await seedUser(dataSource, {
@@ -55,7 +61,7 @@ describe('RBAC (e2e)', () => {
   })
 
   afterAll(async () => {
-    await avatarOptionRepo.delete(rbacAvatarOptionId)
+    if (rbacAvatarOptionId) await avatarOptionRepo.delete(rbacAvatarOptionId)
     await cleanupUsers(dataSource, [
       'rbac-user@example.com',
       'rbac-admin@example.com',
