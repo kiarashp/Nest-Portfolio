@@ -35,15 +35,24 @@ createPost(...) {}
 
 `RolesGuard` reads the `ROLES_KEY` metadata via `Reflector`. If no `@Roles()` is set, the guard passes through. If roles are required but no user is on the request (which would only happen if `@Auth(AuthType.None)` and `@Roles()` are mistakenly combined), access is **denied** — not silently allowed.
 
-### Ownership checks (EDITOR restriction)
+### Ownership checks
 
-`EDITOR` can only act on their own posts. This check lives in the provider, not the guard:
+**Post write routes (EDITOR restriction only):**
+
+`EDITOR` can only act on their own posts. `AUTHOR` and `ADMIN` skip the check entirely. Implemented in the provider, not the guard:
 
 - `UpdatePostProvider.update()` — throws `ForbiddenException` if `EDITOR` and `post.author.id !== activeUser.sub`
 - `RemovePostProvider.remove()` — same check
 - `UploadPostImageProvider.uploadPostImage()` — same check
 
-`AUTHOR` and `ADMIN` skip the ownership check entirely.
+**Meta-option write routes (EDITOR and AUTHOR restriction):**
+
+Unlike post routes, MetaOption write routes restrict both EDITOR and AUTHOR to their own posts' meta-options. Only ADMIN may update or delete any meta-option regardless of ownership. Implemented in:
+
+- `UpdateMetaOptionProvider.update()` — throws `ForbiddenException` if `activeUser.role !== ADMIN && post.author.id !== activeUser.sub`
+- `DeleteMetaOptionProvider.delete()` — same check
+
+This stricter model is intentional: MetaOption holds per-post SEO metadata and there is no cross-author reuse case analogous to an AUTHOR editing someone else's post content.
 
 ### `ActiveUserData`
 

@@ -12,49 +12,6 @@ The gaps below are features that either a portfolio site inherently needs (conta
 
 ## Priority 2 — Bugs & correctness (fix before frontend starts)
 
-### 11. Replace `POST /meta-options` with proper CRUD ✓
-
-**What was done:**
-`POST /meta-options` accepted only `metaValue` with no `postId`, creating orphaned rows that could never be assigned to a post (there is no "assign existing MetaOption to Post" API — MetaOptions are cascade-created through `Post`). Removed.
-
-In its place, `MetaOptionsController` now exposes `GET /:id`, `PATCH /:id`, and `DELETE /:id` so the CMS can read and manage MetaOptions that were created via `POST /posts`. Creation still happens only through the Post cascade. `PATCH` and `DELETE` enforce ownership — only the post's author or ADMIN may write.
-
-**Files changed:**
-- `src/meta-options/meta-options.controller.ts` — replaced POST with GET/PATCH/DELETE
-- `src/meta-options/provieders/meta-options.service.ts` — new facade for find/update/delete
-- `src/meta-options/meta-options.module.ts` — registered three new providers
-- `src/meta-options/dto/update-meta-option.dto.ts` — new DTO (PartialType of CreatePostMetaOptionsDto)
-- `src/meta-options/providers/find-one-meta-option.provider.ts` — new
-- `src/meta-options/providers/update-meta-option.provider.ts` — new
-- `src/meta-options/providers/delete-meta-option.provider.ts` — new
-- `test/meta-options/meta-options.e2e-spec.ts` — new e2e spec
-
-- [x] Remove `POST /meta-options`
-- [x] Add `GET /meta-options/:id`, `PATCH /meta-options/:id`, `DELETE /meta-options/:id`
-- [x] Ownership check on write operations
-- [x] E2E tests
-
----
-
-### 12. Fix `publishOn` column to use `timestamptz`
-
-**Why this exists:**
-`Post.publishOn` is declared as `type: 'timestamp'` (timezone-naive). The comment in the entity even notes "equal to datetime in mysql" — it was written with MySQL in mind. In PostgreSQL, `timestamp` stores the wall-clock time at the server's local timezone. If the server TZ ever shifts (DST, container restart, region change), scheduled posts will publish at the wrong time.
-
-The User entity uses `timestamptz` correctly for all token expiry columns. `publishOn` must match before any scheduled-publishing cron is built.
-
-**What to do:**
-Change the column type to `timestamptz` in the entity and generate a migration.
-
-**Files to touch:**
-- `src/posts/entities/post.entity.ts` — change `type: 'timestamp'` to `type: 'timestamptz'`
-- Generate migration: `pnpm run typeorm migration:generate src/database/migrations/PublishOnTimestamptz -d src/database/data-source.ts`
-
-- [ ] Update `Post.publishOn` column type to `timestamptz`
-- [ ] Generate and commit migration
-
----
-
 ### 13. Fix `UsersService.findAll()` — pagination params are silently ignored
 
 **Why this exists:**

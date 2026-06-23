@@ -72,7 +72,7 @@ export class Post {
   featuredImage?: string
   //   publishOn
   @Column({
-    type: 'timestamp', // equal to 'datetime in mysql'
+    type: 'timestamptz',
     nullable: true,
   })
   publishOn?: Date

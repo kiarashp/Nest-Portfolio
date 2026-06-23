@@ -221,6 +221,20 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 
 **Conflict handling in `UpdateTagProvider`:** unique constraint violations (`PostgreSQL error 23505`) are caught explicitly as `ConflictException`. All other save errors are surfaced as `RequestTimeoutException`.
 
+### Meta-options routes
+
+| Route | Auth | Notes |
+|---|---|---|
+| `GET /meta-options/:id` | EDITOR / AUTHOR / ADMIN | Returns a MetaOption by ID (includes linked `post` and `author`). No ownership check — any authenticated EDITOR/AUTHOR/ADMIN may read. 404 if not found. |
+| `PATCH /meta-options/:id` | EDITOR / AUTHOR / ADMIN | Updates `metaValue`. Only the linked post's author or ADMIN may write — all others receive 403. 404 if not found. |
+| `DELETE /meta-options/:id` | EDITOR / AUTHOR / ADMIN | Deletes the MetaOption row without deleting its post. Same 403/404 rules as PATCH. |
+
+**Creation:** MetaOptions are always created through `POST /posts` via a nested `metaOptions: { metaValue }` in the body — TypeORM cascade handles the insert. There is intentionally no `POST /meta-options` endpoint: it was removed because it could only produce orphaned rows (the MetaOption owns the FK, so there is no API to assign an existing MetaOption to a Post after the fact).
+
+**Ownership model:** Unlike post write routes where AUTHOR can act on any post, MetaOption write routes restrict both EDITOR and AUTHOR to their own posts' meta-options. Only ADMIN bypasses this. Logic lives in `UpdateMetaOptionProvider` and `DeleteMetaOptionProvider`: load with `{ post: { author: true } }`, then `if activeUser.role !== ADMIN && post.author.id !== activeUser.sub → ForbiddenException`.
+
+**Directory note:** new providers live in `src/meta-options/providers/` (correct spelling). The legacy service lives in the misspelled `src/meta-options/provieders/` directory — this inconsistency is known but harmless.
+
 ### Posts routes
 
 | Route | Auth | Notes |
