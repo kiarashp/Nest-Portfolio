@@ -165,7 +165,7 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 
 | Route | Auth | Notes |
 |---|---|---|
-| `GET /health` | None (public) | Health check — returns `{ status: 'ok' }` wrapped in the data envelope. Used by Coolify container health polling. |
+| `GET /health` | None (public) | Terminus health check — pings the TypeORM connection via `TypeOrmHealthIndicator`. Returns 200 `{ status: 'ok', info: { database: { status: 'up' } }, ... }` wrapped in the data envelope when the DB is reachable; returns 503 when it is not. Used by Coolify container health polling. Implemented in `AppController.check()` using `HealthCheckService` from `@nestjs/terminus`; `TerminusModule` is imported in `AppModule`. |
 
 ### Auth routes
 
@@ -332,7 +332,7 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 ### Code style
 
 - No semicolons, single quotes, `trailingComma: "all"` (`.prettierrc`); ESLint extends `typescript-eslint` recommendedTypeChecked + prettier. `no-explicit-any` and `no-unused-vars` are off; `no-floating-promises`/`no-unsafe-argument` are warnings only.
-- After making edits, always run `pnpm run lint` — it runs `eslint --fix` which auto-applies all Prettier formatting. The only expected unfixable error is the stale `src/app.controller.spec.ts`.
+- After making edits, always run `pnpm run lint` — it runs `eslint --fix` which auto-applies all Prettier formatting. No known unfixable lint errors remain.
 - Path aliasing: imports use the `src/...` absolute form (e.g. `src/users/users.module`) rather than deep relative paths, per `tsconfig.json` `baseUrl: "./"`.
 - **Comments:** Add comments to providers, service methods, and constructor injections. Use single-line `// ...` for injections and JSDoc `/** ... */` for public methods. Write in plain English — full sentences, say what the code does and why, not how. No analogies. Before writing a comment, ask: would any developer on the team understand every word without looking it up? If not, rewrite it in simpler terms.
 - **TypeScript build config:** Treat `tsconfig.build.json` as the source of truth for NestJS compilation. For build-only issues (such as generated files interfering with `rootDir`), fix `tsconfig.build.json` by excluding those files instead of modifying `tsconfig.json`. Only change `tsconfig.json` when the setting should apply to the entire TypeScript project — path aliases, strict mode, `target`, `moduleResolution`, `types`, etc. If the problem is `nest build` → check `tsconfig.build.json` first. If the problem is the IDE, `tsc`, or path aliases → check `tsconfig.json`.

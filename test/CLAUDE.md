@@ -194,6 +194,21 @@ Do not split just because a file is long — each separate file boots the NestJS
 
 When writing assertions against user data returned from post routes, do not assert on `email`, `role`, or `isEmailVerified` — they will not be present.
 
+## Pagination count/data race condition
+
+`PaginationProvider` runs `repository.find()` then `repository.count()` as two separate queries with no transaction between them. Under parallel test execution, another suite can insert or delete a row between those two calls, making `data.length` and `meta.totalItems` differ.
+
+**Do not assert strict equality between `data.length` and `meta.totalItems`** in any test that runs alongside other suites. Instead, assert the invariant that actually matters:
+
+```ts
+// ✗ fragile under parallel execution
+expect(body.data.length).toBe(body.meta.totalItems)
+
+// ✓ tests the real invariant (totalItems is not capped below actual results)
+expect(body.meta.totalItems).toBeGreaterThanOrEqual(body.data.length)
+expect(body.data.length).toBeGreaterThanOrEqual(seededCount)
+```
+
 ## Paginated response shape
 
 Routes that return paginated lists (`GET /posts`, `GET /users`) wrap their payload in a `Paginated<T>` object:
