@@ -243,10 +243,11 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 | `GET /posts/my` | Bearer (any role) | Paginated list of the caller's own posts — all statuses (draft, review, scheduled, published). Optional `?status=draft\|review\|scheduled\|published` to filter to one. Declared before `/:id` to avoid `ParseIntPipe` collision. |
 | `GET /posts/slug/:slug` | None (public) | Single published post by slug. 404 if draft. |
 | `GET /posts/:id` | None (public) | Single published post by DB ID. 404 if draft. |
-| `POST /posts` | EDITOR / AUTHOR / ADMIN | Create a post. |
+| `POST /posts` | EDITOR / AUTHOR / ADMIN | Create a post. `title`, `slug`, and `status` are optional — omit them to get defaults (`"Untitled"`, `"draft-<uuid>"`, `"draft"`). Only `postType` is required. Intended for draft-first CMS flows: create the draft immediately on form open, then upload images and auto-save content before publishing. |
 | `PATCH /posts/:id` | EDITOR / AUTHOR / ADMIN | Update a post. EDITORs restricted to own posts. |
 | `POST /posts/:id/tags` | EDITOR / AUTHOR / ADMIN | Add tags to a post without replacing existing ones — body `{ tagIds: number[] }`. Tags already on the post are skipped. EDITORs restricted to own posts. |
 | `DELETE /posts/:id/tags` | EDITOR / AUTHOR / ADMIN | Remove tags from a post — body `{ tagIds: number[] }`. Tags not on the post are simply skipped. EDITORs restricted to own posts. |
+| `GET /posts/:id/images` | EDITOR / AUTHOR / ADMIN | List all `UploadFile` records uploaded for a post. EDITORs restricted to own posts. Returns the full `UploadFile` array including `path` (Cloudinary URL) — frontend uses this to populate an image picker and set `featuredImage` via `PATCH /posts/:id`. |
 | `POST /posts/:id/images` | EDITOR / AUTHOR / ADMIN | Upload an image for a post. EDITORs restricted to own posts. |
 | `DELETE /posts/:id` | EDITOR / AUTHOR / ADMIN | Delete a post. EDITORs restricted to own posts. |
 
@@ -322,6 +323,7 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 - `UploadsService` is split into two providers: `UploadFileProvider` (validates buffer magic bytes, uploads to storage, persists the row) and `DeleteFileProvider` (looks up by URL, deletes from Cloudinary, removes the DB row).
 - `StorageProvider` is an abstract class (not an interface) so it can serve as a NestJS DI token at runtime. `CloudinaryProvider` is its only current implementation, registered via `{ provide: StorageProvider, useClass: CloudinaryProvider }` in `UploadsModule`. Swap backends by changing only that line.
 - Post image upload route: `POST /posts/:id/images` — requires `EDITOR / AUTHOR / ADMIN`. EDITORs can only upload to their own posts. Returns the `UploadFile` record; the client decides whether to use the URL as `featuredImage` via `PATCH /posts/:id`. All `UploadFile` rows are created through this route, so every row always has a `postId` and is cascade-deleted when the post is removed — there are no orphaned uploads.
+- Post image list route: `GET /posts/:id/images` — returns all `UploadFile` rows for a post. EDITORs restricted to own posts (same rule as upload). Used by the frontend image picker so the user can select a previously uploaded image as `featuredImage` without re-uploading.
 - Avatar pool management: `POST /users/avatar-options` — ADMIN only. Uploads an image to Cloudinary via `StorageProvider` and saves `{ url, publicId }` as an `AvatarOption` row. No `UploadFile` row is created — `StorageProvider` is injected directly by `AvatarOptionsProvider` rather than going through `UploadsService`.
 - `UploadsModule` exports `StorageProvider` so `UsersModule` can inject it without duplicating Cloudinary setup.
 
