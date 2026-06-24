@@ -108,7 +108,7 @@ pnpm run seed:admin   # uses NODE_ENV=development → .env.development
 
 ## Architecture
 
-NestJS (v11) + TypeORM + PostgreSQL blog/portfolio API. Module-per-domain layout: `users`, `posts`, `tags`, `meta-options`, `auth` (with a nested `social` sub-feature for Google), plus cross-cutting `common`, `config`, and `crypto` directories. `CryptoModule` (`src/crypto/`) is a standalone utility module that provides `HashingProvider` (abstract) and `BcryptProvider` (concrete); both `AuthModule` and `UsersModule` import it — this is how password hashing is shared without a circular dependency between those two modules.
+NestJS (v11) + TypeORM + PostgreSQL blog/portfolio API. Module-per-domain layout: `users`, `posts`, `tags`, `meta-options`, `auth` (with a nested `social` sub-feature for Google), plus cross-cutting `common`, `config`, `crypto`, and `audit-log` directories. `CryptoModule` (`src/crypto/`) is a standalone utility module that provides `HashingProvider` (abstract) and `BcryptProvider` (concrete); both `AuthModule` and `UsersModule` import it — this is how password hashing is shared without a circular dependency between those two modules. `AuditLogModule` (`src/audit-log/`) is imported by `UsersModule`, `PostsModule`, `TagsModule`, and `MetaOptionsModule` — any module whose providers write audit records must import it.
 
 Within each domain module the convention is: `*.module.ts` → `*.controller.ts` → `providers/*.service.ts`, where the service is a **thin facade** that delegates to single-purpose provider classes for individual operations. Each provider handles exactly one responsibility (e.g. `create-post.provider.ts`, `find-one-post.provider.ts`, `remove-post.provider.ts`). DTOs live in `dto(s)/`, TypeORM entities in `entities/`.
 
@@ -120,6 +120,7 @@ Entity relations:
 - `User` 1—N `UploadFile` (non-nullable — every upload is tied to the uploading user)
 - `AvatarOption` — standalone entity (`src/users/entities/avatar-option.entity.ts`), no FK to `User`. Columns: `id`, `url`, `publicId`, `createdAt`. Admins populate the pool via `POST /users/avatar-options`; users pick one with `PATCH /users/avatar`.
 - `ContactSubmission` — standalone entity (`src/contact/entities/contact-submission.entity.ts`), no FK to any other table. Columns: `id`, `name`, `email`, `subject`, `message`, `createdAt`. Every submission is persisted permanently so the owner can review them even if an email notification is missed.
+- `AuditLog` — standalone entity (`src/audit-log/entities/audit-log.entity.ts`), no FK to any other table. Columns: `id`, `userId` (nullable int — null for self-service operations like registration), `action` (varchar 32), `entity` (varchar 64), `entityId` (int), `createdAt`. Written by providers after every successful write; never deleted.
 
 ### Request pipeline (global, wired in `app.module.ts`)
 
@@ -268,6 +269,12 @@ Authenticated write routes (`PATCH`, `DELETE`, `POST /images`) use `FindOnePostP
 - `authorId` — filter by author user ID. Used only by `GET /posts`.
 - `q` — keyword search (1–100 chars). Case-insensitive `ILIKE '%q%'` applied to both `title` and `content` as OR branches. Composes with all other filters: `FindAllPostsProvider` builds a cross-product of search branches × tag branches so `(title OR content) AND (tag1 OR tag2)` semantics are preserved. Draft posts are still excluded. Used only by `GET /posts`; ignored by `GET /posts/my`.
 
+### Audit log routes
+
+| Route | Auth | Notes |
+|---|---|---|
+| `GET /audit-logs` | ADMIN | Paginated list of audit records. Accepts `?limit`, `?page`, `?entity=<name>` (exact match, e.g. `Post`), `?action=<action>` (exact match, e.g. `CREATE`). Returns `Paginated<AuditLog>`. |
+
 ### Serialization
 
 `ClassSerializerInterceptor` is global. Entity fields control their own visibility via class-transformer decorators.
@@ -354,6 +361,45 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 - Post image list route: `GET /posts/:id/images` — returns all `UploadFile` rows for a post. EDITORs restricted to own posts (same rule as upload). Used by the frontend image picker so the user can select a previously uploaded image as `featuredImage` without re-uploading.
 - Avatar pool management: `POST /users/avatar-options` — ADMIN only. Uploads an image to Cloudinary via `StorageProvider` and saves `{ url, publicId }` as an `AvatarOption` row. No `UploadFile` row is created — `StorageProvider` is injected directly by `AvatarOptionsProvider` rather than going through `UploadsService`.
 - `UploadsModule` exports `StorageProvider` so `UsersModule` can inject it without duplicating Cloudinary setup.
+
+### Audit logging
+
+`src/audit-log` is a cross-cutting module that writes a permanent record of every write operation. It never blocks a request — `AuditLogService.log()` wraps `repository.save()` in a try/catch and swallows errors.
+
+**Structure:**
+- `entities/audit-log.entity.ts` — the `audit_logs` table (see Entity relations above).
+- `enums/audit-action.enum.ts` — `CREATE | UPDATE | DELETE | SOFT_DELETE`.
+- `providers/audit-log.service.ts` — `log(userId, action, entity, entityId)` (write) and `findAll(dto)` (paginated read for the admin endpoint).
+- `audit-log.controller.ts` — `GET /audit-logs`, ADMIN only.
+- `audit-log.module.ts` — exports `AuditLogService`; imports `PaginationModule`.
+
+**Current instrumented providers (14):**
+
+| Provider | action | entity | userId source |
+|---|---|---|---|
+| `CreateUserProvider` | CREATE | 'User' | `newUser.id` (null actor — self-registration) |
+| `RemoveOneByIdProvider` | DELETE | 'User' | `activeUserId` (threaded from controller) |
+| `ChangeUserRoleProvider` | UPDATE | 'User' | `activeUserId` (threaded from controller) |
+| `PatchUserProvider` | UPDATE | 'User' | `activeUserId` (threaded from controller) |
+| `PatchUserProfileProvider` | UPDATE | 'User' | `userId` (self-update, actor = target) |
+| `AvatarOptionsProvider.create` | CREATE | 'AvatarOption' | `activeUserId` (threaded from controller) |
+| `AvatarOptionsProvider.remove` | DELETE | 'AvatarOption' | `activeUserId` (threaded from controller) |
+| `CreatePostProvider` | CREATE | 'Post' | `activeUser.sub` |
+| `UpdatePostProvider` | UPDATE | 'Post' | `activeUser.sub` |
+| `RemovePostProvider` | DELETE | 'Post' | `activeUser.sub` |
+| `TagsService.create` | CREATE | 'Tag' | `activeUserId` (threaded from controller) |
+| `TagsService.delete` | DELETE | 'Tag' | `activeUserId` (threaded from controller) |
+| `TagsService.softDelete` | SOFT_DELETE | 'Tag' | `activeUserId` (threaded from controller) |
+| `UpdateMetaOptionProvider` | UPDATE | 'MetaOption' | `activeUser.sub` |
+| `DeleteMetaOptionProvider` | DELETE | 'MetaOption' | `activeUser.sub` |
+
+**Signature threading:** Several providers originally received only the target entity's `id`. For audit purposes, `activeUserId: number` was added as a final parameter and threaded through the service facade and controller. The pattern is: controller reads `@ActiveUser('sub') activeUserId: number`, passes it to the service method, which passes it to the provider. Affected chains: `RemoveOneByIdProvider`, `ChangeUserRoleProvider`, `PatchUserProvider`, `AvatarOptionsProvider.create/remove`, and `TagsService.create/delete/softDelete`.
+
+**Adding audit logging to a new provider:**
+1. Import `AuditLogModule` in the domain module if not already imported.
+2. Inject `AuditLogService` into the provider's constructor.
+3. Call `await this.auditLogService.log(userId, AuditAction.ACTION, 'EntityName', entityId)` after the successful DB write.
+4. If the provider doesn't currently receive `activeUserId`, add it as a parameter and thread it through the service facade and controller (see Signature threading above).
 
 ### TypeORM gotchas
 
