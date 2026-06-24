@@ -28,7 +28,7 @@ These are real features but out of scope until the frontend is running and real 
 
 Run these after finishing all features above:
 
-- [ ] `pnpm run build` — TypeScript compilation must pass with zero errors
+- [x] `pnpm run build` — TypeScript compilation must pass with zero errors
 - [x] `pnpm run lint` — ESLint + Prettier auto-fix; no unfixable errors (the only known unfixable error is the stale `src/app.controller.spec.ts`)
 - [x] `pnpm run test` — all unit tests green
 - [x] `pnpm run test:e2e` — all new e2e specs pass (requires `.env.test` pointing at the test DB `nest_portfolio_test`)

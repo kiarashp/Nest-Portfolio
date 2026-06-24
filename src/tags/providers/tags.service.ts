@@ -36,10 +36,11 @@ export class TagsService {
   }
 
   /**
-   * Find all tags
+   * Find all tags. Capped at 200 rows so a runaway DB query can't stall the
+   * response even if the tag list grows unexpectedly large.
    */
   public async findAll() {
-    return await this.tagsRepository.find()
+    return await this.tagsRepository.find({ take: 200 })
   }
   /**
    * Find multiple tags and return them
