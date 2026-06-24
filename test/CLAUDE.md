@@ -145,6 +145,7 @@ Throttle limits that matter in tests:
 | `POST /auth/resend-verification` | 3 / 300 s |
 | `POST /contact` | 3 / 300 s |
 | `POST /auth/sign-in` | 5 / 60 s |
+| `POST /auth/refresh-tokens` | 10 / 60 s |
 | `POST /auth/reset-password` | 5 / 60 s |
 | `POST /auth/change-password` | 5 / 60 s |
 | `POST /users` | 5 / 600 s |

@@ -80,7 +80,7 @@ See `test/CLAUDE.md` for the e2e helper infrastructure and spec-writing conventi
 
 Swagger/OpenAPI docs are served at `/api` in development only (`NODE_ENV !== 'production'`). In production the endpoint returns 404 — Swagger is disabled at startup in `app.create.ts`.
 
-`src/app.create.ts` (beside `main.ts`) contains all post-creation setup: global pipes, `cookie-parser` middleware, Swagger, CORS, and `app.listen()`. `main.ts` just calls `NestFactory.create(AppModule)` then delegates to `appCreate(app)`. Change global middleware or port config there, not in `main.ts`.
+`src/app.create.ts` (beside `main.ts`) contains all post-creation setup: global pipes, `cookie-parser` middleware, Swagger, CORS, and `app.listen()`. `main.ts` calls `NestFactory.create(AppModule)`, enables shutdown hooks (`app.enableShutdownHooks()` — lets Coolify drain in-flight requests on SIGTERM before stopping the container), then delegates to `appCreate(app)`. Change global middleware or port config there, not in `main.ts`. Response compression is handled by Coolify's Caddy reverse proxy — do not add Node.js-level compression middleware.
 
 ## Environment configuration
 
@@ -140,6 +140,7 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 | Endpoint | Limit |
 |---|---|
 | `POST /auth/sign-in` | 5 / 60s |
+| `POST /auth/refresh-tokens` | 10 / 60s |
 | `POST /auth/reset-password` | 5 / 60s |
 | `POST /auth/change-password` | 5 / 60s |
 | `POST /auth/resend-verification` | 3 / 300s |
@@ -172,7 +173,7 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 | Route | Auth | Notes |
 |---|---|---|
 | `POST /auth/sign-in` | None (public) | Returns `{ accessToken, refreshToken }` + sets HttpOnly refresh cookie. Throttled 5 / 60s. |
-| `POST /auth/refresh-tokens` | None (public) | Accepts refresh token from cookie (browser) or body (mobile). Rotates both tokens. |
+| `POST /auth/refresh-tokens` | None (public) | Accepts refresh token from cookie (browser) or body (mobile). Rotates both tokens. Throttled 10 / 60s. |
 | `POST /auth/sign-out` | None (public) | Clears the HttpOnly refresh cookie. |
 | `GET /auth/verify-email` | None (public) | Verifies email address via token from verification email. |
 | `POST /auth/resend-verification` | None (public) | Re-sends the verification email. Throttled 3 / 300s. |
@@ -211,7 +212,7 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 
 | Route | Auth | Notes |
 |---|---|---|
-| `GET /tags` | None (public) | Returns all tags as a flat array (no pagination). |
+| `GET /tags` | None (public) | Returns all tags as a flat array (no pagination). Capped at 200 rows. |
 | `POST /tags` | AUTHOR / ADMIN | Create a tag — `name` and `slug` required, both unique. |
 | `PATCH /tags/:id` | AUTHOR / ADMIN | Partial update — any subset of `name`, `slug`, `description`, `schema`, `featuredImage`. Returns 404 if not found, 409 if `name` or `slug` collides with an existing tag. |
 | `DELETE /tags/soft/:id` | AUTHOR / ADMIN | Soft delete — sets `deletedAt`, row stays in DB. |
@@ -364,4 +365,5 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 - After making edits, always run `pnpm run lint` — it runs `eslint --fix` which auto-applies all Prettier formatting. No known unfixable lint errors remain.
 - Path aliasing: imports use the `src/...` absolute form (e.g. `src/users/users.module`) rather than deep relative paths, per `tsconfig.json` `baseUrl: "./"`.
 - **Comments:** Add comments to providers, service methods, and constructor injections. Use single-line `// ...` for injections and JSDoc `/** ... */` for public methods. Write in plain English — full sentences, say what the code does and why, not how. No analogies. Before writing a comment, ask: would any developer on the team understand every word without looking it up? If not, rewrite it in simpler terms.
+- **Task workflow:** For every change — add comments following the style above, decide whether unit and/or e2e tests are needed and write them, check whether the change could break existing tests and fix any that break, then run `pnpm run test` and `pnpm run test:e2e` and confirm both are fully green before marking the task done.
 - **TypeScript build config:** Treat `tsconfig.build.json` as the source of truth for NestJS compilation. For build-only issues (such as generated files interfering with `rootDir`), fix `tsconfig.build.json` by excluding those files instead of modifying `tsconfig.json`. Only change `tsconfig.json` when the setting should apply to the entire TypeScript project — path aliases, strict mode, `target`, `moduleResolution`, `types`, etc. If the problem is `nest build` → check `tsconfig.build.json` first. If the problem is the IDE, `tsc`, or path aliases → check `tsconfig.json`.
