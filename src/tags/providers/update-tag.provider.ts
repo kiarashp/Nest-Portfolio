@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   RequestTimeoutException,
 } from '@nestjs/common'
@@ -11,6 +12,8 @@ import { UpdateTagDto } from '../dto/update-tag.dto'
 
 @Injectable()
 export class UpdateTagProvider {
+  private readonly logger = new Logger(UpdateTagProvider.name)
+
   constructor(
     /**
      * inject tag repository
@@ -40,12 +43,17 @@ export class UpdateTagProvider {
 
     // Persist and catch unique constraint violations from `name` and `slug`.
     try {
-      return await this.tagsRepository.save(tag)
+      const saved = await this.tagsRepository.save(tag)
+      this.logger.log(`Tag updated — tagId=${id}`)
+      return saved
     } catch (error: unknown) {
       if (
         error instanceof QueryFailedError &&
         (error.driverError as { code?: string })?.code === '23505'
       ) {
+        this.logger.warn(
+          `Tag update conflict: name or slug already in use — tagId=${id}`,
+        )
         throw new ConflictException('Tag name or slug already in use')
       }
       throw new RequestTimeoutException(

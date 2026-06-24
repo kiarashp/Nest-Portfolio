@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common'
 import type { ConfigType } from '@nestjs/config'
@@ -14,6 +15,8 @@ import { AccessTokenPayload } from 'src/auth/interfaces/access-token-payload'
 
 @Injectable()
 export class AccessTokenGuard implements CanActivate {
+  private readonly logger = new Logger(AccessTokenGuard.name)
+
   constructor(
     /**
      * inject jwt service
@@ -33,6 +36,9 @@ export class AccessTokenGuard implements CanActivate {
     const token = this.extractRequestFromHeader(request)
     // validate the access token
     if (!token) {
+      this.logger.warn(
+        `Access token missing — ${request.method} ${request.path}`,
+      )
       throw new UnauthorizedException(
         'Access token not found in the request header',
       )
@@ -44,6 +50,9 @@ export class AccessTokenGuard implements CanActivate {
       )
       request[REQUEST_USER_KEY] = payload
     } catch {
+      this.logger.warn(
+        `Invalid access token — ${request.method} ${request.path}`,
+      )
       throw new UnauthorizedException('Invalid access token')
     }
     return true

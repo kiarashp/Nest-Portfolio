@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   RequestTimeoutException,
 } from '@nestjs/common'
 import { randomBytes } from 'crypto'
@@ -17,6 +18,8 @@ import { AppEvents, UserCreatedPayload } from 'src/common/events/app-events'
 
 @Injectable()
 export class CreateUserProvider {
+  private readonly logger = new Logger(CreateUserProvider.name)
+
   constructor(
     /**
      * Injecting UserRepository
@@ -56,7 +59,12 @@ export class CreateUserProvider {
     }
 
     //handle execption
-    if (existingUser) throw new BadRequestException('User already exist')
+    if (existingUser) {
+      this.logger.warn(
+        `Registration rejected: email already in use — email=${createUserDto.email}`,
+      )
+      throw new BadRequestException('User already exist')
+    }
     //create a new user
     let newUser: User | null = null
     try {
@@ -101,6 +109,9 @@ export class CreateUserProvider {
       verificationUrl,
     } satisfies UserCreatedPayload)
 
+    this.logger.log(
+      `User registered — userId=${newUser.id}, email=${newUser.email}`,
+    )
     return newUser
   }
 }

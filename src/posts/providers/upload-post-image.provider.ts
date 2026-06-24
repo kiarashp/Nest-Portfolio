@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common'
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common'
 import { UploadsService } from 'src/uploads/providers/uploads.service'
 import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
@@ -7,6 +7,8 @@ import { UserRole } from 'src/auth/enums/user-role.enum'
 
 @Injectable()
 export class UploadPostImageProvider {
+  private readonly logger = new Logger(UploadPostImageProvider.name)
+
   constructor(
     /**
      * inject `FindOnePostProvider` to look up the post and verify ownership
@@ -42,11 +44,15 @@ export class UploadPostImageProvider {
     }
 
     // Step 3: upload and persist the file, linked to this post.
-    return await this.uploadsService.uploadFile(
+    const result = await this.uploadsService.uploadFile(
       file,
       activeUser.sub,
       `posts/${postId}`,
       postId,
     )
+    this.logger.log(
+      `Image uploaded for post — postId=${postId}, fileId=${result.id}, uploaderId=${activeUser.sub}`,
+    )
+    return result
   }
 }

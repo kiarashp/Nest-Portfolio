@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   RequestTimeoutException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -12,6 +13,8 @@ import { MailService } from 'src/mail/mail.service'
 
 @Injectable()
 export class ResendVerificationProvider {
+  private readonly logger = new Logger(ResendVerificationProvider.name)
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -35,6 +38,9 @@ export class ResendVerificationProvider {
     }
 
     if (user.isEmailVerified) {
+      this.logger.log(
+        `Resend verification skipped: already verified — userId=${user.id}`,
+      )
       return { message: 'Email is already verified' }
     }
 
@@ -62,6 +68,7 @@ export class ResendVerificationProvider {
       verificationUrl,
     })
 
+    this.logger.log(`Verification email resent — userId=${user.id}`)
     return { message: 'Verification email sent' }
   }
 }

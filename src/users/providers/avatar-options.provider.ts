@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -10,6 +11,8 @@ import { AvatarOption } from '../entities/avatar-option.entity'
 
 @Injectable()
 export class AvatarOptionsProvider {
+  private readonly logger = new Logger(AvatarOptionsProvider.name)
+
   constructor(
     /**
      * Inject the AvatarOption repository for DB reads and writes
@@ -36,8 +39,13 @@ export class AvatarOptionsProvider {
   public async create(file: Express.Multer.File): Promise<AvatarOption> {
     const { url, publicId } = await this.storageProvider.upload(file, 'avatars')
     try {
-      return await this.avatarOptionRepo.save({ url, publicId })
+      const saved = await this.avatarOptionRepo.save({ url, publicId })
+      this.logger.log(
+        `Avatar option created — id=${saved.id}, publicId=${publicId}`,
+      )
+      return saved
     } catch {
+      this.logger.error(`Failed to save avatar option — publicId=${publicId}`)
       throw new BadRequestException('Could not save avatar option')
     }
   }
@@ -53,6 +61,9 @@ export class AvatarOptionsProvider {
     await this.storageProvider.delete(option.publicId)
     await this.avatarOptionRepo.delete(id)
 
+    this.logger.log(
+      `Avatar option removed — id=${id}, publicId=${option.publicId}`,
+    )
     return { message: 'Avatar option removed' }
   }
 }

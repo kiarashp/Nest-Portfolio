@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import type { ConfigType } from '@nestjs/config'
 import { v2 as cloudinary } from 'cloudinary'
 import cloudinaryConfig from 'src/config/cloudinary.config'
@@ -11,6 +11,8 @@ import { StorageProvider, UploadResult } from './storage.provider'
  */
 @Injectable()
 export class CloudinaryProvider extends StorageProvider {
+  private readonly logger = new Logger(CloudinaryProvider.name)
+
   constructor(
     /**
      * inject cloudinary configuration
@@ -41,11 +43,15 @@ export class CloudinaryProvider extends StorageProvider {
         { resource_type: 'image', folder },
         (error, result) => {
           if (error || !result) {
-            return reject(
+            const err =
               error instanceof Error
                 ? error
-                : new Error(error?.message ?? 'Cloudinary upload failed'),
+                : new Error(error?.message ?? 'Cloudinary upload failed')
+            this.logger.error(
+              `Cloudinary upload failed — folder=${folder}`,
+              err.stack,
             )
+            return reject(err)
           }
           resolve({ url: result.secure_url, publicId: result.public_id })
         },

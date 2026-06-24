@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common'
 import { UsersService } from 'src/users/providers/users.service'
@@ -10,6 +11,8 @@ import { ChangePasswordDto } from '../dtos/change-password.dto'
 
 @Injectable()
 export class ChangePasswordProvider {
+  private readonly logger = new Logger(ChangePasswordProvider.name)
+
   constructor(
     /**
      * Inject users service to load the user and persist the new password
@@ -35,6 +38,9 @@ export class ChangePasswordProvider {
 
     // Google-only accounts have no local password — direct them to account settings
     if (!user.password) {
+      this.logger.warn(
+        `Change-password rejected: Google-only account — userId=${userId}`,
+      )
       throw new BadRequestException(
         'This account uses Google Sign-In. Use account settings to manage your password.',
       )
@@ -46,12 +52,16 @@ export class ChangePasswordProvider {
     )
 
     if (!isMatch) {
+      this.logger.warn(
+        `Change-password failed: incorrect current password — userId=${userId}`,
+      )
       throw new UnauthorizedException('Current password is incorrect.')
     }
 
     const hashed = await this.hashingProvider.hashPassword(dto.newPassword)
     await this.usersService.updatePassword(userId, hashed)
 
+    this.logger.log(`Password changed — userId=${userId}`)
     return { message: 'Password changed successfully' }
   }
 }

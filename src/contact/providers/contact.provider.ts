@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { ContactSubmission } from '../entities/contact-submission.entity'
@@ -8,6 +8,8 @@ import { AppEvents } from 'src/common/events/app-events'
 
 @Injectable()
 export class ContactProvider {
+  private readonly logger = new Logger(ContactProvider.name)
+
   constructor(
     // repository for persisting contact form submissions
     @InjectRepository(ContactSubmission)
@@ -21,6 +23,9 @@ export class ContactProvider {
     const submission = this.contactSubmissionRepository.create(dto)
     const saved = await this.contactSubmissionRepository.save(submission)
     this.eventEmitter.emit(AppEvents.CONTACT_SUBMITTED, dto)
+    this.logger.log(
+      `Contact submission received — id=${saved.id}, email=${dto.email}`,
+    )
     return saved
   }
 }

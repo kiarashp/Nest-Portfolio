@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   RequestTimeoutException,
   UnauthorizedException,
 } from '@nestjs/common'
@@ -10,6 +11,8 @@ import { GenerateTokensProvider } from './generate-tokens.provider'
 
 @Injectable()
 export class SignInProvider {
+  private readonly logger = new Logger(SignInProvider.name)
+
   constructor(
     /**
      * injec user service
@@ -34,9 +37,15 @@ export class SignInProvider {
     //throw exception if user not found
     const user = await this.userService.findOneByEmail(signInDto.email)
     if (!user.password) {
+      this.logger.warn(
+        `Sign-in rejected: Google-only account attempted local sign-in — email=${signInDto.email}`,
+      )
       throw new UnauthorizedException('This account uses Google Sign-In')
     }
     if (!user.isEmailVerified) {
+      this.logger.warn(
+        `Sign-in rejected: unverified email — email=${signInDto.email}`,
+      )
       throw new UnauthorizedException(
         'Please verify your email address before signing in',
       )
@@ -49,13 +58,20 @@ export class SignInProvider {
         user.password,
       )
     } catch (error) {
+      this.logger.error('Password comparison failed', (error as Error).stack)
       throw new RequestTimeoutException(
         error,
         'Unable to process your request, please try again later',
       )
     }
 
-    if (!isEqual) throw new UnauthorizedException('Invalid credentials')
+    if (!isEqual) {
+      this.logger.warn(
+        `Sign-in failed: invalid credentials — email=${signInDto.email}`,
+      )
+      throw new UnauthorizedException('Invalid credentials')
+    }
+    this.logger.log(`User signed in — userId=${user.id}`)
     //send tokens
     return this.generateTokensProvider.generateTokens(user)
   }

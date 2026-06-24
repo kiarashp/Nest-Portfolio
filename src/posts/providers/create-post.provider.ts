@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
 } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { CreatePostDto } from '../dto/create-post.dto'
@@ -17,6 +18,8 @@ import { PostStatus } from '../enums/postStatus.enum'
 
 @Injectable()
 export class CreatePostProvider {
+  private readonly logger = new Logger(CreatePostProvider.name)
+
   constructor(
     /**
      * inject user service
@@ -73,8 +76,16 @@ export class CreatePostProvider {
       tags: tags,
     })
     try {
-      return await this.postsRepository.save(post)
+      const saved = await this.postsRepository.save(post)
+      this.logger.log(
+        `Post created — postId=${saved.id}, authorId=${activeUser.sub}, status=${saved.status}`,
+      )
+      return saved
     } catch (error) {
+      this.logger.error(
+        `Failed to create post — authorId=${activeUser.sub}`,
+        (error as Error).stack,
+      )
       throw new ConflictException(error, {
         description: 'Ensure that the post slug is unique',
       })

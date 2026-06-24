@@ -1,6 +1,7 @@
 import {
   Inject,
   Injectable,
+  Logger,
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common'
@@ -13,6 +14,7 @@ import { GenerateTokensProvider } from 'src/auth/providers/generate-tokens.provi
 
 @Injectable()
 export class GoogleAuthenticationService implements OnModuleInit {
+  private readonly logger = new Logger(GoogleAuthenticationService.name)
   private oauthClient!: OAuth2Client
 
   constructor(
@@ -48,6 +50,9 @@ export class GoogleAuthenticationService implements OnModuleInit {
       })
     } catch {
       // Catches expired tokens, bad signatures, or network errors during verification
+      this.logger.warn(
+        'Google token verification failed: invalid or expired token',
+      )
       throw new UnauthorizedException('Google token verification failed: ')
     }
     //Check if the login ticket exists/is valid
@@ -75,6 +80,9 @@ export class GoogleAuthenticationService implements OnModuleInit {
     }
 
     if (!email_verified) {
+      this.logger.warn(
+        `Google sign-in rejected: unverified Google email — email=${email}`,
+      )
       throw new UnauthorizedException('Google account email is not verified')
     }
 
@@ -89,6 +97,7 @@ export class GoogleAuthenticationService implements OnModuleInit {
         firstName,
         lastName,
       })
+      this.logger.log(`Google sign-in: existing user — userId=${user.id}`)
       return this.generateTokensProvider.generateTokens(synced)
     }
     //if not exist , create a new user and then generate both tokens
@@ -98,6 +107,7 @@ export class GoogleAuthenticationService implements OnModuleInit {
       lastName,
       googleId,
     })
+    this.logger.log(`Google sign-in: new user created — email=${email}`)
     return this.generateTokensProvider.generateTokens(newUser)
     //if faced error throw unauthorized exception
   }

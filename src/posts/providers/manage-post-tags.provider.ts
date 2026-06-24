@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   RequestTimeoutException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -15,6 +16,8 @@ import { UserRole } from 'src/auth/enums/user-role.enum'
 
 @Injectable()
 export class ManagePostTagsProvider {
+  private readonly logger = new Logger(ManagePostTagsProvider.name)
+
   constructor(
     /**
      * inject `Post` repository
@@ -72,7 +75,11 @@ export class ManagePostTagsProvider {
     post.tags = [...(post.tags ?? []), ...tagsToAdd]
 
     try {
-      return await this.postsRepository.save(post)
+      const saved = await this.postsRepository.save(post)
+      this.logger.log(
+        `Tags added to post — postId=${postId}, addedTagIds=[${tagsToAdd.map((t) => t.id).join(', ')}]`,
+      )
+      return saved
     } catch {
       throw new RequestTimeoutException(
         'Unable to process your request, please try again later',
@@ -103,7 +110,11 @@ export class ManagePostTagsProvider {
     post.tags = (post.tags ?? []).filter((t) => !removeSet.has(t.id))
 
     try {
-      return await this.postsRepository.save(post)
+      const saved = await this.postsRepository.save(post)
+      this.logger.log(
+        `Tags removed from post — postId=${postId}, removedTagIds=[${tagIds.join(', ')}]`,
+      )
+      return saved
     } catch {
       throw new RequestTimeoutException(
         'Unable to process your request, please try again later',

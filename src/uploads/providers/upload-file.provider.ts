@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -30,6 +31,8 @@ function isSupportedImageBuffer(buffer: Buffer): boolean {
 
 @Injectable()
 export class UploadFileProvider {
+  private readonly logger = new Logger(UploadFileProvider.name)
+
   constructor(
     /**
      * inject the active storage backend (currently Cloudinary, see UploadsModule)
@@ -64,6 +67,10 @@ export class UploadFileProvider {
     try {
       uploadResult = await this.storageProvider.upload(file, folder)
     } catch (error) {
+      this.logger.error(
+        `Storage upload failed — folder=${folder}, userId=${userId}`,
+        (error as Error).stack,
+      )
       throw new ConflictException(error, {
         description: 'Could not upload the file to storage',
       })
@@ -83,8 +90,16 @@ export class UploadFileProvider {
 
     // Step 4: persist the record so the file can be looked up later.
     try {
-      return await this.filesRepository.save(newFile)
+      const saved = await this.filesRepository.save(newFile)
+      this.logger.log(
+        `File uploaded — fileId=${saved.id}, folder=${folder}, userId=${userId}`,
+      )
+      return saved
     } catch (error) {
+      this.logger.error(
+        `Failed to persist file record — folder=${folder}, userId=${userId}`,
+        (error as Error).stack,
+      )
       throw new ConflictException(error, {
         description: 'Could not persist the file record',
       })

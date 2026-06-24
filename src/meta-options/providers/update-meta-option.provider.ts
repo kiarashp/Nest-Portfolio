@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   RequestTimeoutException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -13,6 +14,8 @@ import { FindOneMetaOptionProvider } from './find-one-meta-option.provider'
 
 @Injectable()
 export class UpdateMetaOptionProvider {
+  private readonly logger = new Logger(UpdateMetaOptionProvider.name)
+
   constructor(
     /** inject MetaOption repository */
     @InjectRepository(MetaOption)
@@ -36,6 +39,9 @@ export class UpdateMetaOptionProvider {
       activeUser.role !== UserRole.ADMIN &&
       metaOption.post.author.id !== activeUser.sub
     ) {
+      this.logger.warn(
+        `MetaOption update denied — metaOptionId=${id}, userId=${activeUser.sub}`,
+      )
       throw new ForbiddenException(
         'You can only update meta options for your own posts',
       )
@@ -46,7 +52,11 @@ export class UpdateMetaOptionProvider {
     }
 
     try {
-      return await this.metaOptionsRepository.save(metaOption)
+      const saved = await this.metaOptionsRepository.save(metaOption)
+      this.logger.log(
+        `MetaOption updated — metaOptionId=${id}, updatedById=${activeUser.sub}`,
+      )
+      return saved
     } catch {
       throw new RequestTimeoutException(
         'Unable to process your request, please try again later',

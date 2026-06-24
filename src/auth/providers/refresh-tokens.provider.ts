@@ -1,4 +1,9 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common'
+import {
+  Inject,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import jwtConfig from '../config/jwt.config'
 import type { ConfigType } from '@nestjs/config'
@@ -8,6 +13,8 @@ import { RefreshTokenPayload } from '../interfaces/refresh-token-payload'
 
 @Injectable()
 export class RefreshTokensProvider {
+  private readonly logger = new Logger(RefreshTokensProvider.name)
+
   constructor(
     /**
      * Inject the jwt service
@@ -48,11 +55,13 @@ export class RefreshTokensProvider {
         },
       )
     } catch {
+      this.logger.warn('Refresh token rejected: invalid or expired token')
       throw new UnauthorizedException('Invalid refresh token')
     }
     //based on the id , fetch the user from the database.
     const user = await this.usersService.findOneById(payload.sub)
 
+    this.logger.log(`Tokens rotated — userId=${payload.sub}`)
     // generate new access token and refresh token
     return this.generateTokensProvider.generateTokens(user)
   }

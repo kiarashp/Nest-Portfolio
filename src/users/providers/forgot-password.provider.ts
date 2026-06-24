@@ -1,4 +1,4 @@
-import { Injectable, RequestTimeoutException } from '@nestjs/common'
+import { Injectable, Logger, RequestTimeoutException } from '@nestjs/common'
 import { randomBytes } from 'crypto'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -13,6 +13,8 @@ const GENERIC_RESPONSE = {
 
 @Injectable()
 export class ForgotPasswordProvider {
+  private readonly logger = new Logger(ForgotPasswordProvider.name)
+
   constructor(
     // access the users table
     @InjectRepository(User)
@@ -41,7 +43,12 @@ export class ForgotPasswordProvider {
     }
 
     // Return early without revealing whether the email is registered
-    if (!user || !user.password) return GENERIC_RESPONSE
+    if (!user || !user.password) {
+      this.logger.log(
+        'Password reset requested for unknown or Google-only email — generic response sent',
+      )
+      return GENERIC_RESPONSE
+    }
 
     const token = randomBytes(32).toString('hex')
     user.passwordResetToken = token
@@ -66,6 +73,7 @@ export class ForgotPasswordProvider {
       resetUrl,
     })
 
+    this.logger.log(`Password reset email sent — userId=${user.id}`)
     return GENERIC_RESPONSE
   }
 }

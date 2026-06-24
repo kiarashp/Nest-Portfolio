@@ -2,6 +2,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common'
 import type { ConfigType } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
@@ -12,6 +13,8 @@ import { GeneratedTokens } from '../interfaces/generated-tokens'
 
 @Injectable()
 export class GenerateTokensProvider {
+  private readonly logger = new Logger(GenerateTokensProvider.name)
+
   constructor(
     /**
      * Inject JwtService
@@ -62,8 +65,13 @@ export class GenerateTokensProvider {
           this.jwtConfiguration.refreshTokenTtl,
         ),
       ])
+      this.logger.debug(`Tokens generated — userId=${user.id}`)
       return { accessToken, refreshToken }
     } catch (error) {
+      this.logger.error(
+        `Token generation failed — userId=${user.id}`,
+        (error as Error).stack,
+      )
       throw new InternalServerErrorException(
         'Failed to generate authentication tokens',
         { cause: error },

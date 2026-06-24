@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { User } from '../entities/user.entity'
@@ -8,6 +8,8 @@ import { HashingProvider } from 'src/crypto/providers/hashing.provider'
 
 @Injectable()
 export class PatchUserProvider {
+  private readonly logger = new Logger(PatchUserProvider.name)
+
   constructor(
     /**
      * Inject User repository
@@ -54,6 +56,8 @@ export class PatchUserProvider {
     if (dto.firstName !== undefined) user.firstName = dto.firstName
     if (dto.lastName !== undefined) user.lastName = dto.lastName
 
-    return this.usersRepository.save(user)
+    const saved = await this.usersRepository.save(user)
+    this.logger.log(`User updated — userId=${id}`)
+    return saved
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { User } from '../entities/user.entity'
@@ -7,6 +7,8 @@ import { FindOneByIdProvider } from './find-one-by-id.provider'
 
 @Injectable()
 export class PatchUserProfileProvider {
+  private readonly logger = new Logger(PatchUserProfileProvider.name)
+
   constructor(
     /**
      * Inject User repository
@@ -35,6 +37,8 @@ export class PatchUserProfileProvider {
     if (dto.lastName !== undefined) user.lastName = dto.lastName
     if (dto.bio !== undefined) user.bio = dto.bio
 
-    return this.usersRepository.save(user)
+    const saved = await this.usersRepository.save(user)
+    this.logger.log(`Profile updated — userId=${userId}`)
+    return saved
   }
 }

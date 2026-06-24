@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -11,6 +12,8 @@ import { FindOneByIdProvider } from './find-one-by-id.provider'
 
 @Injectable()
 export class SelectAvatarProvider {
+  private readonly logger = new Logger(SelectAvatarProvider.name)
+
   constructor(
     /**
      * Inject User repository to update avatarUrl on the user record
@@ -47,8 +50,16 @@ export class SelectAvatarProvider {
     user.avatarUrl = option.url
 
     try {
-      return await this.usersRepository.save(user)
+      const saved = await this.usersRepository.save(user)
+      this.logger.log(
+        `Avatar selected — userId=${userId}, avatarOptionId=${avatarOptionId}`,
+      )
+      return saved
     } catch (error) {
+      this.logger.error(
+        `Failed to update avatar — userId=${userId}`,
+        (error as Error).stack,
+      )
       throw new ConflictException(error, {
         description: 'Could not update the user avatar',
       })

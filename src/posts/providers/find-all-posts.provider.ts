@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import {
   Between,
@@ -16,6 +16,8 @@ import { PostStatus } from '../enums/postStatus.enum'
 
 @Injectable()
 export class FindAllPostsProvider {
+  private readonly logger = new Logger(FindAllPostsProvider.name)
+
   constructor(
     /**
      * inject `Post` repository
@@ -68,6 +70,9 @@ export class FindAllPostsProvider {
       tagBranches.map((tb) => ({ ...base, ...sf, ...tb })),
     )
 
+    this.logger.debug(
+      `Finding posts — page=${getPostsDto.page ?? 1}, limit=${getPostsDto.limit ?? 10}`,
+    )
     return await this.paginationProvider.paginateQuery(
       { page: getPostsDto.page, limit: getPostsDto.limit },
       this.postsRepository,

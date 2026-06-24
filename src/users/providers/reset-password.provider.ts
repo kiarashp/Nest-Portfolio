@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   RequestTimeoutException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -11,6 +12,8 @@ import { HashingProvider } from 'src/crypto/providers/hashing.provider'
 
 @Injectable()
 export class ResetPasswordProvider {
+  private readonly logger = new Logger(ResetPasswordProvider.name)
+
   constructor(
     // access the users table
     @InjectRepository(User)
@@ -44,6 +47,7 @@ export class ResetPasswordProvider {
       !user.passwordResetTokenExpiry ||
       new Date() > user.passwordResetTokenExpiry
     ) {
+      this.logger.warn('Password reset rejected: token not found or expired')
       throw new BadRequestException('Invalid or expired password reset token')
     }
 
@@ -61,6 +65,7 @@ export class ResetPasswordProvider {
       )
     }
 
+    this.logger.log(`Password reset — userId=${user.id}`)
     return { message: 'Password reset successfully' }
   }
 }

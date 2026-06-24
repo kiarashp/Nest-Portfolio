@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Post } from '../entities/post.entity'
@@ -8,6 +8,8 @@ import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
 
 @Injectable()
 export class FindMyPostsProvider {
+  private readonly logger = new Logger(FindMyPostsProvider.name)
+
   constructor(
     /**
      * inject `Post` repository
@@ -32,6 +34,9 @@ export class FindMyPostsProvider {
     if (getPostsDto.status) {
       where['status'] = getPostsDto.status
     }
+    this.logger.debug(
+      `Finding posts for userId=${userId} — page=${getPostsDto.page ?? 1}, limit=${getPostsDto.limit ?? 10}`,
+    )
     return await this.paginationProvider.paginateQuery(
       { page: getPostsDto.page, limit: getPostsDto.limit },
       this.postsRepository,

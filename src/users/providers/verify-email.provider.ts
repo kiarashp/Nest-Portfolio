@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   RequestTimeoutException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -9,6 +10,8 @@ import { User } from '../entities/user.entity'
 
 @Injectable()
 export class VerifyEmailProvider {
+  private readonly logger = new Logger(VerifyEmailProvider.name)
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -32,6 +35,9 @@ export class VerifyEmailProvider {
       !user.emailVerificationTokenExpiry ||
       new Date() > user.emailVerificationTokenExpiry
     ) {
+      this.logger.warn(
+        'Email verification rejected: token not found or expired',
+      )
       throw new BadRequestException('Invalid or expired verification token')
     }
 
@@ -48,6 +54,7 @@ export class VerifyEmailProvider {
       )
     }
 
+    this.logger.log(`Email verified — userId=${user.id}`)
     return { message: 'Email verified successfully' }
   }
 }

@@ -1,4 +1,4 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common'
+import { INestApplication, Logger, ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import cookieParser from 'cookie-parser'
@@ -7,6 +7,7 @@ import helmet from 'helmet'
 // Full production setup extracted from bootstrap() so main.ts stays slim.
 // Applies helmet security headers, cookie parser, validation pipe, Swagger, CORS, then listens.
 export async function appCreate(app: INestApplication): Promise<void> {
+  const logger = new Logger('Bootstrap')
   const configService = app.get(ConfigService)
   const port = configService.get<number>('appConfig.appPort') ?? 3000
   const appUrl =
@@ -36,6 +37,9 @@ export async function appCreate(app: INestApplication): Promise<void> {
       .build()
     const document = SwaggerModule.createDocument(app, swaggerConfig)
     SwaggerModule.setup('api', app, document)
+    logger.log('Swagger UI available at /api')
+  } else {
+    logger.log('Swagger UI disabled in production')
   }
 
   const frontendUrl =
@@ -48,6 +52,8 @@ export async function appCreate(app: INestApplication): Promise<void> {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
+  logger.log(`CORS enabled for origin: ${frontendUrl}`)
 
   await app.listen(port)
+  logger.log(`Listening on port ${port}`)
 }

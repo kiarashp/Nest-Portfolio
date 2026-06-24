@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common'
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Post } from '../entities/post.entity'
@@ -8,6 +8,8 @@ import { UserRole } from 'src/auth/enums/user-role.enum'
 
 @Injectable()
 export class RemovePostProvider {
+  private readonly logger = new Logger(RemovePostProvider.name)
+
   constructor(
     /**
      * inject `Post` repository
@@ -54,6 +56,9 @@ export class RemovePostProvider {
     // Step 4: delete the post row.
     await this.postsRepository.delete(post.id)
 
+    this.logger.log(
+      `Post deleted — postId=${id}, deletedById=${activeUser.sub}`,
+    )
     return { deleted: true, id }
   }
 }

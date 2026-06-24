@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   RequestTimeoutException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -16,6 +17,8 @@ import { UserRole } from 'src/auth/enums/user-role.enum'
 
 @Injectable()
 export class UpdatePostProvider {
+  private readonly logger = new Logger(UpdatePostProvider.name)
+
   constructor(
     /**
      * inject `Post` repository
@@ -80,7 +83,11 @@ export class UpdatePostProvider {
 
     // Step 5: persist.
     try {
-      return await this.postsRepository.save(post)
+      const saved = await this.postsRepository.save(post)
+      this.logger.log(
+        `Post updated — postId=${id}, status=${saved.status}, editorId=${activeUser.sub}`,
+      )
+      return saved
     } catch {
       throw new RequestTimeoutException(
         'Unable to process your request, please try again later',

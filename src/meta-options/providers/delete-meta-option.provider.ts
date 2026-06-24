@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   RequestTimeoutException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -12,6 +13,8 @@ import { FindOneMetaOptionProvider } from './find-one-meta-option.provider'
 
 @Injectable()
 export class DeleteMetaOptionProvider {
+  private readonly logger = new Logger(DeleteMetaOptionProvider.name)
+
   constructor(
     /** inject MetaOption repository */
     @InjectRepository(MetaOption)
@@ -34,6 +37,9 @@ export class DeleteMetaOptionProvider {
       activeUser.role !== UserRole.ADMIN &&
       metaOption.post.author.id !== activeUser.sub
     ) {
+      this.logger.warn(
+        `MetaOption delete denied — metaOptionId=${id}, userId=${activeUser.sub}`,
+      )
       throw new ForbiddenException(
         'You can only delete meta options for your own posts',
       )
@@ -41,6 +47,9 @@ export class DeleteMetaOptionProvider {
 
     try {
       await this.metaOptionsRepository.remove(metaOption)
+      this.logger.log(
+        `MetaOption deleted — metaOptionId=${id}, deletedById=${activeUser.sub}`,
+      )
       return { deleted: true, id }
     } catch {
       throw new RequestTimeoutException(

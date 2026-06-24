@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { User } from '../entities/user.entity'
@@ -11,6 +11,8 @@ interface GoogleFields {
 
 @Injectable()
 export class SyncGoogleUserProvider {
+  private readonly logger = new Logger(SyncGoogleUserProvider.name)
+
   constructor(
     /**
      * Inject User repository
@@ -51,6 +53,7 @@ export class SyncGoogleUserProvider {
     }
 
     if (changed) {
+      this.logger.log(`Google user profile synced — userId=${user.id}`)
       return this.usersRepository.save(user)
     }
 

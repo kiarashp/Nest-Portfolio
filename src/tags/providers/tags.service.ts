@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { CreateTagDto } from '../dto/create-tag.dto'
 import { UpdateTagDto } from '../dto/update-tag.dto'
 import { In, Repository } from 'typeorm'
@@ -8,6 +8,8 @@ import { UpdateTagProvider } from './update-tag.provider'
 
 @Injectable()
 export class TagsService {
+  private readonly logger = new Logger(TagsService.name)
+
   constructor(
     /**
      * injecting tag repository
@@ -32,7 +34,9 @@ export class TagsService {
    */
   public async create(createTagDto: CreateTagDto) {
     const tag = this.tagsRepository.create(createTagDto)
-    return await this.tagsRepository.save(tag)
+    const saved = await this.tagsRepository.save(tag)
+    this.logger.log(`Tag created — tagId=${saved.id}, slug=${saved.slug}`)
+    return saved
   }
 
   /**
@@ -57,6 +61,7 @@ export class TagsService {
    */
   public async delete(id: number) {
     await this.tagsRepository.delete(id)
+    this.logger.log(`Tag hard-deleted — tagId=${id}`)
     return { deleted: true, id }
   }
   /**
@@ -64,6 +69,7 @@ export class TagsService {
    */
   public async softDelete(id: number) {
     await this.tagsRepository.softDelete(id)
+    this.logger.log(`Tag soft-deleted — tagId=${id}`)
     return { deleted: true, id }
   }
 }
