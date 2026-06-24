@@ -28,6 +28,14 @@ describe('Tags (e2e)', () => {
   beforeAll(async () => {
     ;({ app, dataSource } = await createApp())
 
+    // Pre-cleanup: remove rows left by a previous failed run so re-runs never
+    // hit unique-constraint conflicts.
+    const tagRepo = dataSource.getRepository(Tag)
+    for (const slug of ['e2e-patch-target', 'e2e-patch-conflict']) {
+      await tagRepo.delete({ slug })
+    }
+    await cleanupUsers(dataSource, [AUTHOR_EMAIL, USER_EMAIL])
+
     // Seed an AUTHOR who can create and delete tags, and a plain USER who must
     // be blocked from write operations.
     await seedUser(dataSource, {
@@ -46,7 +54,6 @@ describe('Tags (e2e)', () => {
     userToken = await getAuthToken(app, USER_EMAIL, PASSWORD)
 
     // Seed two tags used by the PATCH tests.
-    const tagRepo = dataSource.getRepository(Tag)
     const patchTag: Tag = await tagRepo.save(
       tagRepo.create({ name: 'e2e-patch-target', slug: 'e2e-patch-target' }),
     )

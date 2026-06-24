@@ -116,7 +116,7 @@ Entity relations:
 - `User` 1—N `Post` (eager-loaded author on `Post`)
 - `Post` 1—1 `MetaOption` (cascade + eager)
 - `Post` N—N `Tag` (eager, owning side with `@JoinTable`)
-- `Post` 1—N `UploadFile` (non-eager — only loaded explicitly, e.g. on post deletion for cleanup)
+- `Post` 1—N `UploadFile` (non-eager — only loaded explicitly, e.g. on post deletion for cleanup). `Post` also has a `@CreateDateColumn() createdAt: Date` used by the `startDate`/`endDate` filters on `GET /posts`.
 - `User` 1—N `UploadFile` (non-nullable — every upload is tied to the uploading user)
 - `AvatarOption` — standalone entity (`src/users/entities/avatar-option.entity.ts`), no FK to `User`. Columns: `id`, `url`, `publicId`, `createdAt`. Admins populate the pool via `POST /users/avatar-options`; users pick one with `PATCH /users/avatar`.
 - `ContactSubmission` — standalone entity (`src/contact/entities/contact-submission.entity.ts`), no FK to any other table. Columns: `id`, `name`, `email`, `subject`, `message`, `createdAt`. Every submission is persisted permanently so the owner can review them even if an email notification is missed.
@@ -261,7 +261,7 @@ Authenticated write routes (`PATCH`, `DELETE`, `POST /images`) use `FindOnePostP
 
 **`GetPostsDto` query params** (shared by `GET /posts` and `GET /posts/my`):
 - `limit` / `page` — pagination (via `PaginationQueryDto`)
-- `startDate` / `endDate` — declared but not yet wired in `FindAllPostsProvider` (dead code)
+- `startDate` / `endDate` — optional date range filter on `Post.createdAt`. Query strings are converted to `Date` objects by `@Transform` before `@IsDate` validates them. `FindAllPostsProvider` applies `Between`, `MoreThanOrEqual`, or `LessThanOrEqual` depending on which values are present; open-ended ranges (one side only) are supported. Used only by `GET /posts`; ignored by `GET /posts/my`.
 - `status` — used only by `GET /posts/my`; ignored by `FindAllPostsProvider` (which hardcodes PUBLISHED)
 - `tagIds` — array of tag IDs, OR logic (`?tagIds=1&tagIds=2` returns posts with tag 1 OR tag 2). Used only by `GET /posts`; ignored by `GET /posts/my`. Transform converts string scalars to `number[]` before validation.
 - `authorId` — filter by author user ID. Used only by `GET /posts`.

@@ -24,9 +24,9 @@ describe('POST|DELETE /posts/:id/tags (e2e)', () => {
   let authorPostId: number
   let editorPostId: number
 
-  const AUTHOR_EMAIL = 'tags-author@e2e.test'
-  const EDITOR_EMAIL = 'tags-editor@e2e.test'
-  const USER_EMAIL = 'tags-user@e2e.test'
+  const AUTHOR_EMAIL = 'posts-tags-author@e2e.test'
+  const EDITOR_EMAIL = 'posts-tags-editor@e2e.test'
+  const USER_EMAIL = 'posts-tags-user@e2e.test'
   const PASSWORD = 'Password1!'
 
   beforeAll(async () => {

@@ -1,5 +1,6 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinTable,
   ManyToMany,
@@ -92,4 +93,7 @@ export class Post {
   // images uploaded for this post — not eager, only loaded when needed (e.g. on delete)
   @OneToMany(() => UploadFile, (uploadFile) => uploadFile.post)
   uploadFiles?: UploadFile[]
+  // timestamp set automatically by TypeORM when the row is first inserted
+  @CreateDateColumn()
+  createdAt!: Date
 }

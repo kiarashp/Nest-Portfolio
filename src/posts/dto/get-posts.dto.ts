@@ -12,11 +12,13 @@ import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.
 import { PostStatus } from '../enums/postStatus.enum'
 
 class GetPostsBaseDto {
-  // start date
+  // start date — query param arrives as a string, transform converts it to a Date before validation
+  @Transform(({ value }: { value: unknown }) => new Date(value as string))
   @IsDate()
   @IsOptional()
   startDate?: Date
   // end date
+  @Transform(({ value }: { value: unknown }) => new Date(value as string))
   @IsDate()
   @IsOptional()
   endDate?: Date

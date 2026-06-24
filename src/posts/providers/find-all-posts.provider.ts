@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { FindOptionsWhere, Repository } from 'typeorm'
+import {
+  Between,
+  FindOptionsWhere,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from 'typeorm'
 import { Post } from '../entities/post.entity'
 import { GetPostsDto } from '../dto/get-posts.dto'
 import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
@@ -31,6 +37,14 @@ export class FindAllPostsProvider {
     const base: FindOptionsWhere<Post> = { status: PostStatus.PUBLISHED }
     if (getPostsDto.authorId) {
       base.author = { id: getPostsDto.authorId }
+    }
+    // Wire date range filter onto createdAt — supports open-ended ranges (one side only)
+    if (getPostsDto.startDate && getPostsDto.endDate) {
+      base.createdAt = Between(getPostsDto.startDate, getPostsDto.endDate)
+    } else if (getPostsDto.startDate) {
+      base.createdAt = MoreThanOrEqual(getPostsDto.startDate)
+    } else if (getPostsDto.endDate) {
+      base.createdAt = LessThanOrEqual(getPostsDto.endDate)
     }
 
     // When tagIds are provided, expand into one where-branch per tag so TypeORM

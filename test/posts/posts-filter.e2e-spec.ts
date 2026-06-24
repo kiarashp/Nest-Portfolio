@@ -270,6 +270,107 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
     expect(ids).not.toContain(postNoTagsId)
   })
 
+  // ── GET /posts?startDate / endDate ───────────────────────────────────────
+
+  it('GET /posts?startDate=<past>&endDate=<future> → seeded posts appear in range', async () => {
+    // A range that brackets today should include the posts seeded in beforeAll.
+    const startDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0]
+    const endDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0]
+
+    const res = await request(app.getHttpServer())
+      .get('/posts')
+      .query({ startDate, endDate })
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+
+    expect(ids).toContain(postTagAId)
+    expect(ids).toContain(postTagABId)
+    expect(ids).toContain(postTagBId)
+    expect(ids).not.toContain(postDraftId)
+  })
+
+  it('GET /posts?startDate=<past> (no endDate) → open-ended range includes seeded posts', async () => {
+    const startDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0]
+
+    const res = await request(app.getHttpServer())
+      .get('/posts')
+      .query({ startDate })
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+
+    expect(ids).toContain(postTagAId)
+    expect(ids).toContain(postTagABId)
+  })
+
+  it('GET /posts?endDate=<yesterday> → posts created today are excluded', async () => {
+    // endDate strictly before today means none of the posts seeded moments ago match.
+    const endDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0]
+
+    const res = await request(app.getHttpServer())
+      .get('/posts')
+      .query({ endDate })
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+
+    expect(ids).not.toContain(postTagAId)
+    expect(ids).not.toContain(postTagABId)
+    expect(ids).not.toContain(postTagBId)
+  })
+
+  it('GET /posts?startDate=<future> → no posts returned', async () => {
+    const startDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0]
+
+    const res = await request(app.getHttpServer())
+      .get('/posts')
+      .query({ startDate })
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    expect(paginated.data).toHaveLength(0)
+  })
+
+  it('GET /posts?startDate=<valid>&tagIds[]=A → date and tag filters combine correctly', async () => {
+    const startDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0]
+
+    const res = await request(app.getHttpServer())
+      .get('/posts')
+      .query({ startDate, tagIds: [tagAId] })
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+
+    expect(ids).toContain(postTagAId)
+    expect(ids).toContain(postTagABId)
+    expect(ids).not.toContain(postTagBId)
+    expect(ids).not.toContain(postDraftId)
+  })
+
+  it('GET /posts?startDate=notADate → 400 validation error', async () => {
+    await request(app.getHttpServer())
+      .get('/posts')
+      .query({ startDate: 'notADate' })
+      .expect(400)
+  })
+
   // ── Validation ────────────────────────────────────────────────────────────
 
   it('GET /posts?tagIds=notAnInt → 400 validation error', async () => {
