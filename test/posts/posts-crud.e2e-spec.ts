@@ -59,6 +59,7 @@ describe('Posts CRUD (e2e)', () => {
       'e2e-editor-post',
       'e2e-post-to-delete',
       'e2e-inline-create-post',
+      'e2e-no-title', // left over if a previous run hit the old "missing title" test
     ]) {
       await postRepo.delete({ slug })
     }
@@ -217,11 +218,11 @@ describe('Posts CRUD (e2e)', () => {
       .expect(403)
   })
 
-  it('POST /posts (missing required title) → 400', async () => {
+  it('POST /posts (missing required postType) → 400', async () => {
     await request(app.getHttpServer())
       .post('/posts')
       .set('Authorization', `Bearer ${authorToken}`)
-      .send({ postType: 'post', slug: 'e2e-no-title', status: 'draft' })
+      .send({ title: 'No PostType', slug: 'e2e-no-posttype', status: 'draft' })
       .expect(400)
   })
 

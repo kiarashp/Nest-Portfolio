@@ -15,6 +15,7 @@ import { RemovePostProvider } from './remove-post.provider'
 import { UploadPostImageProvider } from './upload-post-image.provider'
 import { FindMyPostsProvider } from './find-my-posts.provider'
 import { ManagePostTagsProvider } from './manage-post-tags.provider'
+import { FindPostImagesProvider } from './find-post-images.provider'
 import { PostTagsDto } from '../dto/post-tags.dto'
 
 @Injectable()
@@ -56,6 +57,10 @@ export class PostsService {
      * inject manage post tags provider
      */
     private readonly managePostTagsProvider: ManagePostTagsProvider,
+    /**
+     * inject find post images provider
+     */
+    private readonly findPostImagesProvider: FindPostImagesProvider,
   ) {}
 
   public async create(
@@ -107,6 +112,14 @@ export class PostsService {
       postId,
       activeUser,
     )
+  }
+
+  /** Returns all images uploaded for a post. */
+  public async findPostImages(
+    postId: number,
+    activeUser: ActiveUserData,
+  ): Promise<UploadFile[]> {
+    return await this.findPostImagesProvider.findPostImages(postId, activeUser)
   }
 
   /** Adds tags to a post without replacing existing ones. */

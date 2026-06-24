@@ -10,36 +10,6 @@ The gaps below are features that either a portfolio site inherently needs (conta
 
 ---
 
-## Priority 3 — Upload management
-
-### 10. List own uploads
-
-**Why this exists:**
-The Svelte CMS editor needs a media library so authors can browse previously uploaded images and reuse them (e.g. selecting a `featuredImage` from existing uploads instead of re-uploading). Right now there is no `GET /uploads` endpoint — uploads are write-only from the frontend's perspective.
-
-**Current state:**
-The `UploadFile` entity has `userId` (who uploaded it) and `postId` (which post it belongs to, nullable). A list endpoint should let EDITOR/AUTHOR see their own uploads, while ADMIN can see all uploads. Both should be paginated using the existing `PaginationProvider`.
-
-**What to build:**
-`GET /uploads` — roles: EDITOR, AUTHOR, ADMIN. Paginated (`limit`, `page` from `PaginationQueryDto`). EDITOR and AUTHOR: `where { user: { id: activeUser.sub } }`. ADMIN: no `where` filter (all uploads). Returns `UploadFile` entities with `id`, `name`, `path`, `mime`, `size`, `type`, `createdAt`.
-
-**Files to touch:**
-- `src/uploads/providers/find-all-uploads.provider.ts` — new provider
-- `src/uploads/uploads.controller.ts` — add `GET /uploads`
-- `src/uploads/uploads.module.ts` — register new provider
-
-**E2E spec:** `test/uploads-list.e2e-spec.ts`
-- GET /uploads (as ADMIN) → 200, paginated list of all uploads
-- GET /uploads (as EDITOR) → only own uploads, not other users'
-- GET /uploads (unauthenticated) → 401
-- GET /uploads (as USER role) → 403
-
-- [ ] Create `FindAllUploadsProvider`
-- [ ] Add `GET /uploads` to `UploadsController` with EDITOR/AUTHOR/ADMIN roles
-- [ ] Write e2e spec
-
----
-
 ## Deferred (post-launch)
 
 These are real features but out of scope until the frontend is running and real usage patterns are clear.

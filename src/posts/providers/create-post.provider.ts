@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common'
+import { randomUUID } from 'crypto'
 import { CreatePostDto } from '../dto/create-post.dto'
 import { UsersService } from 'src/users/providers/users.service'
 import { TagsService } from 'src/tags/providers/tags.service'
@@ -12,6 +13,7 @@ import { Post } from '../entities/post.entity'
 import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { Tag } from 'src/tags/entities/tag.entity'
 import { User } from 'src/users/entities/user.entity'
+import { PostStatus } from '../enums/postStatus.enum'
 
 @Injectable()
 export class CreatePostProvider {
@@ -56,9 +58,17 @@ export class CreatePostProvider {
     if (requestedCount !== foundCount)
       throw new BadRequestException('please check the tags ID and try again')
 
+    // Fill in defaults for optional fields so a draft can be created with minimal input.
+    const title = createPostDto.title ?? 'Untitled'
+    const slug = createPostDto.slug ?? `draft-${randomUUID()}`
+    const status = createPostDto.status ?? PostStatus.DRAFT
+
     //create post
     const post = this.postsRepository.create({
       ...createPostDto,
+      title,
+      slug,
+      status,
       author: author,
       tags: tags,
     })

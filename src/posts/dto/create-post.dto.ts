@@ -18,16 +18,16 @@ import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class CreatePostDto {
-  // title
-  @ApiProperty({
+  // title — omit to default to "Untitled" (useful for instant-draft creation)
+  @ApiPropertyOptional({
     description: 'The title of the post',
     example: 'My first post title',
   })
   @IsString()
   @MinLength(3)
   @MaxLength(512)
-  @IsNotEmpty()
-  title!: string
+  @IsOptional()
+  title?: string
   // postType
   @ApiProperty({
     enum: PostType,
@@ -37,25 +37,25 @@ export class CreatePostDto {
   @IsEnum(PostType)
   @IsNotEmpty()
   postType!: PostType
-  // slug
-  @ApiProperty({
+  // slug — omit to auto-generate a unique draft slug
+  @ApiPropertyOptional({
     description: 'The slug of the post',
     example: 'my-first-post',
   })
   @IsString()
   @MinLength(3)
   @MaxLength(256)
-  @IsNotEmpty()
-  slug!: string
-  // status
-  @ApiProperty({
+  @IsOptional()
+  slug?: string
+  // status — omit to default to draft
+  @ApiPropertyOptional({
     enum: PostStatus,
     description: 'Possible values: draft, scheduled, review, published',
     example: 'published',
   })
   @IsEnum(PostStatus)
-  @IsNotEmpty()
-  status!: PostStatus
+  @IsOptional()
+  status?: PostStatus
   // content
   @ApiPropertyOptional({
     description: 'The content of the post',

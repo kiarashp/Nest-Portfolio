@@ -16,7 +16,9 @@ import { RemovePostProvider } from './providers/remove-post.provider'
 import { UploadPostImageProvider } from './providers/upload-post-image.provider'
 import { FindMyPostsProvider } from './providers/find-my-posts.provider'
 import { ManagePostTagsProvider } from './providers/manage-post-tags.provider'
+import { FindPostImagesProvider } from './providers/find-post-images.provider'
 import { UploadsModule } from 'src/uploads/uploads.module'
+import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 
 @Module({
   controllers: [PostsController],
@@ -31,13 +33,14 @@ import { UploadsModule } from 'src/uploads/uploads.module'
     UploadPostImageProvider,
     FindMyPostsProvider,
     ManagePostTagsProvider,
+    FindPostImagesProvider,
   ],
   imports: [
     UsersModule,
     TagsModule,
     PaginationModule,
     UploadsModule,
-    TypeOrmModule.forFeature([Post, MetaOption]),
+    TypeOrmModule.forFeature([Post, MetaOption, UploadFile]),
   ],
 })
 export class PostsModule {}

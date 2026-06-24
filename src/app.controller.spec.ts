@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing'
-import { HealthCheckResult, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus'
+import {
+  HealthCheckResult,
+  HealthCheckService,
+  TypeOrmHealthIndicator,
+} from '@nestjs/terminus'
 import { AppController } from './app.controller'
 
 describe('AppController', () => {

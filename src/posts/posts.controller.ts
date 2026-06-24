@@ -151,6 +151,23 @@ export class PostsController {
   }
 
   /**
+   * list all images uploaded for a post — used by the frontend image picker
+   */
+  @ApiOperation({ summary: 'List all images uploaded for a post' })
+  @ApiResponse({ status: 200, description: 'Array of UploadFile records' })
+  @ApiResponse({ status: 403, description: 'Not the post author' })
+  @ApiResponse({ status: 404, description: 'Post not found' })
+  @ApiBearerAuth()
+  @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
+  @Get(':id/images')
+  findPostImages(
+    @Param('id', ParseIntPipe) id: number,
+    @ActiveUser() activeUser: ActiveUserData,
+  ) {
+    return this.postsService.findPostImages(id, activeUser)
+  }
+
+  /**
    * upload an image for a post
    */
   @ApiOperation({ summary: 'Upload an image for a post' })
