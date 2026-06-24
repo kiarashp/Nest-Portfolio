@@ -5,6 +5,8 @@ import { Post } from '../entities/post.entity'
 import { UploadsService } from 'src/uploads/providers/uploads.service'
 import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { UserRole } from 'src/auth/enums/user-role.enum'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
 @Injectable()
 export class RemovePostProvider {
@@ -20,6 +22,8 @@ export class RemovePostProvider {
      * inject uploads service to delete associated images before removing the post
      */
     private readonly uploadsService: UploadsService,
+    /** inject audit log service to record post deletion */
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -58,6 +62,12 @@ export class RemovePostProvider {
 
     this.logger.log(
       `Post deleted — postId=${id}, deletedById=${activeUser.sub}`,
+    )
+    await this.auditLogService.log(
+      activeUser.sub,
+      AuditAction.DELETE,
+      'Post',
+      id,
     )
     return { deleted: true, id }
   }

@@ -7,6 +7,8 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { User } from '../entities/user.entity'
 import { Repository } from 'typeorm'
 import { FindOneByIdProvider } from './find-one-by-id.provider'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
 @Injectable()
 export class RemoveOneByIdProvider {
@@ -22,12 +24,15 @@ export class RemoveOneByIdProvider {
      * injecting findOneById provider
      */
     private readonly findOneByIdProvider: FindOneByIdProvider,
+    /** inject audit log service to record the deletion */
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
-   * remove user by id
+   * Deletes the user with the given id. The acting admin's id is recorded in
+   * the audit log after a successful deletion.
    */
-  public async removeUserById(id: number) {
+  public async removeUserById(id: number, activeUserId: number) {
     const user = await this.findOneByIdProvider.findOneById(id)
 
     try {
@@ -42,6 +47,7 @@ export class RemoveOneByIdProvider {
       })
     }
     this.logger.log(`User deleted — userId=${id}, email=${user.email}`)
+    await this.auditLogService.log(activeUserId, AuditAction.DELETE, 'User', id)
     return {
       message: `User with id ${id} and email ${user.email} and name ${user.firstName} has been deleted`,
     }

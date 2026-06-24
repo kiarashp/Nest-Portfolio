@@ -12,6 +12,7 @@ import { TagsService } from 'src/tags/providers/tags.service'
 import { FindOnePostProvider } from './find-one-post.provider'
 import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { UserRole } from 'src/auth/enums/user-role.enum'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 
 // UpdatePostProvider handles the PATCH /posts/:id endpoint.
 // Key business rule: EDITORs may only update posts they authored.
@@ -63,6 +64,10 @@ describe('UpdatePostProvider', () => {
         { provide: getRepositoryToken(Post), useValue: postsRepo },
         { provide: TagsService, useValue: tagsService },
         { provide: FindOnePostProvider, useValue: findOnePostProvider },
+        {
+          provide: AuditLogService,
+          useValue: { log: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile()
 

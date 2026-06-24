@@ -54,11 +54,3 @@ No engagement tracking. Needs:
 - `POST /newsletter/unsubscribe` (public) — unsubscribes via token
 - Admin send-blast endpoint out of scope for now
 
----
-
-### Audit logging
-
-No trail of who did what. Options:
-- Lightweight: a `audit_logs` table `(userId, action, entity, entityId, createdAt)` written by providers on write operations
-- Heavy: use TypeORM subscribers for automatic capture
-- Useful for admin dashboards but not urgent

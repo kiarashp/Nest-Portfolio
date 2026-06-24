@@ -18,6 +18,7 @@ import { FindMyPostsProvider } from './providers/find-my-posts.provider'
 import { ManagePostTagsProvider } from './providers/manage-post-tags.provider'
 import { FindPostImagesProvider } from './providers/find-post-images.provider'
 import { UploadsModule } from 'src/uploads/uploads.module'
+import { AuditLogModule } from 'src/audit-log/audit-log.module'
 import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 
 @Module({
@@ -41,6 +42,7 @@ import { UploadFile } from 'src/uploads/entities/upload-file.entity'
     PaginationModule,
     UploadsModule,
     TypeOrmModule.forFeature([Post, MetaOption, UploadFile]),
+    AuditLogModule,
   ],
 })
 export class PostsModule {}

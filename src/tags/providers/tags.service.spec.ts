@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm'
 import { Tag } from '../entities/tag.entity'
 import { TagsService } from './tags.service'
 import { UpdateTagProvider } from './update-tag.provider'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 
 describe('TagsService', () => {
   let service: TagsService
@@ -26,6 +27,10 @@ describe('TagsService', () => {
         },
         // UpdateTagProvider is not exercised here — stub it out.
         { provide: UpdateTagProvider, useValue: { update: jest.fn() } },
+        {
+          provide: AuditLogService,
+          useValue: { log: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile()
 

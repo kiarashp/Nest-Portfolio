@@ -123,8 +123,9 @@ export class UsersController {
       }),
     )
     file: Express.Multer.File,
+    @ActiveUser('sub') activeUserId: number,
   ) {
-    return this.usersService.createAvatarOption(file)
+    return this.usersService.createAvatarOption(file, activeUserId)
   }
 
   /**
@@ -137,8 +138,11 @@ export class UsersController {
   @ApiOperation({ summary: 'Remove an avatar option (admin only)' })
   @ApiResponse({ status: 200, description: 'Avatar option removed' })
   @ApiResponse({ status: 404, description: 'Option not found' })
-  public async removeAvatarOption(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.removeAvatarOption(id)
+  public async removeAvatarOption(
+    @Param('id', ParseIntPipe) id: number,
+    @ActiveUser('sub') activeUserId: number,
+  ) {
+    return this.usersService.removeAvatarOption(id, activeUserId)
   }
 
   /**
@@ -215,8 +219,13 @@ export class UsersController {
   public changeUserRole(
     @Param('id', ParseIntPipe) id: number,
     @Body() changeUserRoleDto: ChangeUserRoleDto,
+    @ActiveUser('sub') activeUserId: number,
   ) {
-    return this.usersService.changeUserRole(id, changeUserRoleDto.role)
+    return this.usersService.changeUserRole(
+      id,
+      changeUserRoleDto.role,
+      activeUserId,
+    )
   }
 
   /**
@@ -227,8 +236,9 @@ export class UsersController {
   public updateUser(
     @Param('id', ParseIntPipe) id: number,
     @Body() patchUserDto: PatchUserDto,
+    @ActiveUser('sub') activeUserId: number,
   ) {
-    return this.usersService.patchUser(id, patchUserDto)
+    return this.usersService.patchUser(id, patchUserDto, activeUserId)
   }
 
   /**
@@ -236,7 +246,10 @@ export class UsersController {
    */
   @Roles(UserRole.ADMIN)
   @Delete(':id')
-  public deleteUser(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.removeUserById(id)
+  public deleteUser(
+    @Param('id', ParseIntPipe) id: number,
+    @ActiveUser('sub') activeUserId: number,
+  ) {
+    return this.usersService.removeUserById(id, activeUserId)
   }
 }

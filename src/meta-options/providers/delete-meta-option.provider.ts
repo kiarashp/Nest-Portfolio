@@ -10,6 +10,8 @@ import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 import { MetaOption } from '../entities/meta-option.entity'
 import { FindOneMetaOptionProvider } from './find-one-meta-option.provider'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
 @Injectable()
 export class DeleteMetaOptionProvider {
@@ -21,6 +23,8 @@ export class DeleteMetaOptionProvider {
     private readonly metaOptionsRepository: Repository<MetaOption>,
     /** inject find-one provider to look up the meta option with ownership data */
     private readonly findOneMetaOptionProvider: FindOneMetaOptionProvider,
+    /** inject audit log service to record the deletion */
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -49,6 +53,12 @@ export class DeleteMetaOptionProvider {
       await this.metaOptionsRepository.remove(metaOption)
       this.logger.log(
         `MetaOption deleted — metaOptionId=${id}, deletedById=${activeUser.sub}`,
+      )
+      await this.auditLogService.log(
+        activeUser.sub,
+        AuditAction.DELETE,
+        'MetaOption',
+        id,
       )
       return { deleted: true, id }
     } catch {

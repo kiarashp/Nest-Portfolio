@@ -15,6 +15,7 @@ import { Auth } from 'src/auth/decorators/auth.decorator'
 import { AuthType } from 'src/auth/enums/auth-type.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { UserRole } from 'src/auth/enums/user-role.enum'
+import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
 
 @Controller('tags')
 export class TagsController {
@@ -34,8 +35,11 @@ export class TagsController {
    */
   @Roles(UserRole.AUTHOR, UserRole.ADMIN)
   @Post()
-  public async createTag(@Body() createTagDto: CreateTagDto) {
-    return await this.tagsService.create(createTagDto)
+  public async createTag(
+    @Body() createTagDto: CreateTagDto,
+    @ActiveUser('sub') activeUserId: number,
+  ) {
+    return await this.tagsService.create(createTagDto, activeUserId)
   }
 
   /**
@@ -55,8 +59,11 @@ export class TagsController {
    */
   @Roles(UserRole.AUTHOR, UserRole.ADMIN)
   @Delete('soft/:id')
-  public async softDeleteTag(@Param('id', ParseIntPipe) id: number) {
-    return await this.tagsService.softDelete(id)
+  public async softDeleteTag(
+    @Param('id', ParseIntPipe) id: number,
+    @ActiveUser('sub') activeUserId: number,
+  ) {
+    return await this.tagsService.softDelete(id, activeUserId)
   }
 
   /**
@@ -64,7 +71,10 @@ export class TagsController {
    */
   @Roles(UserRole.AUTHOR, UserRole.ADMIN)
   @Delete(':id')
-  public async deleteTag(@Param('id', ParseIntPipe) id: number) {
-    return await this.tagsService.delete(id)
+  public async deleteTag(
+    @Param('id', ParseIntPipe) id: number,
+    @ActiveUser('sub') activeUserId: number,
+  ) {
+    return await this.tagsService.delete(id, activeUserId)
   }
 }

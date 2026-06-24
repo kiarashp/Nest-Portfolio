@@ -15,6 +15,8 @@ import { UserRole } from 'src/auth/enums/user-role.enum'
 import { ConfigService } from '@nestjs/config'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { AppEvents, UserCreatedPayload } from 'src/common/events/app-events'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
 @Injectable()
 export class CreateUserProvider {
@@ -37,6 +39,9 @@ export class CreateUserProvider {
     private readonly eventEmitter: EventEmitter2,
 
     private readonly configService: ConfigService,
+
+    /** inject audit log service to record new user registrations */
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -112,6 +117,8 @@ export class CreateUserProvider {
     this.logger.log(
       `User registered — userId=${newUser.id}, email=${newUser.email}`,
     )
+    // userId is null because the registration is self-service — there is no acting admin
+    await this.auditLogService.log(null, AuditAction.CREATE, 'User', newUser.id)
     return newUser
   }
 }

@@ -30,6 +30,7 @@ import { CryptoModule } from 'src/crypto/crypto.module'
 import { PaginationModule } from 'src/common/pagination/pagination.module'
 import { FindAllUsersProvider } from './providers/find-all-users.provider'
 import { UserEventsListener } from './listeners/user-events.listener'
+import { AuditLogModule } from 'src/audit-log/audit-log.module'
 
 @Module({
   controllers: [UsersController],
@@ -64,6 +65,7 @@ import { UserEventsListener } from './listeners/user-events.listener'
     ConfigModule.forFeature(jwtConfig),
     JwtModule.registerAsync(jwtConfig.asProvider()),
     MailModule,
+    AuditLogModule,
   ],
 })
 export class UsersModule {}

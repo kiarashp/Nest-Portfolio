@@ -165,10 +165,11 @@ export class UsersService {
   }
 
   /**
-   * remove a user by id
+   * Remove a user by id. The acting admin's id is forwarded to the provider for
+   * audit logging.
    */
-  public async removeUserById(id: number) {
-    return await this.removeOneByIdProvider.removeUserById(id)
+  public async removeUserById(id: number, activeUserId: number) {
+    return await this.removeOneByIdProvider.removeUserById(id, activeUserId)
   }
 
   /**
@@ -179,10 +180,19 @@ export class UsersService {
   }
 
   /**
-   * Change the role of a user. Only callable by an admin.
+   * Change the role of a user. Only callable by an admin. The acting admin's id
+   * is forwarded to the provider for audit logging.
    */
-  public async changeUserRole(id: number, role: UserRole) {
-    return await this.changeUserRoleProvider.changeUserRole(id, role)
+  public async changeUserRole(
+    id: number,
+    role: UserRole,
+    activeUserId: number,
+  ) {
+    return await this.changeUserRoleProvider.changeUserRole(
+      id,
+      role,
+      activeUserId,
+    )
   }
 
   public async verifyEmail(token: string) {
@@ -194,10 +204,11 @@ export class UsersService {
   }
 
   /**
-   * Update any field on a user. Only admins can call this.
+   * Update any field on a user. Only admins can call this. The acting admin's id
+   * is forwarded to the provider for audit logging.
    */
-  public async patchUser(id: number, dto: PatchUserDto) {
-    return this.patchUserProvider.patchUser(id, dto)
+  public async patchUser(id: number, dto: PatchUserDto, activeUserId: number) {
+    return this.patchUserProvider.patchUser(id, dto, activeUserId)
   }
 
   /**
@@ -245,16 +256,21 @@ export class UsersService {
 
   /**
    * Uploads a new avatar image to Cloudinary and saves the option to the DB.
+   * The acting admin's id is forwarded to the provider for audit logging.
    */
-  public async createAvatarOption(file: Express.Multer.File) {
-    return this.avatarOptionsProvider.create(file)
+  public async createAvatarOption(
+    file: Express.Multer.File,
+    activeUserId: number,
+  ) {
+    return this.avatarOptionsProvider.create(file, activeUserId)
   }
 
   /**
    * Deletes the Cloudinary asset and removes the avatar option row from the DB.
+   * The acting admin's id is forwarded to the provider for audit logging.
    */
-  public async removeAvatarOption(id: number) {
-    return this.avatarOptionsProvider.remove(id)
+  public async removeAvatarOption(id: number, activeUserId: number) {
+    return this.avatarOptionsProvider.remove(id, activeUserId)
   }
 
   /**

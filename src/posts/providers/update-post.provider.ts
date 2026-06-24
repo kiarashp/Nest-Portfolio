@@ -14,6 +14,8 @@ import { TagsService } from 'src/tags/providers/tags.service'
 import { FindOnePostProvider } from './find-one-post.provider'
 import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { UserRole } from 'src/auth/enums/user-role.enum'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
 @Injectable()
 export class UpdatePostProvider {
@@ -33,6 +35,8 @@ export class UpdatePostProvider {
      * inject find one post provider to look up the post
      */
     private readonly findOnePostProvider: FindOnePostProvider,
+    /** inject audit log service to record post updates */
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -86,6 +90,12 @@ export class UpdatePostProvider {
       const saved = await this.postsRepository.save(post)
       this.logger.log(
         `Post updated — postId=${id}, status=${saved.status}, editorId=${activeUser.sub}`,
+      )
+      await this.auditLogService.log(
+        activeUser.sub,
+        AuditAction.UPDATE,
+        'Post',
+        id,
       )
       return saved
     } catch {

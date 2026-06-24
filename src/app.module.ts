@@ -26,6 +26,7 @@ import { DataResponseInterceptor } from './common/interceptors/data-response/dat
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { TerminusModule } from '@nestjs/terminus'
 import { EventEmitterModule } from '@nestjs/event-emitter'
+import { AuditLogModule } from './audit-log/audit-log.module'
 
 const ENV = process.env.NODE_ENV
 
@@ -63,6 +64,7 @@ const ENV = process.env.NODE_ENV
     UploadsModule,
     MailModule,
     ContactModule,
+    AuditLogModule,
     ConfigModule.forFeature(jwtConfig),
     JwtModule.registerAsync(jwtConfig.asProvider()),
   ],

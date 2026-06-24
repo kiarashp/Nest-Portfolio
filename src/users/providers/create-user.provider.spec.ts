@@ -8,6 +8,7 @@ import { User } from '../entities/user.entity'
 import { HashingProvider } from 'src/crypto/providers/hashing.provider'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 import { AppEvents } from 'src/common/events/app-events'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 
 // CreateUserProvider registers a new local user.
 // The flow has three DB operations (findOne + two saves) and one mail send,
@@ -49,6 +50,10 @@ describe('CreateUserProvider', () => {
         { provide: HashingProvider, useValue: hashingProvider },
         { provide: EventEmitter2, useValue: eventEmitter },
         { provide: ConfigService, useValue: configService },
+        {
+          provide: AuditLogService,
+          useValue: { log: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile()
 

@@ -8,6 +8,8 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { StorageProvider } from 'src/uploads/providers/storage.provider'
 import { AvatarOption } from '../entities/avatar-option.entity'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
 @Injectable()
 export class AvatarOptionsProvider {
@@ -24,6 +26,9 @@ export class AvatarOptionsProvider {
      * Inject StorageProvider to upload images to Cloudinary and delete them on removal
      */
     private readonly storageProvider: StorageProvider,
+
+    /** inject audit log service to record create and delete operations */
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -35,13 +40,23 @@ export class AvatarOptionsProvider {
 
   /**
    * Uploads the file to Cloudinary, then saves the url and publicId to the DB.
+   * The acting admin's id is recorded in the audit log after a successful save.
    */
-  public async create(file: Express.Multer.File): Promise<AvatarOption> {
+  public async create(
+    file: Express.Multer.File,
+    activeUserId: number,
+  ): Promise<AvatarOption> {
     const { url, publicId } = await this.storageProvider.upload(file, 'avatars')
     try {
       const saved = await this.avatarOptionRepo.save({ url, publicId })
       this.logger.log(
         `Avatar option created — id=${saved.id}, publicId=${publicId}`,
+      )
+      await this.auditLogService.log(
+        activeUserId,
+        AuditAction.CREATE,
+        'AvatarOption',
+        saved.id,
       )
       return saved
     } catch {
@@ -53,8 +68,12 @@ export class AvatarOptionsProvider {
   /**
    * Deletes the Cloudinary asset and removes the DB row.
    * Throws NotFoundException if no option with that id exists.
+   * The acting admin's id is recorded in the audit log after successful deletion.
    */
-  public async remove(id: number): Promise<{ message: string }> {
+  public async remove(
+    id: number,
+    activeUserId: number,
+  ): Promise<{ message: string }> {
     const option = await this.avatarOptionRepo.findOne({ where: { id } })
     if (!option) throw new NotFoundException('Avatar option not found')
 
@@ -63,6 +82,12 @@ export class AvatarOptionsProvider {
 
     this.logger.log(
       `Avatar option removed — id=${id}, publicId=${option.publicId}`,
+    )
+    await this.auditLogService.log(
+      activeUserId,
+      AuditAction.DELETE,
+      'AvatarOption',
+      id,
     )
     return { message: 'Avatar option removed' }
   }

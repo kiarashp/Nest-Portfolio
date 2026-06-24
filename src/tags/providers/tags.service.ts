@@ -5,6 +5,8 @@ import { In, Repository } from 'typeorm'
 import { Tag } from '../entities/tag.entity'
 import { InjectRepository } from '@nestjs/typeorm'
 import { UpdateTagProvider } from './update-tag.provider'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
 @Injectable()
 export class TagsService {
@@ -20,6 +22,8 @@ export class TagsService {
      * inject update tag provider
      */
     private readonly updateTagProvider: UpdateTagProvider,
+    /** inject audit log service to record tag writes */
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -30,12 +34,19 @@ export class TagsService {
   }
 
   /**
-   * Creates a new tag
+   * Creates a new tag. The acting user's id is recorded in the audit log after a
+   * successful save.
    */
-  public async create(createTagDto: CreateTagDto) {
+  public async create(createTagDto: CreateTagDto, activeUserId: number) {
     const tag = this.tagsRepository.create(createTagDto)
     const saved = await this.tagsRepository.save(tag)
     this.logger.log(`Tag created — tagId=${saved.id}, slug=${saved.slug}`)
+    await this.auditLogService.log(
+      activeUserId,
+      AuditAction.CREATE,
+      'Tag',
+      saved.id,
+    )
     return saved
   }
 
@@ -46,6 +57,7 @@ export class TagsService {
   public async findAll() {
     return await this.tagsRepository.find({ take: 200 })
   }
+
   /**
    * Find multiple tags and return them
    */
@@ -56,20 +68,30 @@ export class TagsService {
     const result = await this.tagsRepository.find({ where: { id: In(ids) } })
     return result
   }
+
   /**
-   * delete a tag
+   * Hard-deletes a tag. The acting user's id is recorded in the audit log after deletion.
    */
-  public async delete(id: number) {
+  public async delete(id: number, activeUserId: number) {
     await this.tagsRepository.delete(id)
     this.logger.log(`Tag hard-deleted — tagId=${id}`)
+    await this.auditLogService.log(activeUserId, AuditAction.DELETE, 'Tag', id)
     return { deleted: true, id }
   }
+
   /**
-   * soft delete a tag
+   * Soft-deletes a tag (sets deletedAt). The acting user's id is recorded in the
+   * audit log after deletion.
    */
-  public async softDelete(id: number) {
+  public async softDelete(id: number, activeUserId: number) {
     await this.tagsRepository.softDelete(id)
     this.logger.log(`Tag soft-deleted — tagId=${id}`)
+    await this.auditLogService.log(
+      activeUserId,
+      AuditAction.SOFT_DELETE,
+      'Tag',
+      id,
+    )
     return { deleted: true, id }
   }
 }

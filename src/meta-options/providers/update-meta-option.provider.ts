@@ -11,6 +11,8 @@ import { UserRole } from 'src/auth/enums/user-role.enum'
 import { MetaOption } from '../entities/meta-option.entity'
 import { UpdateMetaOptionDto } from '../dto/update-meta-option.dto'
 import { FindOneMetaOptionProvider } from './find-one-meta-option.provider'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
 @Injectable()
 export class UpdateMetaOptionProvider {
@@ -22,6 +24,8 @@ export class UpdateMetaOptionProvider {
     private readonly metaOptionsRepository: Repository<MetaOption>,
     /** inject find-one provider to look up the meta option with ownership data */
     private readonly findOneMetaOptionProvider: FindOneMetaOptionProvider,
+    /** inject audit log service to record the update */
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -55,6 +59,12 @@ export class UpdateMetaOptionProvider {
       const saved = await this.metaOptionsRepository.save(metaOption)
       this.logger.log(
         `MetaOption updated — metaOptionId=${id}, updatedById=${activeUser.sub}`,
+      )
+      await this.auditLogService.log(
+        activeUser.sub,
+        AuditAction.UPDATE,
+        'MetaOption',
+        id,
       )
       return saved
     } catch {

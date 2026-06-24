@@ -15,6 +15,8 @@ import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { Tag } from 'src/tags/entities/tag.entity'
 import { User } from 'src/users/entities/user.entity'
 import { PostStatus } from '../enums/postStatus.enum'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
 @Injectable()
 export class CreatePostProvider {
@@ -34,6 +36,8 @@ export class CreatePostProvider {
      */
     @InjectRepository(Post)
     private readonly postsRepository: Repository<Post>,
+    /** inject audit log service to record post creation */
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -79,6 +83,12 @@ export class CreatePostProvider {
       const saved = await this.postsRepository.save(post)
       this.logger.log(
         `Post created — postId=${saved.id}, authorId=${activeUser.sub}, status=${saved.status}`,
+      )
+      await this.auditLogService.log(
+        activeUser.sub,
+        AuditAction.CREATE,
+        'Post',
+        saved.id,
       )
       return saved
     } catch (error) {

@@ -5,6 +5,8 @@ import { User } from '../entities/user.entity'
 import { PatchUserDto } from '../dtos/patch-user.dto'
 import { FindOneByIdProvider } from './find-one-by-id.provider'
 import { HashingProvider } from 'src/crypto/providers/hashing.provider'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
 @Injectable()
 export class PatchUserProvider {
@@ -25,13 +27,21 @@ export class PatchUserProvider {
     // Hashes the new password when the admin supplies one in the patch body
     @Inject(HashingProvider)
     private readonly hashingProvider: HashingProvider,
+
+    /** inject audit log service to record the update */
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
    * Updates any allowed field on a user. Only admins can call this.
    * Role changes are not handled here — use the dedicated role route for that.
+   * The acting admin's id is recorded in the audit log after a successful save.
    */
-  public async patchUser(id: number, dto: PatchUserDto): Promise<User> {
+  public async patchUser(
+    id: number,
+    dto: PatchUserDto,
+    activeUserId: number,
+  ): Promise<User> {
     const user = await this.findOneByIdProvider.findOneById(id)
 
     if (dto.email && dto.email !== user.email) {
@@ -58,6 +68,7 @@ export class PatchUserProvider {
 
     const saved = await this.usersRepository.save(user)
     this.logger.log(`User updated — userId=${id}`)
+    await this.auditLogService.log(activeUserId, AuditAction.UPDATE, 'User', id)
     return saved
   }
 }

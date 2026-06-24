@@ -8,6 +8,8 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { User } from '../entities/user.entity'
 import { UserRole } from 'src/auth/enums/user-role.enum'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
 @Injectable()
 export class ChangeUserRoleProvider {
@@ -19,12 +21,19 @@ export class ChangeUserRoleProvider {
      */
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    /** inject audit log service to record the role change */
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
    * Changes the role of a user. Only callable by an ADMIN (enforced at the route level).
+   * The acting admin's id is recorded in the audit log after a successful save.
    */
-  public async changeUserRole(id: number, role: UserRole): Promise<User> {
+  public async changeUserRole(
+    id: number,
+    role: UserRole,
+    activeUserId: number,
+  ): Promise<User> {
     const user = await this.usersRepository.findOneBy({ id })
     if (!user) {
       throw new NotFoundException(`User with id ${id} not found`)
@@ -37,6 +46,12 @@ export class ChangeUserRoleProvider {
       const saved = await this.usersRepository.save(user)
       this.logger.log(
         `Role changed — userId=${id}, from=${previousRole}, to=${role}`,
+      )
+      await this.auditLogService.log(
+        activeUserId,
+        AuditAction.UPDATE,
+        'User',
+        id,
       )
       return saved
     } catch (error) {

@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm'
 import { StorageProvider } from 'src/uploads/providers/storage.provider'
 import { AvatarOption } from '../entities/avatar-option.entity'
 import { AvatarOptionsProvider } from './avatar-options.provider'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 
 const mockOption: AvatarOption = {
   id: 1,
@@ -41,6 +42,10 @@ describe('AvatarOptionsProvider', () => {
             delete: deleteMock,
           },
         },
+        {
+          provide: AuditLogService,
+          useValue: { log: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile()
 
@@ -49,7 +54,7 @@ describe('AvatarOptionsProvider', () => {
 
   describe('remove()', () => {
     it('calls storageProvider.delete() with the correct publicId', async () => {
-      await provider.remove(mockOption.id)
+      await provider.remove(mockOption.id, 1)
       expect(deleteMock).toHaveBeenCalledTimes(1)
       expect(deleteMock).toHaveBeenCalledWith(mockOption.publicId)
     })
@@ -67,11 +72,15 @@ describe('AvatarOptionsProvider', () => {
             provide: StorageProvider,
             useValue: { upload: jest.fn(), delete: deleteMock },
           },
+          {
+            provide: AuditLogService,
+            useValue: { log: jest.fn().mockResolvedValue(undefined) },
+          },
         ],
       }).compile()
 
       const p = moduleRef.get<AvatarOptionsProvider>(AvatarOptionsProvider)
-      await expect(p.remove(999)).rejects.toThrow(NotFoundException)
+      await expect(p.remove(999, 1)).rejects.toThrow(NotFoundException)
       expect(deleteMock).not.toHaveBeenCalled()
     })
   })

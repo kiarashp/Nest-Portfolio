@@ -4,6 +4,8 @@ import { Repository } from 'typeorm'
 import { User } from '../entities/user.entity'
 import { PatchUserProfileDto } from '../dtos/patch-user-profile.dto'
 import { FindOneByIdProvider } from './find-one-by-id.provider'
+import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
 @Injectable()
 export class PatchUserProfileProvider {
@@ -20,6 +22,9 @@ export class PatchUserProfileProvider {
      * Inject FindOneByIdProvider
      */
     private readonly findOneByIdProvider: FindOneByIdProvider,
+
+    /** inject audit log service to record the profile update */
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -39,6 +44,7 @@ export class PatchUserProfileProvider {
 
     const saved = await this.usersRepository.save(user)
     this.logger.log(`Profile updated — userId=${userId}`)
+    await this.auditLogService.log(userId, AuditAction.UPDATE, 'User', userId)
     return saved
   }
 }

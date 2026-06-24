@@ -7,6 +7,7 @@ import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { AvatarOption } from 'src/users/entities/avatar-option.entity'
 import { ContactSubmission } from 'src/contact/entities/contact-submission.entity'
+import { AuditLog } from 'src/audit-log/entities/audit-log.entity'
 
 config({ path: `.env.${process.env.NODE_ENV ?? 'development'}` })
 
@@ -25,6 +26,7 @@ export default new DataSource({
     UploadFile,
     AvatarOption,
     ContactSubmission,
+    AuditLog,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,
