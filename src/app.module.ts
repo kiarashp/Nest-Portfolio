@@ -25,6 +25,7 @@ import { RolesGuard } from './auth/guards/authorization/roles.guard'
 import { DataResponseInterceptor } from './common/interceptors/data-response/data-response.interceptor'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { TerminusModule } from '@nestjs/terminus'
+import { EventEmitterModule } from '@nestjs/event-emitter'
 
 const ENV = process.env.NODE_ENV
 
@@ -32,6 +33,7 @@ const ENV = process.env.NODE_ENV
   imports: [
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
     TerminusModule,
+    EventEmitterModule.forRoot(),
     UsersModule,
     PostsModule,
     AuthModule,

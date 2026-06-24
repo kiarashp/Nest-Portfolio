@@ -1,4 +1,4 @@
-import { IntersectionType } from '@nestjs/swagger'
+import { ApiPropertyOptional, IntersectionType } from '@nestjs/swagger'
 import { Transform } from 'class-transformer'
 import {
   IsArray,
@@ -7,6 +7,9 @@ import {
   IsInt,
   IsOptional,
   IsPositive,
+  IsString,
+  MaxLength,
+  MinLength,
 } from 'class-validator'
 import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.dto'
 import { PostStatus } from '../enums/postStatus.enum'
@@ -46,6 +49,15 @@ class GetPostsBaseDto {
   @IsInt()
   @IsPositive()
   authorId?: number
+  // keyword search across post title and content — case-insensitive partial match
+  @ApiPropertyOptional({
+    description: 'Keyword search across title and content',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  q?: string
 }
 
 export class GetPostsDto extends IntersectionType(

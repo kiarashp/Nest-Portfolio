@@ -239,7 +239,7 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 
 | Route | Auth | Notes |
 |---|---|---|
-| `GET /posts` | None (public) | Paginated list of published posts only. Accepts `?limit`, `?page`, `?tagIds[]=<id>` (repeat for OR logic), `?authorId=<id>`. |
+| `GET /posts` | None (public) | Paginated list of published posts only. Accepts `?limit`, `?page`, `?tagIds[]=<id>` (repeat for OR logic), `?authorId=<id>`, `?q=<keyword>` (case-insensitive partial match on title or content). |
 | `GET /posts/my` | Bearer (any role) | Paginated list of the caller's own posts — all statuses (draft, review, scheduled, published). Optional `?status=draft\|review\|scheduled\|published` to filter to one. Declared before `/:id` to avoid `ParseIntPipe` collision. |
 | `GET /posts/slug/:slug` | None (public) | Single published post by slug. 404 if draft. |
 | `GET /posts/:id` | None (public) | Single published post by DB ID. 404 if draft. |
@@ -265,6 +265,7 @@ Authenticated write routes (`PATCH`, `DELETE`, `POST /images`) use `FindOnePostP
 - `status` — used only by `GET /posts/my`; ignored by `FindAllPostsProvider` (which hardcodes PUBLISHED)
 - `tagIds` — array of tag IDs, OR logic (`?tagIds=1&tagIds=2` returns posts with tag 1 OR tag 2). Used only by `GET /posts`; ignored by `GET /posts/my`. Transform converts string scalars to `number[]` before validation.
 - `authorId` — filter by author user ID. Used only by `GET /posts`.
+- `q` — keyword search (1–100 chars). Case-insensitive `ILIKE '%q%'` applied to both `title` and `content` as OR branches. Composes with all other filters: `FindAllPostsProvider` builds a cross-product of search branches × tag branches so `(title OR content) AND (tag1 OR tag2)` semantics are preserved. Draft posts are still excluded. Used only by `GET /posts`; ignored by `GET /posts/my`.
 
 ### Serialization
 
@@ -285,6 +286,31 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 ### Pagination
 
 `common/pagination` exports a request-scoped `PaginationProvider` (injects `REQUEST` to build absolute `first/last/current/next/prev` links). Domain services call `paginationProvider.paginateQuery(paginationQueryDto, repository, where?)` rather than reimplementing pagination per module. The optional `where` parameter filters both the result set and the total count used for page calculations. It accepts either a single condition object or an array of condition objects — when an array is passed, TypeORM treats each element as an OR branch (a row is returned if it matches any one of them).
+
+`count()` runs before `find()` intentionally. The two queries are not wrapped in a transaction, so under concurrent writes `totalItems` and `data.length` can diverge. Running count first means a concurrent delete produces `totalItems >= data.length` (the safe direction for callers and for the e2e assertion). A concurrent insert would go the other way, but inserts happen at test setup time, not while pagination tests execute.
+
+### Events
+
+`@nestjs/event-emitter` (backed by EventEmitter2) is registered globally via `EventEmitterModule.forRoot()` in `AppModule`. Use it to decouple fire-and-forget side-effects (email, future notifications) from the request path.
+
+**Event name constants** live in `src/common/events/app-events.ts`. Always import from there — never use raw string literals in emitters or listeners.
+
+**How it works:** `EventEmitter2.emit()` calls listeners synchronously but does **not** await their returned Promises. An `async` listener's work runs on the Node.js event loop after `emit()` returns, so the HTTP response is not blocked by SMTP.
+
+**Listener registration:** listeners are plain `@Injectable()` classes decorated with `@OnEvent(AppEvents.*)`. Register them in their domain module's `providers` array — they do not need to be exported.
+
+**Current events:**
+
+| Event | Emitted by | Listener | Effect |
+|---|---|---|---|
+| `user.created` | `CreateUserProvider` | `UserEventsListener` | Sends email verification link |
+| `contact.submitted` | `ContactProvider` | `ContactEventsListener` | Emails contact notification to site owner |
+
+**Adding a new event:**
+1. Add a constant to `AppEvents` in `src/common/events/app-events.ts`. Add a payload interface if the shape is non-trivial.
+2. Inject `EventEmitter2` into the emitting provider and call `this.eventEmitter.emit(AppEvents.YOUR_EVENT, payload)`.
+3. Create a listener class in the relevant module's `listeners/` directory with `@OnEvent(AppEvents.YOUR_EVENT)`.
+4. Register the listener in the module's `providers` array.
 
 ### Mail
 
@@ -312,8 +338,9 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 **Dev testing:** Use [Mailtrap](https://mailtrap.io) sandbox — set `MAIL_HOST=sandbox.smtp.mailtrap.io`, `MAIL_PORT=2525`, `MAIL_SECURE=false` and your Mailtrap credentials in `.env.development`. Sent emails appear in the Mailtrap inbox without reaching real recipients.
 
 **Current wiring:**
-- `UsersModule` imports `MailModule`. `CreateUserProvider` calls `mailService.sendWelcomeMail()` after saving a new user.
-- `ContactModule` imports `MailModule`. `ContactProvider` calls `mailService.sendContactNotification()` after persisting each submission.
+- `UsersModule` imports `MailModule`. `CreateUserProvider` emits `AppEvents.USER_CREATED`; `UserEventsListener` (`src/users/listeners/user-events.listener.ts`) handles it and calls `mailService.sendVerificationMail()`.
+- `ContactModule` imports `MailModule`. `ContactProvider` emits `AppEvents.CONTACT_SUBMITTED`; `ContactEventsListener` (`src/contact/listeners/contact-events.listener.ts`) handles it and calls `mailService.sendContactNotification()`.
+- Other providers in `UsersModule` that send mail (`ResendVerificationProvider`, `ForgotPasswordProvider`, `ResetPasswordProvider`) still call `MailService` directly — they are synchronous flows where the email is the primary response signal (e.g. the user is waiting for the reset link).
 
 ### Uploads
 

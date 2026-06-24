@@ -20,9 +20,7 @@ These are real features but out of scope until the frontend is running and real 
 - **Newsletter subscribers** — A subscriber list entity and a subscribe/unsubscribe endpoint. Not needed until there is content to send.
 - **Refresh token revocation** — Right now old refresh tokens remain valid until they expire (24h). A revocation list (Redis or DB table) would enable logout-all-devices. The no-Redis approach: a `refresh_token_revocations` DB table `(jti, expiresAt)`, a `jti` claim added to refresh tokens in `GenerateTokensProvider`, and a lookup in `RefreshTokensProvider` before issuing new tokens. A daily cron cleans up expired rows. Deferred for now, but prioritise before real employee accounts exist on a production company site.
 - **Audit logging** — No trail of who did what. Nice for admin dashboards but not needed to launch.
-- **Async email** — `CreateUserProvider` and `ContactProvider` send email synchronously, blocking the HTTP response until the SMTP handshake completes. If the mail server is slow or down, requests hang. The lightweight fix is `@nestjs/event-emitter`: providers emit events (`user.created`, `contact.submitted`) and listeners handle mail out-of-band. No Redis or Bull queue needed. Deferred because Mailtrap is reliable enough in dev, but should be wired before production launch.
 - **`GET /tags` response cap** — `TagsService.findAll()` runs `repository.find()` with no limit, returning all tags in one query. Safe for now, worth adding a simple `take: 200` cap before launch.
-- **Full-text search** — No `GET /posts?q=keyword` endpoint exists. PostgreSQL supports full-text search natively via `tsvector`/`tsquery` — no Elasticsearch needed at this scale. A `GIN`-indexed generated column on `title + content` would support fast keyword queries. Deferred until there is enough content for search to be useful.
 
 ---
 

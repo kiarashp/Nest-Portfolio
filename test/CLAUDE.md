@@ -196,15 +196,17 @@ When writing assertions against user data returned from post routes, do not asse
 
 ## Pagination count/data race condition
 
-`PaginationProvider` runs `repository.find()` then `repository.count()` as two separate queries with no transaction between them. Under parallel test execution, another suite can insert or delete a row between those two calls, making `data.length` and `meta.totalItems` differ.
+`PaginationProvider` runs `repository.count()` then `repository.find()` as two separate queries with no transaction between them. Under parallel test execution, another suite can insert or delete a row between those two calls.
 
-**Do not assert strict equality between `data.length` and `meta.totalItems`** in any test that runs alongside other suites. Instead, assert the invariant that actually matters:
+**Order matters:** count runs first so that a concurrent delete (the common case — other specs clean up in `afterAll`) makes `totalItems` the larger number, keeping `totalItems >= data.length` true. A concurrent insert between count and find would break this, but inserts all happen in `beforeAll` at the very start of the run, well before pagination tests execute.
+
+**Do not assert strict equality between `data.length` and `meta.totalItems`.** Assert the invariant that actually matters:
 
 ```ts
 // ✗ fragile under parallel execution
 expect(body.data.length).toBe(body.meta.totalItems)
 
-// ✓ tests the real invariant (totalItems is not capped below actual results)
+// ✓ safe: totalItems is not capped, and we got at least what we seeded
 expect(body.meta.totalItems).toBeGreaterThanOrEqual(body.data.length)
 expect(body.data.length).toBeGreaterThanOrEqual(seededCount)
 ```

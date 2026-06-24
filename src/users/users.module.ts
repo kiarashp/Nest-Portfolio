@@ -29,6 +29,7 @@ import { AvatarOption } from './entities/avatar-option.entity'
 import { CryptoModule } from 'src/crypto/crypto.module'
 import { PaginationModule } from 'src/common/pagination/pagination.module'
 import { FindAllUsersProvider } from './providers/find-all-users.provider'
+import { UserEventsListener } from './listeners/user-events.listener'
 
 @Module({
   controllers: [UsersController],
@@ -52,6 +53,7 @@ import { FindAllUsersProvider } from './providers/find-all-users.provider'
     ForgotPasswordProvider,
     ResetPasswordProvider,
     AvatarOptionsProvider,
+    UserEventsListener,
   ],
   exports: [UsersService],
   imports: [

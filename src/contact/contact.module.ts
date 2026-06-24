@@ -4,10 +4,11 @@ import { ContactSubmission } from './entities/contact-submission.entity'
 import { ContactProvider } from './providers/contact.provider'
 import { ContactController } from './contact.controller'
 import { MailModule } from 'src/mail/mail.module'
+import { ContactEventsListener } from './listeners/contact-events.listener'
 
 @Module({
   imports: [TypeOrmModule.forFeature([ContactSubmission]), MailModule],
   controllers: [ContactController],
-  providers: [ContactProvider],
+  providers: [ContactProvider, ContactEventsListener],
 })
 export class ContactModule {}

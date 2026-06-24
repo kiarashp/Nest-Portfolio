@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import {
   Between,
   FindOptionsWhere,
+  ILike,
   LessThanOrEqual,
   MoreThanOrEqual,
   Repository,
@@ -47,12 +48,25 @@ export class FindAllPostsProvider {
       base.createdAt = LessThanOrEqual(getPostsDto.endDate)
     }
 
-    // When tagIds are provided, expand into one where-branch per tag so TypeORM
-    // emits OR conditions — a post matching any of the requested tags is returned.
-    const where: FindOptionsWhere<Post> | FindOptionsWhere<Post>[] = getPostsDto
-      .tagIds?.length
-      ? getPostsDto.tagIds.map((id) => ({ ...base, tags: { id } }))
-      : base
+    // Keyword search: two branches (title OR content) when q is provided.
+    // Empty branch ({}) when absent — merges cleanly in the cross-product below.
+    const searchBranches: FindOptionsWhere<Post>[] = getPostsDto.q
+      ? [
+          { title: ILike(`%${getPostsDto.q}%`) },
+          { content: ILike(`%${getPostsDto.q}%`) },
+        ]
+      : [{}]
+
+    // Tag branches: one per tagId for OR logic. Empty branch when absent.
+    const tagBranches: FindOptionsWhere<Post>[] = getPostsDto.tagIds?.length
+      ? getPostsDto.tagIds.map((id) => ({ tags: { id } }))
+      : [{}]
+
+    // Cross-product of search × tag branches merged with base gives correct
+    // AND semantics: PUBLISHED AND (title OR content) AND (tag1 OR tag2).
+    const where: FindOptionsWhere<Post>[] = searchBranches.flatMap((sf) =>
+      tagBranches.map((tb) => ({ ...base, ...sf, ...tb })),
+    )
 
     return await this.paginationProvider.paginateQuery(
       { page: getPostsDto.page, limit: getPostsDto.limit },

@@ -18,6 +18,10 @@ export class PaginationProvider {
     repository: Repository<T>,
     where?: FindOptionsWhere<T> | FindOptionsWhere<T>[],
   ): Promise<Paginated<T>> {
+    // Count before find so that concurrent deletes (e.g. parallel test teardowns) make
+    // totalItems >= data.length rather than the reverse, keeping the meta consistent.
+    const totalItems = await repository.count({ where })
+
     const results = await repository.find({
       take: paginationQuery.limit,
       skip: (paginationQuery.page - 1) * paginationQuery.limit,
@@ -29,10 +33,6 @@ export class PaginationProvider {
     const baseURL =
       this.request.protocol + '://' + this.request.headers.host + '/'
     const newURL = new URL(this.request.url, baseURL)
-    /**
-     * Calculate page numbers
-     */
-    const totalItems = await repository.count({ where })
     const totalPages = Math.ceil(totalItems / paginationQuery.limit)
     const hasNextPage = paginationQuery.page < totalPages
     const nextPage = !hasNextPage

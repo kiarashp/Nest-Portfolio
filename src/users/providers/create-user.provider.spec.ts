@@ -2,11 +2,12 @@ import { BadRequestException, RequestTimeoutException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { ConfigService } from '@nestjs/config'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { CreateUserProvider } from './create-user.provider'
 import { User } from '../entities/user.entity'
 import { HashingProvider } from 'src/crypto/providers/hashing.provider'
-import { MailService } from 'src/mail/mail.service'
 import { UserRole } from 'src/auth/enums/user-role.enum'
+import { AppEvents } from 'src/common/events/app-events'
 
 // CreateUserProvider registers a new local user.
 // The flow has three DB operations (findOne + two saves) and one mail send,
@@ -19,7 +20,7 @@ describe('CreateUserProvider', () => {
     save: jest.Mock
   }
   let hashingProvider: { hashPassword: jest.Mock }
-  let mailService: { sendVerificationMail: jest.Mock }
+  let eventEmitter: { emit: jest.Mock }
   let configService: { get: jest.Mock }
 
   // A minimal DTO that satisfies CreateUserDto's required fields.
@@ -37,7 +38,7 @@ describe('CreateUserProvider', () => {
       save: jest.fn(),
     }
     hashingProvider = { hashPassword: jest.fn() }
-    mailService = { sendVerificationMail: jest.fn() }
+    eventEmitter = { emit: jest.fn() }
     configService = { get: jest.fn() }
 
     const module: TestingModule = await Test.createTestingModule({
@@ -46,7 +47,7 @@ describe('CreateUserProvider', () => {
         // getRepositoryToken(User) is the DI token NestJS uses for the TypeORM repo.
         { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: HashingProvider, useValue: hashingProvider },
-        { provide: MailService, useValue: mailService },
+        { provide: EventEmitter2, useValue: eventEmitter },
         { provide: ConfigService, useValue: configService },
       ],
     }).compile()
@@ -123,7 +124,6 @@ describe('CreateUserProvider', () => {
     userRepo.save.mockResolvedValue(newUser)
     // configService.get is called to build the verification URL.
     configService.get.mockReturnValue('http://localhost:3000')
-    mailService.sendVerificationMail.mockResolvedValue(undefined)
 
     const result = await provider.craeteUser(createUserDto)
 
@@ -136,8 +136,9 @@ describe('CreateUserProvider', () => {
     // The returned entity must have the verification flag cleared and token set.
     expect(result.isEmailVerified).toBe(false)
     expect(result.emailVerificationToken).toBeDefined()
-    // The mail must be sent with at least the user's email address.
-    expect(mailService.sendVerificationMail).toHaveBeenCalledWith(
+    // The user.created event must be emitted with the user's email so the listener sends mail.
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      AppEvents.USER_CREATED,
       expect.objectContaining({ email: createUserDto.email }),
     )
   })

@@ -11,8 +11,9 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { User } from '../entities/user.entity'
 import { HashingProvider } from 'src/crypto/providers/hashing.provider'
 import { UserRole } from 'src/auth/enums/user-role.enum'
-import { MailService } from 'src/mail/mail.service'
 import { ConfigService } from '@nestjs/config'
+import { EventEmitter2 } from '@nestjs/event-emitter'
+import { AppEvents, UserCreatedPayload } from 'src/common/events/app-events'
 
 @Injectable()
 export class CreateUserProvider {
@@ -29,7 +30,8 @@ export class CreateUserProvider {
     @Inject(HashingProvider)
     private readonly hashingProvider: HashingProvider,
 
-    private readonly mailService: MailService,
+    // emits user.created so the mail listener can send the verification email async
+    private readonly eventEmitter: EventEmitter2,
 
     private readonly configService: ConfigService,
   ) {}
@@ -93,11 +95,11 @@ export class CreateUserProvider {
     const appUrl = this.configService.get<string>('appConfig.appUrl')
     const verificationUrl = `${appUrl}/auth/verify-email?token=${token}`
 
-    await this.mailService.sendVerificationMail({
+    this.eventEmitter.emit(AppEvents.USER_CREATED, {
       email: newUser.email,
       firstName: newUser.firstName,
       verificationUrl,
-    })
+    } satisfies UserCreatedPayload)
 
     return newUser
   }
