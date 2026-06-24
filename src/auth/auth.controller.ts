@@ -72,6 +72,7 @@ export class AuthController {
   @Auth(AuthType.None)
   @Post('refresh-tokens')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   public async refreshTokens(
     @Body() refreshTokenDto: RefreshTokenDto,
     @Req() req: Request,

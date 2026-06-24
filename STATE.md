@@ -1,36 +1,64 @@
-# Backend Finalization State
+# Backend State
 
-This file is the single source of truth for what still needs to be built before the Svelte frontend (and later Flutter app) can be developed. Each feature includes the full picture: why it exists, how the existing codebase relates to it, and what exactly needs to be implemented. Check off tasks as they are completed.
-
-## Project overview
-
-NestJS 11 + TypeORM + PostgreSQL backend for a personal blog/portfolio. Auth is fully implemented (JWT, Google OAuth, email verification, password reset, refresh token dual delivery for browser + mobile). Posts, tags, uploads (Cloudinary), and user management are all in place. RBAC has four roles: USER, EDITOR, AUTHOR, ADMIN. All responses are wrapped in `{ apiVersion, data }` by `DataResponseInterceptor`. The global `ValidationPipe` strips and rejects unknown fields. Rate limiting (`ThrottlerGuard`) is the first guard in the pipeline.
-
-All backend features are complete. The items below are either deferred post-launch additions or the final pre-launch verification checklist.
+NestJS 11 + TypeORM + PostgreSQL backend for a personal blog/portfolio. Auth, posts, tags, uploads (Cloudinary), user management, contact form, and RBAC (USER / EDITOR / AUTHOR / ADMIN) are all complete and in production.
 
 ---
 
-## Deferred (post-launch)
+## Upcoming features
 
-These are real features but out of scope until the frontend is running and real usage patterns are clear.
-
-- **Scheduled post auto-publishing** — The `publishOn` field is stored on `Post` but nothing acts on it. A cron job (e.g. `@nestjs/schedule`) would query for posts where `status = SCHEDULED AND publishOn <= now()` and flip them to `PUBLISHED`. Deferred because it adds infrastructure complexity and isn't needed to launch.
-- **Comments** — No entity, no routes. Significant scope — needs moderation, notifications, threading.
-- **Post likes/reactions** — No engagement tracking at all. Needs its own entity and auth-aware endpoints.
-- **Newsletter subscribers** — A subscriber list entity and a subscribe/unsubscribe endpoint. Not needed until there is content to send.
-- **Refresh token revocation** — Right now old refresh tokens remain valid until they expire (24h). A revocation list (Redis or DB table) would enable logout-all-devices. The no-Redis approach: a `refresh_token_revocations` DB table `(jti, expiresAt)`, a `jti` claim added to refresh tokens in `GenerateTokensProvider`, and a lookup in `RefreshTokensProvider` before issuing new tokens. A daily cron cleans up expired rows. Deferred for now, but prioritise before real employee accounts exist on a production company site.
-- **Audit logging** — No trail of who did what. Nice for admin dashboards but not needed to launch.
-- **`GET /tags` response cap** — `TagsService.findAll()` runs `repository.find()` with no limit, returning all tags in one query. Safe for now, worth adding a simple `take: 200` cap before launch.
+Each item below is a self-contained feature to implement when the time comes. Before starting any item: add comments following the style in `CLAUDE.md` (single-line `//` for injections, JSDoc `/** */` for public methods). After finishing: decide whether unit and/or e2e tests are needed and write them, check whether the change could break existing tests and fix any that break, then run `pnpm run test` and `pnpm run test:e2e` to confirm everything is green.
 
 ---
 
-## Post-implementation checklist
+### Scheduled post auto-publishing
 
-Run these after finishing all features above:
+`Post.publishOn` is stored but nothing acts on it. A cron job (`@nestjs/schedule`) should query `status = SCHEDULED AND publishOn <= now()` and flip matching posts to `PUBLISHED`. Needs a migration if any index is added.
 
-- [x] `pnpm run build` — TypeScript compilation must pass with zero errors
-- [x] `pnpm run lint` — ESLint + Prettier auto-fix; no unfixable errors (the only known unfixable error is the stale `src/app.controller.spec.ts`)
-- [x] `pnpm run test` — all unit tests green
-- [x] `pnpm run test:e2e` — all new e2e specs pass (requires `.env.test` pointing at the test DB `nest_portfolio_test`)
-- [ ] `pnpm run generate:types` — regenerate `openapi-types.ts`; open it and confirm the new endpoints appear with correct request/response types
-- [ ] Manually smoke-test via Swagger at `/api`: tag update, post filters (`startDate`/`endDate` on `GET /posts`)
+---
+
+### Refresh token revocation
+
+Old refresh tokens stay valid until natural expiry (24h). To support logout-all-devices:
+- Add a `jti` (JWT ID) claim to refresh tokens in `GenerateTokensProvider`
+- Create a `refresh_token_revocations` table `(jti UUID PK, expiresAt TIMESTAMP)` via migration
+- Check `jti` in `RefreshTokensProvider` before issuing new tokens — throw `UnauthorizedException` if revoked
+- Add a daily cron to purge expired rows
+- No Redis needed — a plain DB table is sufficient at this traffic level
+
+---
+
+### Comments
+
+No entity or routes exist yet. Significant scope:
+- `Comment` entity with FK to `Post` and `User`
+- Nested threading (parent comment FK, nullable)
+- Moderation: a `status` field (`pending` / `approved` / `rejected`), ADMIN/AUTHOR can approve
+- Event-driven email notification to post author on new approved comment
+
+---
+
+### Post likes / reactions
+
+No engagement tracking. Needs:
+- `PostLike` entity `(userId, postId)` with unique constraint
+- `POST /posts/:id/like` and `DELETE /posts/:id/like` (Bearer, any role)
+- Count exposed on `GET /posts` and `GET /posts/:id` responses
+
+---
+
+### Newsletter subscribers
+
+- `Subscriber` entity `(email, confirmedAt, unsubscribeToken)`
+- `POST /newsletter/subscribe` (public) — sends confirmation email
+- `GET /newsletter/confirm` (public) — confirms via token
+- `POST /newsletter/unsubscribe` (public) — unsubscribes via token
+- Admin send-blast endpoint out of scope for now
+
+---
+
+### Audit logging
+
+No trail of who did what. Options:
+- Lightweight: a `audit_logs` table `(userId, action, entity, entityId, createdAt)` written by providers on write operations
+- Heavy: use TypeORM subscribers for automatic capture
+- Useful for admin dashboards but not urgent

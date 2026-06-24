@@ -47,4 +47,21 @@ describe('Throttler Guard (e2e)', () => {
       .send({ email: 'throttle-test@e2e.test' })
       .expect(429)
   })
+
+  it('POST /auth/refresh-tokens → 429 after 10 requests within the window', async () => {
+    // refresh-tokens has @Throttle({ default: { limit: 10, ttl: 60_000 } }).
+    // ThrottlerGuard fires before the controller, so invalid-token 401 responses
+    // still count toward the limit. Requests 1–10 return 401; request 11 → 429.
+    for (let i = 0; i < 10; i++) {
+      await request(app.getHttpServer())
+        .post('/auth/refresh-tokens')
+        .send({ refreshToken: 'invalid.token.value' })
+        .expect(401)
+    }
+
+    await request(app.getHttpServer())
+      .post('/auth/refresh-tokens')
+      .send({ refreshToken: 'invalid.token.value' })
+      .expect(429)
+  })
 })
