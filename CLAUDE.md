@@ -192,7 +192,7 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 | Route | Auth | Notes |
 |---|---|---|
 | `POST /users` | None (public) | Registration — triggers email verification flow |
-| `GET /users` | ADMIN | Paginated list |
+| `GET /users` | ADMIN | Paginated list. Accepts `?limit` and `?page` via `PaginationQueryDto` (defaults: limit=10, page=1). Delegates to `FindAllUsersProvider` → `PaginationProvider`. Returns `Paginated<User>` — access the array as `res.data.data`. |
 | `GET /users/me` | Bearer (any role) | Returns the caller's own profile |
 | `GET /users/avatar-options` | None (public) | Lists all `AvatarOption` rows — frontend uses this to render the avatar picker |
 | `GET /users/:id/profile` | None (public) | Public author profile — 404 for USER-role accounts |

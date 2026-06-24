@@ -10,30 +10,6 @@ The gaps below are features that either a portfolio site inherently needs (conta
 
 ---
 
-## Priority 2 — Bugs & correctness (fix before frontend starts)
-
-### 14. Terminus health check
-
-**Why this exists:**
-`GET /health` returns `{ status: 'ok' }` unconditionally. Coolify uses this endpoint for container health polling, but it will report the container as healthy even if PostgreSQL is unreachable.
-
-**What to do:**
-Install `@nestjs/terminus` and replace the health controller with one that runs a TypeORM ping. A DB failure should return HTTP 503 so Coolify restarts the container instead of routing traffic to it.
-
-```bash
-pnpm add @nestjs/terminus
-```
-
-**Files to touch:**
-- `src/app.controller.ts` — replace the current `GET /health` with Terminus `HealthCheckService` + `TypeOrmHealthIndicator`
-- `src/app.module.ts` — import `TerminusModule`
-
-- [ ] Install `@nestjs/terminus`
-- [ ] Replace health endpoint with TypeORM ping
-- [ ] Verify Coolify health poll still hits `GET /health`
-
----
-
 ## Priority 3 — Upload management
 
 ### 10. List own uploads

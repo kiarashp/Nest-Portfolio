@@ -1,17 +1,27 @@
-import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common'
-import { AppService } from './app.service'
+import { Controller, Get } from '@nestjs/common'
+import {
+  HealthCheck,
+  HealthCheckResult,
+  HealthCheckService,
+  TypeOrmHealthIndicator,
+} from '@nestjs/terminus'
 import { Auth } from './auth/decorators/auth.decorator'
 import { AuthType } from './auth/enums/auth-type.enum'
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(
+    // Orchestrates running health indicators and aggregating their results
+    private readonly health: HealthCheckService,
+    // Pings the default TypeORM connection to verify the database is reachable
+    private readonly db: TypeOrmHealthIndicator,
+  ) {}
 
-  /** Returns 200 OK when the app is running — used by Coolify health checks. */
+  /** Returns 200 with DB info when healthy; 503 when the database is unreachable. Used by Coolify. */
   @Get('health')
   @Auth(AuthType.None)
-  @HttpCode(HttpStatus.OK)
-  health(): { status: string } {
-    return { status: 'ok' }
+  @HealthCheck()
+  check(): Promise<HealthCheckResult> {
+    return this.health.check([() => this.db.pingCheck('database')])
   }
 }

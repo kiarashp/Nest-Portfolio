@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common'
 import { AppController } from './app.controller'
-import { AppService } from './app.service'
 import { UsersModule } from './users/users.module'
 import { PostsModule } from './posts/posts.module'
 import { AuthModule } from './auth/auth.module'
@@ -25,12 +24,14 @@ import { AuthenticationGuard } from './auth/guards/authentication/authentication
 import { RolesGuard } from './auth/guards/authorization/roles.guard'
 import { DataResponseInterceptor } from './common/interceptors/data-response/data-response.interceptor'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
+import { TerminusModule } from '@nestjs/terminus'
 
 const ENV = process.env.NODE_ENV
 
 @Module({
   imports: [
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
+    TerminusModule,
     UsersModule,
     PostsModule,
     AuthModule,
@@ -65,7 +66,6 @@ const ENV = process.env.NODE_ENV
   ],
   controllers: [AppController],
   providers: [
-    AppService,
     // ThrottlerGuard runs first — rate-limits before auth guard touches the DB
     {
       provide: APP_GUARD,

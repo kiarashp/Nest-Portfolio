@@ -33,6 +33,17 @@ describe('App (e2e)', () => {
 
   it('GET /health returns { status: "ok" } in the data envelope', async () => {
     const res = await request(app.getHttpServer()).get('/health').expect(200)
-    expect((res.body as { data: { status: string } }).data.status).toBe('ok')
+    const body = res.body as {
+      data: { status: string; info: Record<string, { status: string }> }
+    }
+    expect(body.data.status).toBe('ok')
+  })
+
+  it('GET /health reports the database as up', async () => {
+    const res = await request(app.getHttpServer()).get('/health').expect(200)
+    const body = res.body as {
+      data: { status: string; info: Record<string, { status: string }> }
+    }
+    expect(body.data.info['database'].status).toBe('up')
   })
 })

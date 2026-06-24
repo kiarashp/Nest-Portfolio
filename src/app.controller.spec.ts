@@ -1,33 +1,47 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { HealthCheckResult, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus'
 import { AppController } from './app.controller'
-import { AppService } from './app.service'
 
-// AppController is a thin NestJS controller with no routes of its own right now.
-// These tests verify the module wires up correctly and that AppService works.
 describe('AppController', () => {
   let appController: AppController
-  let appService: AppService
+  let healthCheckService: jest.Mocked<HealthCheckService>
 
   beforeEach(async () => {
-    // Boot the controller + its only dependency (AppService) in an isolated module.
+    // Boot the controller with mocked Terminus providers — no real DB connection needed.
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService],
+      providers: [
+        {
+          provide: HealthCheckService,
+          useValue: { check: jest.fn() },
+        },
+        {
+          provide: TypeOrmHealthIndicator,
+          useValue: { pingCheck: jest.fn() },
+        },
+      ],
     }).compile()
 
     appController = module.get(AppController)
-    appService = module.get(AppService)
+    healthCheckService = module.get(HealthCheckService)
   })
 
   it('should be defined', () => {
-    // The controller must exist after the module compiles — catches DI wiring errors.
     expect(appController).toBeDefined()
   })
 
-  describe('AppService', () => {
-    it('getHello returns the expected greeting string', () => {
-      // getHello lives on the service, not the controller — test it directly here.
-      expect(appService.getHello()).toBe('Hello World!')
-    })
+  it('check() delegates to HealthCheckService', async () => {
+    const mockResult: HealthCheckResult = {
+      status: 'ok',
+      info: { database: { status: 'up' } },
+      error: {},
+      details: { database: { status: 'up' } },
+    }
+    healthCheckService.check.mockResolvedValue(mockResult)
+
+    const result = await appController.check()
+
+    expect(healthCheckService.check).toHaveBeenCalledTimes(1)
+    expect(result.status).toBe('ok')
   })
 })
