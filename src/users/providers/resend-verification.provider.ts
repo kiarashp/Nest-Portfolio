@@ -59,8 +59,8 @@ export class ResendVerificationProvider {
       )
     }
 
-    const appUrl = this.configService.get<string>('appConfig.appUrl')
-    const verificationUrl = `${appUrl}/auth/verify-email?token=${token}`
+    const frontendUrl = this.configService.get<string>('appConfig.frontendUrl')
+    const verificationUrl = `${frontendUrl}/auth/verify-email?token=${token}`
 
     await this.mailService.sendVerificationMail({
       email: user.email,
