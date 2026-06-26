@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { User } from '../entities/user.entity'
+import type { Request } from 'express'
 import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
 import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.dto'
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
@@ -25,10 +26,13 @@ export class FindAllUsersProvider {
    */
   public async findAll(
     paginationQuery: PaginationQueryDto,
+    request: Request,
   ): Promise<Paginated<User>> {
     return this.paginationProvider.paginateQuery(
       paginationQuery,
       this.userRepository,
+      undefined,
+      request,
     )
   }
 }

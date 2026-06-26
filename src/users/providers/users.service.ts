@@ -30,6 +30,7 @@ import { SyncGoogleUserProvider } from './sync-google-user.provider'
 import { ForgotPasswordProvider } from './forgot-password.provider'
 import { ResetPasswordProvider } from './reset-password.provider'
 import { FindAllUsersProvider } from './find-all-users.provider'
+import type { Request } from 'express'
 import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.dto'
 
 @Injectable()
@@ -122,8 +123,8 @@ export class UsersService {
   /**
    * Returns a paginated list of all users.
    */
-  public findAll(paginationQuery: PaginationQueryDto) {
-    return this.findAllUsersProvider.findAll(paginationQuery)
+  public findAll(paginationQuery: PaginationQueryDto, request: Request) {
+    return this.findAllUsersProvider.findAll(paginationQuery, request)
   }
   /**
    * Find user by id

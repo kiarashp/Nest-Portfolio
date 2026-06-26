@@ -15,7 +15,9 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  Req,
 } from '@nestjs/common'
+import type { Request } from 'express'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 import { Throttle } from '@nestjs/throttler'
@@ -58,8 +60,11 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Users fetched successfully' })
   @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
   @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
-  public getAllUsers(@Query() paginationQuery: PaginationQueryDto) {
-    return this.usersService.findAll(paginationQuery)
+  public getAllUsers(
+    @Query() paginationQuery: PaginationQueryDto,
+    @Req() request: Request,
+  ) {
+    return this.usersService.findAll(paginationQuery, request)
   }
 
   /**

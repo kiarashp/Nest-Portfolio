@@ -6,11 +6,8 @@ import { PaginationProvider } from './pagination.provider'
 type AnyRepo = Repository<ObjectLiteral>
 type AnyWhere = FindOptionsWhere<ObjectLiteral>
 
-// PaginationProvider is request-scoped (it injects the Express Request object
-// to build absolute URLs for the pagination links).
-// We instantiate it directly with a mock request instead of going through the
-// NestJS DI container — this avoids the complexity of resolving request-scoped
-// providers in tests while still fully exercising the pagination logic.
+// PaginationProvider is a singleton — it no longer injects the Express Request.
+// Instead, the request is passed as a method argument, which is simpler to test.
 describe('PaginationProvider', () => {
   let provider: PaginationProvider
   let mockRepo: { find: jest.Mock; count: jest.Mock }
@@ -24,10 +21,7 @@ describe('PaginationProvider', () => {
 
   beforeEach(() => {
     mockRepo = { find: jest.fn(), count: jest.fn() }
-    // The mock only covers the three fields the provider reads.
-    // `as unknown as Request` is safer than `as any` — it narrows the escape
-    // hatch to exactly this cast point instead of silencing type checks globally.
-    provider = new PaginationProvider(mockRequest as unknown as Request)
+    provider = new PaginationProvider()
   })
 
   it('calls repository.find with correct skip and take', async () => {
@@ -38,6 +32,8 @@ describe('PaginationProvider', () => {
     await provider.paginateQuery(
       { limit: 10, page: 3 },
       mockRepo as unknown as AnyRepo,
+      undefined,
+      mockRequest as unknown as Request,
     )
 
     expect(mockRepo.find).toHaveBeenCalledWith(
@@ -54,6 +50,8 @@ describe('PaginationProvider', () => {
     const result = await provider.paginateQuery(
       { limit: 10, page: 2 },
       mockRepo as unknown as AnyRepo,
+      undefined,
+      mockRequest as unknown as Request,
     )
 
     expect(result.meta).toEqual({
@@ -76,6 +74,8 @@ describe('PaginationProvider', () => {
     const result = await provider.paginateQuery(
       { limit: 10, page: 1 },
       mockRepo as unknown as AnyRepo,
+      undefined,
+      mockRequest as unknown as Request,
     )
 
     expect(result.meta.hasPrevPage).toBe(false)
@@ -92,6 +92,8 @@ describe('PaginationProvider', () => {
     const result = await provider.paginateQuery(
       { limit: 10, page: 2 },
       mockRepo as unknown as AnyRepo,
+      undefined,
+      mockRequest as unknown as Request,
     )
 
     expect(result.meta.hasNextPage).toBe(false)
@@ -108,6 +110,8 @@ describe('PaginationProvider', () => {
     const result = await provider.paginateQuery(
       { limit: 10, page: 1 },
       mockRepo as unknown as AnyRepo,
+      undefined,
+      mockRequest as unknown as Request,
     )
 
     expect(result.links.first).toContain('http://localhost:3000')
@@ -126,6 +130,7 @@ describe('PaginationProvider', () => {
       { limit: 5, page: 1 },
       mockRepo as unknown as AnyRepo,
       where,
+      mockRequest as unknown as Request,
     )
 
     expect(mockRepo.find).toHaveBeenCalledWith(

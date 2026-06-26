@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { FindOptionsWhere, Repository } from 'typeorm'
 import { AuditLog } from '../entities/audit-log.entity'
 import { AuditAction } from '../enums/audit-action.enum'
+import type { Request } from 'express'
 import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
 import { GetAuditLogsDto } from '../dto/get-audit-logs.dto'
@@ -43,7 +44,10 @@ export class AuditLogService {
    * Returns a paginated list of audit records. Optionally filtered by entity
    * name and/or action string — both comparisons are exact.
    */
-  public async findAll(dto: GetAuditLogsDto): Promise<Paginated<AuditLog>> {
+  public async findAll(
+    dto: GetAuditLogsDto,
+    request: Request,
+  ): Promise<Paginated<AuditLog>> {
     const where: FindOptionsWhere<AuditLog> = {}
     if (dto.entity) where.entity = dto.entity
     if (dto.action) where.action = dto.action
@@ -51,6 +55,7 @@ export class AuditLogService {
       dto,
       this.auditLogRepository,
       where,
+      request,
     )
   }
 }

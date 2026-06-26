@@ -19,7 +19,7 @@ describe('AuditLogService', () => {
           provide: getRepositoryToken(AuditLog),
           useValue: { save: saveMock, count: jest.fn(), find: jest.fn() },
         },
-        // PaginationProvider is request-scoped in production but a simple stub is enough here
+        // PaginationProvider is a singleton — a simple stub is enough here
         {
           provide: PaginationProvider,
           useValue: { paginateQuery: jest.fn() },

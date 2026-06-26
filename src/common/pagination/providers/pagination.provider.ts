@@ -1,22 +1,15 @@
-import { Injectable, Inject } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PaginationQueryDto } from '../dtos/pagination-query.dto'
 import { FindOptionsWhere, ObjectLiteral, Repository } from 'typeorm'
 import type { Request } from 'express'
-import { REQUEST } from '@nestjs/core'
 import { Paginated } from '../interfaces/paginated.interface'
 @Injectable()
 export class PaginationProvider {
-  constructor(
-    /**
-     * Injecting request
-     */
-    @Inject(REQUEST)
-    private readonly request: Request,
-  ) {}
   public async paginateQuery<T extends ObjectLiteral>(
     paginationQuery: PaginationQueryDto,
     repository: Repository<T>,
-    where?: FindOptionsWhere<T> | FindOptionsWhere<T>[],
+    where: FindOptionsWhere<T> | FindOptionsWhere<T>[] | undefined,
+    request: Request,
   ): Promise<Paginated<T>> {
     // Count before find so that concurrent deletes (e.g. parallel test teardowns) make
     // totalItems >= data.length rather than the reverse, keeping the meta consistent.
@@ -30,9 +23,8 @@ export class PaginationProvider {
     /**
      * Create the request Urls
      */
-    const baseURL =
-      this.request.protocol + '://' + this.request.headers.host + '/'
-    const newURL = new URL(this.request.url, baseURL)
+    const baseURL = request.protocol + '://' + request.headers.host + '/'
+    const newURL = new URL(request.url, baseURL)
     const totalPages = Math.ceil(totalItems / paginationQuery.limit)
     const hasNextPage = paginationQuery.page < totalPages
     const nextPage = !hasNextPage

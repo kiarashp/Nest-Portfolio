@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Post } from '../entities/post.entity'
 import { GetPostsDto } from '../dto/get-posts.dto'
+import type { Request } from 'express'
 import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
 
@@ -29,6 +30,7 @@ export class FindMyPostsProvider {
   public async findMyPosts(
     userId: number,
     getPostsDto: GetPostsDto,
+    request: Request,
   ): Promise<Paginated<Post>> {
     const where: Record<string, unknown> = { author: { id: userId } }
     if (getPostsDto.status) {
@@ -41,6 +43,7 @@ export class FindMyPostsProvider {
       { page: getPostsDto.page, limit: getPostsDto.limit },
       this.postsRepository,
       where,
+      request,
     )
   }
 }

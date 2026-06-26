@@ -1,4 +1,5 @@
-import { Controller, Get, Query } from '@nestjs/common'
+import { Controller, Get, Query, Req } from '@nestjs/common'
+import type { Request } from 'express'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 import { AuditLogService } from './providers/audit-log.service'
@@ -21,7 +22,7 @@ export class AuditLogController {
   @Get()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List audit log entries (admin only)' })
-  public findAll(@Query() dto: GetAuditLogsDto) {
-    return this.auditLogService.findAll(dto)
+  public findAll(@Query() dto: GetAuditLogsDto, @Req() request: Request) {
+    return this.auditLogService.findAll(dto, request)
   }
 }

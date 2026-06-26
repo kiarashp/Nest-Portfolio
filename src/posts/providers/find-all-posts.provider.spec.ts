@@ -7,6 +7,7 @@ import {
   LessThanOrEqual,
   MoreThanOrEqual,
 } from 'typeorm'
+import type { Request } from 'express'
 import { FindAllPostsProvider } from './find-all-posts.provider'
 import { Post } from '../entities/post.entity'
 import { PostStatus } from '../enums/postStatus.enum'
@@ -16,6 +17,12 @@ import { GetPostsDto } from '../dto/get-posts.dto'
 // These tests verify the WHERE clause construction logic in FindAllPostsProvider.
 // The repository and PaginationProvider are mocked — we only care about which
 // conditions are built, not what the DB returns.
+const mockRequest = {
+  protocol: 'http',
+  headers: { host: 'localhost:3000' },
+  url: '/posts?limit=10&page=1',
+} as unknown as Request
+
 describe('FindAllPostsProvider', () => {
   let provider: FindAllPostsProvider
   let paginationProvider: { paginateQuery: jest.Mock }
@@ -53,7 +60,7 @@ describe('FindAllPostsProvider', () => {
   async function getWhereArg(
     dto: Partial<GetPostsDto>,
   ): Promise<FindOptionsWhere<Post>[]> {
-    await provider.findAll(dto as GetPostsDto)
+    await provider.findAll(dto as GetPostsDto, mockRequest)
     const calls = paginationProvider.paginateQuery.mock.calls as [
       unknown,
       unknown,

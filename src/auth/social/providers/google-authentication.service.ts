@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -36,7 +37,6 @@ export class GoogleAuthenticationService implements OnModuleInit {
   onModuleInit() {
     const clientId = this.jwtConfiguration.googleClientId
     const clientSecret = this.jwtConfiguration.googleClientSecret
-
     this.oauthClient = new OAuth2Client(clientId, clientSecret)
   }
 
@@ -47,13 +47,14 @@ export class GoogleAuthenticationService implements OnModuleInit {
       //  Attempt to verify the token
       loginTicket = await this.oauthClient.verifyIdToken({
         idToken: googleTokenDto.token,
+        audience: this.jwtConfiguration.googleClientId,
       })
-    } catch {
-      // Catches expired tokens, bad signatures, or network errors during verification
+    } catch (error) {
+      // Catches expired tokens, bad signatures, wrong audience, or network errors
       this.logger.warn(
-        'Google token verification failed: invalid or expired token',
+        `Google token verification failed: ${error instanceof Error ? error.message : String(error)}`,
       )
-      throw new UnauthorizedException('Google token verification failed: ')
+      throw new UnauthorizedException('Google token verification failed')
     }
     //Check if the login ticket exists/is valid
     if (!loginTicket) {
@@ -100,6 +101,19 @@ export class GoogleAuthenticationService implements OnModuleInit {
       this.logger.log(`Google sign-in: existing user — userId=${user.id}`)
       return this.generateTokensProvider.generateTokens(synced)
     }
+    // No Google account found — check whether this email belongs to a local account
+    // before attempting to create, so we give the user an actionable error instead
+    // of a raw DB constraint violation.
+    const existingLocal = await this.usersService.findOneByEmail(email)
+    if (existingLocal) {
+      this.logger.warn(
+        `Google sign-in blocked: email already registered as local account — email=${email}`,
+      )
+      throw new ConflictException(
+        'This email is already registered. Please sign in with your email and password.',
+      )
+    }
+
     //if not exist , create a new user and then generate both tokens
     const newUser = await this.usersService.createGoogleUser({
       email,

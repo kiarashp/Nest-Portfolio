@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import type { Request } from 'express'
 import { CreatePostDto } from '../dto/create-post.dto'
 import { PatchPostDto } from '../dto/update-post.dto'
 import { GetPostsDto } from '../dto/get-posts.dto'
@@ -70,16 +71,24 @@ export class PostsService {
     return await this.createPostProvider.create(createPostDto, activeUser)
   }
 
-  public async findAll(getPostsDto: GetPostsDto): Promise<Paginated<Post>> {
-    return await this.findAllPostsProvider.findAll(getPostsDto)
+  public async findAll(
+    getPostsDto: GetPostsDto,
+    request: Request,
+  ): Promise<Paginated<Post>> {
+    return await this.findAllPostsProvider.findAll(getPostsDto, request)
   }
 
   /** Returns the caller's own posts across all statuses, with an optional status filter. */
   public async findMyPosts(
     userId: number,
     getPostsDto: GetPostsDto,
+    request: Request,
   ): Promise<Paginated<Post>> {
-    return await this.findMyPostsProvider.findMyPosts(userId, getPostsDto)
+    return await this.findMyPostsProvider.findMyPosts(
+      userId,
+      getPostsDto,
+      request,
+    )
   }
 
   public async findOne(id: number): Promise<Post> {

@@ -10,6 +10,7 @@ import {
 } from 'typeorm'
 import { Post } from '../entities/post.entity'
 import { GetPostsDto } from '../dto/get-posts.dto'
+import type { Request } from 'express'
 import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
 import { PostStatus } from '../enums/postStatus.enum'
@@ -35,7 +36,10 @@ export class FindAllPostsProvider {
    * Draft, scheduled, and review posts are never returned to public callers.
    * Supports optional filtering by one or more tag IDs (OR logic) and by author ID.
    */
-  public async findAll(getPostsDto: GetPostsDto): Promise<Paginated<Post>> {
+  public async findAll(
+    getPostsDto: GetPostsDto,
+    request: Request,
+  ): Promise<Paginated<Post>> {
     // always filter to published posts only; add author filter if provided
     const base: FindOptionsWhere<Post> = { status: PostStatus.PUBLISHED }
     if (getPostsDto.authorId) {
@@ -77,6 +81,7 @@ export class FindAllPostsProvider {
       { page: getPostsDto.page, limit: getPostsDto.limit },
       this.postsRepository,
       where,
+      request,
     )
   }
 }

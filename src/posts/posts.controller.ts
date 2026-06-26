@@ -11,9 +11,11 @@ import {
   Param,
   Delete,
   Query,
+  Req,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common'
+import type { Request } from 'express'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 import { PostsService } from './providers/posts.service'
@@ -62,8 +64,8 @@ export class PostsController {
    */
   @Auth(AuthType.None)
   @Get()
-  findAll(@Query() getPostsDto: GetPostsDto) {
-    return this.postsService.findAll(getPostsDto)
+  findAll(@Query() getPostsDto: GetPostsDto, @Req() request: Request) {
+    return this.postsService.findAll(getPostsDto, request)
   }
 
   /**
@@ -82,8 +84,9 @@ export class PostsController {
   findMyPosts(
     @ActiveUser() activeUser: ActiveUserData,
     @Query() getPostsDto: GetPostsDto,
+    @Req() request: Request,
   ) {
-    return this.postsService.findMyPosts(activeUser.sub, getPostsDto)
+    return this.postsService.findMyPosts(activeUser.sub, getPostsDto, request)
   }
 
   /**
