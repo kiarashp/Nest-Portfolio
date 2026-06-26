@@ -23,7 +23,7 @@ export class ForgotPasswordProvider {
     // send the reset email
     private readonly mailService: MailService,
 
-    // read the app URL to build the reset link
+    // read the frontend URL to build the reset link
     private readonly configService: ConfigService,
   ) {}
 
@@ -64,8 +64,8 @@ export class ForgotPasswordProvider {
       )
     }
 
-    const appUrl = this.configService.get<string>('appConfig.appUrl')
-    const resetUrl = `${appUrl}/auth/reset-password?token=${token}`
+    const frontendUrl = this.configService.get<string>('appConfig.frontendUrl')
+    const resetUrl = `${frontendUrl}/auth/reset-password?token=${token}`
 
     await this.mailService.sendPasswordResetMail({
       email: user.email,
