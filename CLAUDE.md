@@ -108,7 +108,7 @@ pnpm run seed:admin   # uses NODE_ENV=development → .env.development
 
 ## Architecture
 
-NestJS (v11) + TypeORM + PostgreSQL blog/portfolio API. Module-per-domain layout: `users`, `posts`, `tags`, `meta-options`, `auth` (with a nested `social` sub-feature for Google), plus cross-cutting `common`, `config`, `crypto`, and `audit-log` directories. `CryptoModule` (`src/crypto/`) is a standalone utility module that provides `HashingProvider` (abstract) and `BcryptProvider` (concrete); both `AuthModule` and `UsersModule` import it — this is how password hashing is shared without a circular dependency between those two modules. `AuditLogModule` (`src/audit-log/`) is imported by `UsersModule`, `PostsModule`, `TagsModule`, and `MetaOptionsModule` — any module whose providers write audit records must import it.
+NestJS (v11) + TypeORM + PostgreSQL blog/portfolio API. Module-per-domain layout: `users`, `posts`, `tags`, `meta-options`, `auth` (with a nested `social` sub-feature for Google), `products`, `contact`, plus cross-cutting `common`, `config`, `crypto`, and `audit-log` directories. `CryptoModule` (`src/crypto/`) is a standalone utility module that provides `HashingProvider` (abstract) and `BcryptProvider` (concrete); both `AuthModule` and `UsersModule` import it — this is how password hashing is shared without a circular dependency between those two modules. `AuditLogModule` (`src/audit-log/`) is imported by `UsersModule`, `PostsModule`, `TagsModule`, `MetaOptionsModule`, and `ProductsModule` — any module whose providers write audit records must import it. `ProductsModule` (`src/products/`) owns two entities (`ProductType`, `Product`) and two controllers (`ProductTypesController`, `ProductsController`); it imports `PaginationModule`, `UploadsModule`, and `AuditLogModule`.
 
 Within each domain module the convention is: `*.module.ts` → `*.controller.ts` → `providers/*.service.ts`, where the service is a **thin facade** that delegates to single-purpose provider classes for individual operations. Each provider handles exactly one responsibility (e.g. `create-post.provider.ts`, `find-one-post.provider.ts`, `remove-post.provider.ts`). DTOs live in `dto(s)/`, TypeORM entities in `entities/`.
 
@@ -121,6 +121,8 @@ Entity relations:
 - `AvatarOption` — standalone entity (`src/users/entities/avatar-option.entity.ts`), no FK to `User`. Columns: `id`, `url`, `publicId`, `createdAt`. Admins populate the pool via `POST /users/avatar-options`; users pick one with `PATCH /users/avatar`.
 - `ContactSubmission` — standalone entity (`src/contact/entities/contact-submission.entity.ts`), no FK to any other table. Columns: `id`, `name`, `email`, `subject`, `message`, `createdAt`. Every submission is persisted permanently so the owner can review them even if an email notification is missed.
 - `AuditLog` — standalone entity (`src/audit-log/entities/audit-log.entity.ts`), no FK to any other table. Columns: `id`, `userId` (nullable int — null for self-service operations like registration), `action` (varchar 32), `entity` (varchar 64), `entityId` (int), `createdAt`. Written by providers after every successful write; never deleted.
+- `ProductType` 1—N `Product` (non-eager — the inverse `products` relation is never loaded automatically; always query products directly). `ProductType` entity (`src/products/entities/product-type.entity.ts`) exports the `FilterableField` interface used in `filterableFields` (jsonb column).
+- `Product` N—1 `ProductType` (eager — `productType` is always included in product responses). `Product` entity (`src/products/entities/product.entity.ts`) has `@DeleteDateColumn deletedAt` for soft-delete, `@Index({ using: 'gin' })` on `specs` (jsonb) for future filter queries, and a B-tree `@Index(['productTypeId'])` at class level for type-based filtering. Soft-deleted products are automatically excluded from all TypeORM queries unless `withDeleted: true` is passed.
 
 ### Request pipeline (global, wired in `app.module.ts`)
 
@@ -275,6 +277,38 @@ Authenticated write routes (`PATCH`, `DELETE`, `POST /images`) use `FindOnePostP
 |---|---|---|
 | `GET /audit-logs` | ADMIN | Paginated list of audit records. Accepts `?limit`, `?page`, `?entity=<name>` (exact match, e.g. `Post`), `?action=<action>` (exact match, e.g. `CREATE`). Returns `Paginated<AuditLog>`. |
 
+### Product Types routes
+
+| Route | Auth | Notes |
+|---|---|---|
+| `GET /product-types` | None (public) | Returns all product types ordered by name (no pagination). Used by the frontend type picker and filter UI. |
+| `GET /product-types/:id` | None (public) | Single product type by ID. Includes `filterableFields` array. 404 if not found. |
+| `POST /product-types` | ADMIN | Create a product type — `name` and `slug` required (both unique), `filterableFields` optional (jsonb array). 409 on name/slug collision. |
+| `PATCH /product-types/:id` | ADMIN | Partial update — any subset of `name`, `slug`, `filterableFields`. 404 if not found, 409 on collision. |
+| `DELETE /product-types/:id` | ADMIN | Hard delete. 409 if any products still reference this type — caller must delete or reassign products first. |
+
+### Products routes
+
+| Route | Auth | Notes |
+|---|---|---|
+| `GET /products` | None (public) | Paginated list of **published** products only. Accepts `?limit`, `?page`, `?productTypeId=<id>`, `?q=<keyword>` (case-insensitive partial match on name or shortDescription). |
+| `GET /products/slug/:slug` | None (public) | Single **published** product by slug. 404 if draft or not found. Declared before `/:id` to prevent `ParseIntPipe` collision. |
+| `GET /products/admin` | ADMIN | Paginated list of **all** products including drafts and soft-deleted-excluded (soft-deleted rows are still excluded — TypeORM respects `@DeleteDateColumn`). Accepts same query params as `GET /products`. Declared before `/:id`. |
+| `GET /products/:id` | None (public) | Single **published** product by DB ID. 404 if draft or not found. |
+| `POST /products` | ADMIN | Create a product. Only `productTypeId` and `shortDescription` are required. `isPublished` defaults false — draft-first flow. 409 on duplicate slug/SKU, 400 on invalid `productTypeId` (FK violation caught and mapped). |
+| `PATCH /products/:id` | ADMIN | Partial update. Uses `!== undefined` (not `??`) to allow explicit `null` to clear nullable fields (`imageUrl`, `specs`, etc.). 404 if not found, 409 on slug/SKU collision. |
+| `POST /products/:id/image` | ADMIN | Upload the product's main image (`multipart/form-data`, field `file`, max 5 MB, jpeg/png/webp). Sets `product.imageUrl` to the Cloudinary URL. No `UploadFile` row is created — `StorageProvider` is injected directly (same pattern as `AvatarOptionsProvider`). Returns the updated product. |
+| `DELETE /products/:id` | ADMIN | Soft-delete — sets `deletedAt`, row stays in DB. Product disappears from all public routes. Returns `{ deleted: true, id }`. |
+
+**Draft visibility rules (Products):**
+
+Public routes (`GET /products`, `GET /products/:id`, `GET /products/slug/:slug`) enforce `isPublished = true` at the DB level via `FindAllProductsProvider` and `FindOneProductProvider.findOnePublishedByIdOrFail` / `findOneBySlugOrFail`. Drafts are invisible and return 404, not 403. `GET /products/admin` bypasses this filter so admins can see and edit unpublished products.
+
+**`GetProductsDto` query params:**
+- `limit` / `page` — pagination (via `PaginationQueryDto`)
+- `productTypeId` — filter by product type ID (`@Type(() => Number)` converts query string to number)
+- `q` — keyword (1–100 chars), case-insensitive `ILIKE '%q%'` on both `name` and `shortDescription` as OR branches. Composes with `productTypeId`: `(name OR shortDescription) AND productTypeId`.
+
 ### Serialization
 
 `ClassSerializerInterceptor` is global. Entity fields control their own visibility via class-transformer decorators.
@@ -354,7 +388,7 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 
 ### Uploads
 
-`src/uploads` is a dedicated, reusable module for Cloudinary image uploads. It exports `UploadsService`, which is consumed by `PostsModule` and `UsersModule`.
+`src/uploads` is a dedicated, reusable module for Cloudinary image uploads. It exports `UploadsService`, which is consumed by `PostsModule` and `UsersModule`. `ProductsModule` also imports `UploadsModule` to access `StorageProvider` directly for product image uploads.
 
 - `UploadFile` entity (`src/uploads/entities/upload-file.entity.ts`) records every upload: `name`, `path` (Cloudinary `secure_url`), `publicId`, `type` (`FileType` enum), `mime`, `size`, `userId`, and optional `postId`. When `postId` is set, the upload is linked to that post and will be deleted from Cloudinary when the post is deleted.
 - `UploadsService` is split into two providers: `UploadFileProvider` (validates buffer magic bytes, uploads to storage, persists the row) and `DeleteFileProvider` (looks up by URL, deletes from Cloudinary, removes the DB row).
@@ -375,7 +409,7 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 - `audit-log.controller.ts` — `GET /audit-logs`, ADMIN only.
 - `audit-log.module.ts` — exports `AuditLogService`; imports `PaginationModule`.
 
-**Current instrumented providers (14):**
+**Current instrumented providers (22):**
 
 | Provider | action | entity | userId source |
 |---|---|---|---|
@@ -394,6 +428,13 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 | `TagsService.softDelete` | SOFT_DELETE | 'Tag' | `activeUserId` (threaded from controller) |
 | `UpdateMetaOptionProvider` | UPDATE | 'MetaOption' | `activeUser.sub` |
 | `DeleteMetaOptionProvider` | DELETE | 'MetaOption' | `activeUser.sub` |
+| `CreateProductTypeProvider` | CREATE | 'ProductType' | `activeUserId` (threaded from controller) |
+| `UpdateProductTypeProvider` | UPDATE | 'ProductType' | `activeUserId` (threaded from controller) |
+| `DeleteProductTypeProvider` | DELETE | 'ProductType' | `activeUserId` (threaded from controller) |
+| `CreateProductProvider` | CREATE | 'Product' | `activeUserId` (threaded from controller) |
+| `UpdateProductProvider` | UPDATE | 'Product' | `activeUserId` (threaded from controller) |
+| `UploadProductImageProvider` | UPDATE | 'Product' | `activeUserId` (threaded from controller) |
+| `DeleteProductProvider` | SOFT_DELETE | 'Product' | `activeUserId` (threaded from controller) |
 
 **Signature threading:** Several providers originally received only the target entity's `id`. For audit purposes, `activeUserId: number` was added as a final parameter and threaded through the service facade and controller. The pattern is: controller reads `@ActiveUser('sub') activeUserId: number`, passes it to the service method, which passes it to the provider. Affected chains: `RemoveOneByIdProvider`, `ChangeUserRoleProvider`, `PatchUserProvider`, `AvatarOptionsProvider.create/remove`, and `TagsService.create/delete/softDelete`.
 

@@ -27,6 +27,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { TerminusModule } from '@nestjs/terminus'
 import { EventEmitterModule } from '@nestjs/event-emitter'
 import { AuditLogModule } from './audit-log/audit-log.module'
+import { ProductsModule } from './products/products.module'
 
 const ENV = process.env.NODE_ENV
 
@@ -65,6 +66,7 @@ const ENV = process.env.NODE_ENV
     MailModule,
     ContactModule,
     AuditLogModule,
+    ProductsModule,
     ConfigModule.forFeature(jwtConfig),
     JwtModule.registerAsync(jwtConfig.asProvider()),
   ],

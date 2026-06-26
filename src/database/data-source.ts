@@ -8,6 +8,8 @@ import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { AvatarOption } from 'src/users/entities/avatar-option.entity'
 import { ContactSubmission } from 'src/contact/entities/contact-submission.entity'
 import { AuditLog } from 'src/audit-log/entities/audit-log.entity'
+import { Product } from 'src/products/entities/product.entity'
+import { ProductType } from 'src/products/entities/product-type.entity'
 
 config({ path: `.env.${process.env.NODE_ENV ?? 'development'}` })
 
@@ -27,6 +29,8 @@ export default new DataSource({
     AvatarOption,
     ContactSubmission,
     AuditLog,
+    Product,
+    ProductType,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,

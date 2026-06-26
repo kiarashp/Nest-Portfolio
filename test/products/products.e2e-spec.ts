@@ -1,0 +1,502 @@
+import { INestApplication } from '@nestjs/common'
+import request from 'supertest'
+import { App } from 'supertest/types'
+import { DataSource, Repository } from 'typeorm'
+import { UserRole } from '../../src/auth/enums/user-role.enum'
+import { Product } from '../../src/products/entities/product.entity'
+import { ProductType } from '../../src/products/entities/product-type.entity'
+import { ApiResponse, getAuthToken } from '../helpers/auth.helper'
+import { createApp } from '../helpers/create-app.helper'
+import { cleanupUsers, seedUser } from '../helpers/seed.helper'
+
+interface Paginated<T> {
+  data: T[]
+  meta: {
+    itemsPerPage: number
+    totalItems: number
+    currentPage: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPrevPage: boolean
+  }
+  links: Record<string, string>
+}
+
+// URL returned by the default StorageProvider mock in create-app.helper.ts
+const MOCK_IMAGE_URL =
+  'https://res.cloudinary.com/mock/image/upload/v1/avatars/test.jpg'
+
+// Minimal JPEG buffer — starts with the SOI + APP0 JFIF magic bytes that
+// the file-type package needs to detect this as image/jpeg.
+const JPEG_MAGIC = Buffer.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+])
+
+describe('Products (e2e)', () => {
+  let app: INestApplication<App>
+  let dataSource: DataSource
+  let adminToken: string
+  let userToken: string
+
+  let productRepo: Repository<Product>
+  let productTypeRepo: Repository<ProductType>
+
+  // IDs captured in beforeAll for shared read tests.
+  let productTypeId: number
+  let publishedProductId: number
+
+  // Track all created IDs so afterAll can clean up even if tests fail mid-run.
+  // Products must be deleted before product types (FK constraint).
+  const createdProductIds: number[] = []
+  const createdProductTypeIds: number[] = []
+
+  const ADMIN_EMAIL = 'products-admin@e2e.test'
+  const USER_EMAIL = 'products-user@e2e.test'
+  const PASSWORD = 'Password1!'
+
+  const PUBLISHED_SLUG = 'e2e-product-published'
+
+  beforeAll(async () => {
+    ;({ app, dataSource } = await createApp())
+
+    productRepo = dataSource.getRepository(Product)
+    productTypeRepo = dataSource.getRepository(ProductType)
+
+    // Pre-cleanup: delete rows left by a previous failed run so seeds never
+    // hit unique-constraint conflicts.  Products first (FK to product_type).
+    for (const slug of [PUBLISHED_SLUG, 'e2e-product-draft', 'e2e-product-delete']) {
+      await productRepo.delete({ slug })
+    }
+    for (const slug of [
+      'e2e-type-main',
+      'e2e-type-conflict',
+      'e2e-type-to-delete',
+    ]) {
+      await productTypeRepo.delete({ slug })
+    }
+    await cleanupUsers(dataSource, [ADMIN_EMAIL, USER_EMAIL])
+
+    await seedUser(dataSource, {
+      email: ADMIN_EMAIL,
+      password: PASSWORD,
+      firstName: 'ProductsAdmin',
+      role: UserRole.ADMIN,
+    })
+    await seedUser(dataSource, {
+      email: USER_EMAIL,
+      password: PASSWORD,
+      firstName: 'ProductsUser',
+    })
+
+    adminToken = await getAuthToken(app, ADMIN_EMAIL, PASSWORD)
+    userToken = await getAuthToken(app, USER_EMAIL, PASSWORD)
+
+    // Seed the product type that product tests depend on.
+    const ptRes = await request(app.getHttpServer())
+      .post('/product-types')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'e2e-type-main',
+        slug: 'e2e-type-main',
+        filterableFields: [
+          { key: 'tempRange', label: 'Temperature Range', type: 'number', unit: '°C' },
+        ],
+      })
+      .expect(201)
+    productTypeId = (ptRes.body as ApiResponse<ProductType>).data.id
+    createdProductTypeIds.push(productTypeId)
+
+    // Seed a published product that multiple read tests share.
+    const pRes = await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'E2E Thermocouple',
+        slug: PUBLISHED_SLUG,
+        productTypeId,
+        shortDescription: 'Thermocouple for e2e tests',
+        specs: { tempRange: 1260 },
+        isPublished: true,
+      })
+      .expect(201)
+    publishedProductId = (pRes.body as ApiResponse<Product>).data.id
+    createdProductIds.push(publishedProductId)
+  })
+
+  afterAll(async () => {
+    // Delete all products first (products reference product types via FK).
+    if (createdProductIds.length) {
+      await productRepo.delete(createdProductIds)
+    }
+    if (createdProductTypeIds.length) {
+      await productTypeRepo.delete(createdProductTypeIds)
+    }
+    await cleanupUsers(dataSource, [ADMIN_EMAIL, USER_EMAIL])
+    await app.close()
+  })
+
+  // ── GET /product-types ────────────────────────────────────────────────────
+
+  it('GET /product-types (public) → 200 with an array', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/product-types')
+      .expect(200)
+    expect(
+      Array.isArray((res.body as ApiResponse<ProductType[]>).data),
+    ).toBe(true)
+  })
+
+  // ── GET /product-types/:id ────────────────────────────────────────────────
+
+  it('GET /product-types/:id (public) → 200 with filterableFields', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/product-types/${productTypeId}`)
+      .expect(200)
+
+    const pt = (res.body as ApiResponse<ProductType>).data
+    expect(pt.id).toBe(productTypeId)
+    expect(pt.filterableFields).toBeDefined()
+  })
+
+  it('GET /product-types/99999 → 404', async () => {
+    await request(app.getHttpServer()).get('/product-types/99999').expect(404)
+  })
+
+  // ── POST /product-types ───────────────────────────────────────────────────
+
+  it('POST /product-types (no token) → 401', async () => {
+    await request(app.getHttpServer())
+      .post('/product-types')
+      .send({ name: 'e2e-no-auth', slug: 'e2e-no-auth' })
+      .expect(401)
+  })
+
+  it('POST /product-types (USER role) → 403', async () => {
+    await request(app.getHttpServer())
+      .post('/product-types')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ name: 'e2e-user-type', slug: 'e2e-user-type' })
+      .expect(403)
+  })
+
+  it('POST /product-types duplicate slug → 409', async () => {
+    // e2e-type-main was already created in beforeAll
+    await request(app.getHttpServer())
+      .post('/product-types')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'different-name', slug: 'e2e-type-main' })
+      .expect(409)
+  })
+
+  // ── PATCH /product-types/:id ──────────────────────────────────────────────
+
+  it('PATCH /product-types/:id (ADMIN) → 200 with updated fields', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/product-types/${productTypeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'e2e-type-main-updated' })
+      .expect(200)
+
+    const pt = (res.body as ApiResponse<ProductType>).data
+    expect(pt.name).toBe('e2e-type-main-updated')
+    expect(pt.slug).toBe('e2e-type-main')
+  })
+
+  // ── DELETE /product-types/:id ─────────────────────────────────────────────
+
+  it('DELETE /product-types/:id with products attached → 409', async () => {
+    // productTypeId has publishedProductId referencing it — must be blocked
+    await request(app.getHttpServer())
+      .delete(`/product-types/${productTypeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(409)
+  })
+
+  it('DELETE /product-types/:id when empty → 200', async () => {
+    // Create a product type with no products so we can delete it cleanly.
+    const ptRes = await request(app.getHttpServer())
+      .post('/product-types')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'e2e-type-to-delete', slug: 'e2e-type-to-delete' })
+      .expect(201)
+
+    const emptyTypeId: number = (ptRes.body as ApiResponse<ProductType>).data.id
+
+    const delRes = await request(app.getHttpServer())
+      .delete(`/product-types/${emptyTypeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    expect(
+      (delRes.body as ApiResponse<{ deleted: boolean; id: number }>).data,
+    ).toEqual({ deleted: true, id: emptyTypeId })
+
+    // Do not push to createdProductTypeIds — it's already deleted.
+  })
+
+  // ── GET /products ─────────────────────────────────────────────────────────
+
+  it('GET /products (public) → 200, only published products', async () => {
+    const res = await request(app.getHttpServer()).get('/products').expect(200)
+    const body = (res.body as ApiResponse<Paginated<Product>>).data
+    expect(Array.isArray(body.data)).toBe(true)
+    expect(body.meta.totalItems).toBeGreaterThanOrEqual(body.data.length)
+    // Every result must be published
+    for (const p of body.data) {
+      expect(p.isPublished).toBe(true)
+    }
+  })
+
+  it('GET /products?productTypeId=X → filters by type', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products?productTypeId=${productTypeId}`)
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<Product>>).data
+    for (const p of body.data) {
+      expect(p.productTypeId).toBe(productTypeId)
+    }
+  })
+
+  it('GET /products?q=keyword → matches on name or shortDescription', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/products?q=Thermocouple')
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<Product>>).data
+    expect(body.data.length).toBeGreaterThanOrEqual(1)
+    expect(body.data.some((p) => p.id === publishedProductId)).toBe(true)
+  })
+
+  it('GET /products?q=nomatch → returns empty results', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/products?q=zzz-nomatch-zzz')
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<Product>>).data
+    expect(body.data.length).toBe(0)
+  })
+
+  // ── GET /products/slug/:slug ──────────────────────────────────────────────
+
+  it('GET /products/slug/:slug → 200 with published product', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/slug/${PUBLISHED_SLUG}`)
+      .expect(200)
+
+    const p = (res.body as ApiResponse<Product>).data
+    expect(p.id).toBe(publishedProductId)
+    expect(p.slug).toBe(PUBLISHED_SLUG)
+  })
+
+  it('GET /products/slug/ghost-slug → 404', async () => {
+    await request(app.getHttpServer())
+      .get('/products/slug/ghost-slug')
+      .expect(404)
+  })
+
+  // ── GET /products/:id ─────────────────────────────────────────────────────
+
+  it('GET /products/:id → 200 with published product', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}`)
+      .expect(200)
+
+    const p = (res.body as ApiResponse<Product>).data
+    expect(p.id).toBe(publishedProductId)
+  })
+
+  it('GET /products/99999 → 404', async () => {
+    await request(app.getHttpServer()).get('/products/99999').expect(404)
+  })
+
+  // ── GET /products/admin ───────────────────────────────────────────────────
+
+  it('GET /products/admin (no token) → 401', async () => {
+    await request(app.getHttpServer()).get('/products/admin').expect(401)
+  })
+
+  it('GET /products/admin (USER role) → 403', async () => {
+    await request(app.getHttpServer())
+      .get('/products/admin')
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(403)
+  })
+
+  it('GET /products/admin (ADMIN) → 200, includes unpublished', async () => {
+    // Create a draft product to confirm it appears in the admin list.
+    const draftRes = await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'E2E Draft Product',
+        slug: 'e2e-product-draft',
+        productTypeId,
+        shortDescription: 'Draft for admin list test',
+      })
+      .expect(201)
+
+    const draftId: number = (draftRes.body as ApiResponse<Product>).data.id
+    createdProductIds.push(draftId)
+
+    const res = await request(app.getHttpServer())
+      .get('/products/admin')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<Product>>).data
+    expect(body.meta.totalItems).toBeGreaterThanOrEqual(body.data.length)
+    // The draft must appear (it would be hidden on the public GET /products route).
+    expect(body.data.some((p) => p.id === draftId)).toBe(true)
+  })
+
+  // ── POST /products ────────────────────────────────────────────────────────
+
+  it('POST /products (no token) → 401', async () => {
+    await request(app.getHttpServer())
+      .post('/products')
+      .send({ name: 'x', slug: 'x', productTypeId, shortDescription: 'x' })
+      .expect(401)
+  })
+
+  it('POST /products (USER role) → 403', async () => {
+    await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ name: 'x', slug: 'x', productTypeId, shortDescription: 'x' })
+      .expect(403)
+  })
+
+  it('POST /products with invalid productTypeId → 400', async () => {
+    await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'x',
+        slug: 'e2e-bad-type',
+        productTypeId: 999999,
+        shortDescription: 'x',
+      })
+      .expect(400)
+  })
+
+  it('POST /products missing required field → 400', async () => {
+    await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'x', slug: 'x' }) // missing productTypeId and shortDescription
+      .expect(400)
+  })
+
+  // ── PATCH /products/:id ───────────────────────────────────────────────────
+
+  it('PATCH /products/:id (ADMIN) → 200 with updated field', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/products/${publishedProductId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'E2E Thermocouple Updated' })
+      .expect(200)
+
+    const p = (res.body as ApiResponse<Product>).data
+    expect(p.name).toBe('E2E Thermocouple Updated')
+    expect(p.slug).toBe(PUBLISHED_SLUG) // slug unchanged
+  })
+
+  it('PATCH /products/:id (no token) → 401', async () => {
+    await request(app.getHttpServer())
+      .patch(`/products/${publishedProductId}`)
+      .send({ name: 'nope' })
+      .expect(401)
+  })
+
+  it('PATCH /products/99999 → 404', async () => {
+    await request(app.getHttpServer())
+      .patch('/products/99999')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'ghost' })
+      .expect(404)
+  })
+
+  // ── POST /products/:id/image ──────────────────────────────────────────────
+
+  it('POST /products/:id/image (ADMIN) → 201, imageUrl set on product', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`/products/${publishedProductId}/image`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'test.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+
+    const p = (res.body as ApiResponse<Product>).data
+    expect(p.imageUrl).toBe(MOCK_IMAGE_URL)
+  })
+
+  it('POST /products/:id/image with oversized file → 400', async () => {
+    const oversized = Buffer.alloc(6 * 1024 * 1024)
+    // Write JPEG magic at the start so file-type accepts it as JPEG
+    oversized[0] = 0xff
+    oversized[1] = 0xd8
+    oversized[2] = 0xff
+    oversized[3] = 0xe0
+
+    await request(app.getHttpServer())
+      .post(`/products/${publishedProductId}/image`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', oversized, {
+        filename: 'huge.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(400)
+  })
+
+  // ── DELETE /products/:id ──────────────────────────────────────────────────
+
+  it('DELETE /products/:id (ADMIN) → soft-delete; 404 on subsequent public GET', async () => {
+    // Create a product specifically for deletion so no other test depends on it.
+    const createRes = await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'E2E Product to Delete',
+        slug: 'e2e-product-delete',
+        productTypeId,
+        shortDescription: 'Will be soft-deleted',
+        isPublished: true,
+      })
+      .expect(201)
+
+    const deleteId: number = (createRes.body as ApiResponse<Product>).data.id
+    createdProductIds.push(deleteId)
+
+    // Soft-delete via API.
+    const delRes = await request(app.getHttpServer())
+      .delete(`/products/${deleteId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    expect(
+      (delRes.body as ApiResponse<{ deleted: boolean; id: number }>).data,
+    ).toEqual({ deleted: true, id: deleteId })
+
+    // The row must still be in DB with deletedAt set.
+    const row: Product | null = await productRepo.findOne({
+      where: { id: deleteId },
+      withDeleted: true,
+    })
+    expect(row).not.toBeNull()
+    expect(row?.deletedAt).toBeDefined()
+
+    // The public route must return 404 — the product is no longer visible.
+    await request(app.getHttpServer())
+      .get(`/products/${deleteId}`)
+      .expect(404)
+  })
+
+  it('DELETE /products/:id (no token) → 401', async () => {
+    await request(app.getHttpServer())
+      .delete(`/products/${publishedProductId}`)
+      .expect(401)
+  })
+})

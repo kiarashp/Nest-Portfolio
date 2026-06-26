@@ -38,6 +38,7 @@ Nothing else needs to change. Never import `CloudinaryProvider` from outside thi
 `UploadsModule` exports `UploadsService` and `StorageProvider`. Current consumers:
 - `UsersModule` — avatar pool management via `AvatarOptionsProvider`, which injects `StorageProvider` directly (no `UploadFile` rows created). `UploadsModule` is also imported so `StorageProvider` is available in the DI context.
 - `PostsModule` — post image upload via `UploadPostImageProvider` (folder: `posts/<postId>/`, with `postId` stored on the `UploadFile` row). Also queries `UploadFile` directly via `FindPostImagesProvider` (`GET /posts/:id/images`) — `UploadFile` is registered in `PostsModule`'s own `TypeOrmModule.forFeature` for this purpose.
+- `ProductsModule` — product image upload via `UploadProductImageProvider`, which injects `StorageProvider` directly (folder: `products`). No `UploadFile` row is created — the Cloudinary URL is stored directly on `Product.imageUrl` (same pattern as `AvatarOptionsProvider`). `ProductsModule` imports `UploadsModule` to gain access to the exported `StorageProvider` token.
 
 To add a consumer that needs full upload tracking (creates `UploadFile` rows): inject `UploadsService`.
 To add a consumer that only needs raw Cloudinary access without DB tracking: inject `StorageProvider` directly.
