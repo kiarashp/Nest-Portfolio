@@ -1,7 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger'
 import { ArrayNotEmpty, IsArray, IsInt, IsPositive } from 'class-validator'
 
 export class PostTagsDto {
-  // IDs of the tags to add or remove from the post
+  @ApiProperty({ type: [Number] })
   @IsArray()
   @ArrayNotEmpty()
   @IsInt({ each: true })

@@ -18,8 +18,10 @@ export class PatchUserProfileDto {
   lastName?: string
 
   @ApiPropertyOptional({
+    type: String,
     description: 'Short plain-text bio (max 500 chars)',
     example: 'I build things for the web.',
+    nullable: true,
   })
   @IsOptional()
   @IsString()

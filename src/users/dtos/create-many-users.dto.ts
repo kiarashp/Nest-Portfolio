@@ -4,11 +4,7 @@ import { Type } from 'class-transformer'
 import { ApiProperty } from '@nestjs/swagger'
 
 export class CreateManyUsersDto {
-  @ApiProperty({
-    type: 'array',
-    required: true,
-    items: { type: 'User' },
-  })
+  @ApiProperty({ type: () => CreateUserDto, isArray: true })
   @IsNotEmpty()
   @IsArray()
   @ValidateNested({ each: true })
