@@ -17,6 +17,10 @@ Guidance specific to this module. See the root `CLAUDE.md` for the high-level su
 
 Avatars bypass `UploadFile` entirely — `AvatarOptionsProvider` injects `StorageProvider` directly and writes to `AvatarOption`, a separate table with no `postId`.
 
+## OpenAPI typing of `UploadFile`
+
+`UploadFile` carries `@ApiProperty` on its scalar fields so the `GET /posts/:id/images` (array) and `POST /posts/:id/images` (single) responses are fully typed in `openapi-types.ts`. The `user` and `post` relations are intentionally **left undecorated** — without the swagger introspection plugin, only `@ApiProperty`-decorated properties enter the schema, so those relations stay out of the response shape (they are not serialized into the images endpoints anyway). See the root `CLAUDE.md` "OpenAPI response typing" section for the overall pattern.
+
 ## Extending `FileType`
 
 `enums/file-type.enum.ts` currently only has `IMAGE = 'image'`. If you add a new type:

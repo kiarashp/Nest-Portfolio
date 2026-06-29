@@ -175,8 +175,9 @@ response field. This makes the generated `openapi-types.ts` expose real response
 `FilterableFieldDto` is also decorated so the frontend gets a typed filter-metadata shape.
 Nullable fields pass an explicit `type` (e.g. `@ApiPropertyOptional({ type: String, nullable: true })`)
 because a `string | null` union otherwise emits `Object` metadata and renders as an empty object.
-This is currently the only fully response-typed module — see the root `CLAUDE.md` Serialization
-section for the rationale and how to extend it.
+The **posts** module is also fully response-typed using these same helpers — see the root
+`CLAUDE.md` Serialization section for the rationale, the `PublicAuthor` embedded-author pattern,
+and how to extend this to other modules.
 
 ## Data-source registration
 

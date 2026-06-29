@@ -36,6 +36,15 @@ import { Roles } from 'src/auth/decorators/roles.decorator'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { AuthType } from 'src/auth/enums/auth-type.enum'
+// entity aliased to PostEntity because the HTTP `Post` decorator owns the `Post` name here
+import { Post as PostEntity } from './entities/post.entity'
+import { UploadFile } from 'src/uploads/entities/upload-file.entity'
+import { DeleteResultDto } from 'src/common/dto/delete-result.dto'
+import {
+  ApiArrayDataResponse,
+  ApiDataResponse,
+  ApiPaginatedResponse,
+} from 'src/common/swagger/api-response.helpers'
 
 @Controller('posts')
 @ApiTags('Posts')
@@ -46,7 +55,7 @@ export class PostsController {
    * create a new post
    */
   @ApiOperation({ summary: 'Create a new post' })
-  @ApiResponse({
+  @ApiDataResponse(PostEntity, {
     status: 201,
     description: 'The post has been successfully created',
   })
@@ -62,6 +71,7 @@ export class PostsController {
   /**
    * get all published posts (public)
    */
+  @ApiPaginatedResponse(PostEntity)
   @Auth(AuthType.None)
   @Get()
   findAll(@Query() getPostsDto: GetPostsDto, @Req() request: Request) {
@@ -71,6 +81,7 @@ export class PostsController {
   /**
    * get a single published post by slug (public)
    */
+  @ApiDataResponse(PostEntity)
   @Auth(AuthType.None)
   @Get('slug/:slug')
   findBySlug(@Param('slug') slug: string) {
@@ -80,6 +91,7 @@ export class PostsController {
   /**
    * get all posts by the authenticated user (all statuses)
    */
+  @ApiPaginatedResponse(PostEntity)
   @Get('my')
   findMyPosts(
     @ActiveUser() activeUser: ActiveUserData,
@@ -92,6 +104,7 @@ export class PostsController {
   /**
    * get a single published post by id (public)
    */
+  @ApiDataResponse(PostEntity)
   @Auth(AuthType.None)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
@@ -102,8 +115,7 @@ export class PostsController {
    * update a post
    */
   @ApiOperation({ summary: 'Update a post' })
-  @ApiResponse({
-    status: 200,
+  @ApiDataResponse(PostEntity, {
     description: 'The post has been successfully updated',
   })
   @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
@@ -120,7 +132,7 @@ export class PostsController {
    * add tags to a post without replacing the existing tag set
    */
   @ApiOperation({ summary: 'Add tags to a post' })
-  @ApiResponse({ status: 200, description: 'Tags added successfully' })
+  @ApiDataResponse(PostEntity, { description: 'Tags added successfully' })
   @ApiResponse({ status: 400, description: 'Invalid tag IDs' })
   @ApiResponse({ status: 403, description: 'Not the post author' })
   @ApiResponse({ status: 404, description: 'Post not found' })
@@ -139,7 +151,7 @@ export class PostsController {
    * remove tags from a post — idempotent if tag is not currently on the post
    */
   @ApiOperation({ summary: 'Remove tags from a post' })
-  @ApiResponse({ status: 200, description: 'Tags removed successfully' })
+  @ApiDataResponse(PostEntity, { description: 'Tags removed successfully' })
   @ApiResponse({ status: 403, description: 'Not the post author' })
   @ApiResponse({ status: 404, description: 'Post not found' })
   @ApiBearerAuth()
@@ -157,7 +169,9 @@ export class PostsController {
    * list all images uploaded for a post — used by the frontend image picker
    */
   @ApiOperation({ summary: 'List all images uploaded for a post' })
-  @ApiResponse({ status: 200, description: 'Array of UploadFile records' })
+  @ApiArrayDataResponse(UploadFile, {
+    description: 'Array of UploadFile records',
+  })
   @ApiResponse({ status: 403, description: 'Not the post author' })
   @ApiResponse({ status: 404, description: 'Post not found' })
   @ApiBearerAuth()
@@ -175,7 +189,10 @@ export class PostsController {
    */
   @ApiOperation({ summary: 'Upload an image for a post' })
   @ApiConsumes('multipart/form-data')
-  @ApiResponse({ status: 201, description: 'Image uploaded successfully' })
+  @ApiDataResponse(UploadFile, {
+    status: 201,
+    description: 'Image uploaded successfully',
+  })
   @ApiResponse({ status: 400, description: 'Invalid file' })
   @ApiResponse({ status: 403, description: 'Not the post author' })
   @ApiResponse({ status: 404, description: 'Post not found' })
@@ -202,6 +219,7 @@ export class PostsController {
   /**
    * delete a post
    */
+  @ApiDataResponse(DeleteResultDto)
   @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
   @Delete(':id')
   remove(

@@ -1,4 +1,5 @@
 import { Post } from 'src/posts/entities/post.entity'
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
   Column,
   CreateDateColumn,
@@ -12,9 +13,11 @@ import {
 @Entity()
 export class Tag {
   // id
+  @ApiProperty({ example: 1 })
   @PrimaryGeneratedColumn()
   id!: number
   // name
+  @ApiProperty({ example: 'TypeScript' })
   @Column({
     type: 'varchar',
     length: 256,
@@ -23,6 +26,7 @@ export class Tag {
   })
   name!: string
   // slug
+  @ApiProperty({ example: 'typescript' })
   @Column({
     type: 'varchar',
     length: 256,
@@ -31,17 +35,20 @@ export class Tag {
   })
   slug!: string
   // description
+  @ApiPropertyOptional({ type: String, nullable: true })
   @Column({
     type: 'text',
     nullable: true,
   })
   description?: string | null
+  @ApiPropertyOptional({ type: String, nullable: true })
   @Column({
     type: 'text',
     nullable: true,
   })
   // schema
   schema?: string | null
+  @ApiPropertyOptional({ type: String, nullable: true })
   @Column({
     type: 'varchar',
     length: 1024,
@@ -49,16 +56,19 @@ export class Tag {
   })
   // featured image
   featuredImage?: string | null
-  // posts
+  // posts — inverse relation, never loaded on a tag response; left undecorated
   @ManyToMany(() => Post, (post) => post.tags, { onDelete: 'CASCADE' })
   posts!: Post[]
   // created at
+  @ApiProperty()
   @CreateDateColumn()
   createdAt!: Date
   // updated at
+  @ApiProperty()
   @UpdateDateColumn()
   updatedAt!: Date
-  // deleted at
+  // deleted at — non-null once the tag is soft-deleted
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   @DeleteDateColumn()
   deletedAt?: Date
 }
