@@ -34,6 +34,18 @@ export class ProductTypesController {
   }
 
   /**
+   * get a single product type by slug — public
+   * Declared before /:id so NestJS does not try to parse "slug" as an integer.
+   */
+  @Auth(AuthType.None)
+  @ApiOperation({ summary: 'Get a product type by slug' })
+  @ApiResponse({ status: 404, description: 'Product type not found' })
+  @Get('slug/:slug')
+  public findBySlug(@Param('slug') slug: string) {
+    return this.productTypesService.findBySlug(slug)
+  }
+
+  /**
    * get a single product type by id — public
    */
   @Auth(AuthType.None)

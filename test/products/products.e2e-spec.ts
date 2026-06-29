@@ -64,7 +64,11 @@ describe('Products (e2e)', () => {
 
     // Pre-cleanup: delete rows left by a previous failed run so seeds never
     // hit unique-constraint conflicts.  Products first (FK to product_type).
-    for (const slug of [PUBLISHED_SLUG, 'e2e-product-draft', 'e2e-product-delete']) {
+    for (const slug of [
+      PUBLISHED_SLUG,
+      'e2e-product-draft',
+      'e2e-product-delete',
+    ]) {
       await productRepo.delete({ slug })
     }
     for (const slug of [
@@ -99,7 +103,18 @@ describe('Products (e2e)', () => {
         name: 'e2e-type-main',
         slug: 'e2e-type-main',
         filterableFields: [
-          { key: 'tempRange', label: 'Temperature Range', type: 'number', unit: '°C' },
+          {
+            key: 'tempRange',
+            label: 'Temperature Range',
+            type: 'number',
+            unit: '°C',
+          },
+          {
+            key: 'sheathMaterial',
+            label: 'Sheath Material',
+            type: 'enum',
+            options: ['Inconel 600', 'Stainless 316'],
+          },
         ],
       })
       .expect(201)
@@ -115,7 +130,7 @@ describe('Products (e2e)', () => {
         slug: PUBLISHED_SLUG,
         productTypeId,
         shortDescription: 'Thermocouple for e2e tests',
-        specs: { tempRange: 1260 },
+        specs: { tempRange: 1260, sheathMaterial: 'Inconel 600' },
         isPublished: true,
       })
       .expect(201)
@@ -141,9 +156,9 @@ describe('Products (e2e)', () => {
     const res = await request(app.getHttpServer())
       .get('/product-types')
       .expect(200)
-    expect(
-      Array.isArray((res.body as ApiResponse<ProductType[]>).data),
-    ).toBe(true)
+    expect(Array.isArray((res.body as ApiResponse<ProductType[]>).data)).toBe(
+      true,
+    )
   })
 
   // ── GET /product-types/:id ────────────────────────────────────────────────
@@ -160,6 +175,25 @@ describe('Products (e2e)', () => {
 
   it('GET /product-types/99999 → 404', async () => {
     await request(app.getHttpServer()).get('/product-types/99999').expect(404)
+  })
+
+  // ── GET /product-types/slug/:slug ─────────────────────────────────────────
+
+  it('GET /product-types/slug/:slug (public) → 200 with filterableFields', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/product-types/slug/e2e-type-main')
+      .expect(200)
+
+    const pt = (res.body as ApiResponse<ProductType>).data
+    expect(pt.id).toBe(productTypeId)
+    expect(pt.slug).toBe('e2e-type-main')
+    expect(pt.filterableFields).toBeDefined()
+  })
+
+  it('GET /product-types/slug/ghost-slug → 404', async () => {
+    await request(app.getHttpServer())
+      .get('/product-types/slug/ghost-slug')
+      .expect(404)
   })
 
   // ── POST /product-types ───────────────────────────────────────────────────
@@ -277,6 +311,95 @@ describe('Products (e2e)', () => {
     expect(body.data.length).toBe(0)
   })
 
+  it('GET /products?typeSlug=X → filters by type slug', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/products?typeSlug=e2e-type-main')
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<Product>>).data
+    expect(body.data.some((p) => p.id === publishedProductId)).toBe(true)
+    for (const p of body.data) {
+      expect(p.productTypeId).toBe(productTypeId)
+    }
+  })
+
+  it('GET /products?specs[enum] (match) → includes the product', async () => {
+    const res = await request(app.getHttpServer())
+      .get(
+        '/products?typeSlug=e2e-type-main&specs[sheathMaterial]=Inconel%20600',
+      )
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<Product>>).data
+    expect(body.data.some((p) => p.id === publishedProductId)).toBe(true)
+  })
+
+  it('GET /products?specs[enum] (no match) → excludes the product', async () => {
+    const res = await request(app.getHttpServer())
+      .get(
+        '/products?typeSlug=e2e-type-main&specs[sheathMaterial]=Stainless%20316',
+      )
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<Product>>).data
+    expect(body.data.some((p) => p.id === publishedProductId)).toBe(false)
+  })
+
+  it('GET /products?specs[number][min/max] (in range) → includes the product', async () => {
+    const res = await request(app.getHttpServer())
+      .get(
+        '/products?typeSlug=e2e-type-main&specs[tempRange][min]=1000&specs[tempRange][max]=1500',
+      )
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<Product>>).data
+    expect(body.data.some((p) => p.id === publishedProductId)).toBe(true)
+  })
+
+  it('GET /products?specs[number][min] (out of range) → excludes the product', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/products?typeSlug=e2e-type-main&specs[tempRange][min]=2000')
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<Product>>).data
+    expect(body.data.some((p) => p.id === publishedProductId)).toBe(false)
+  })
+
+  it('GET /products?specs[unknownKey] → 400', async () => {
+    await request(app.getHttpServer())
+      .get('/products?typeSlug=e2e-type-main&specs[nope]=x')
+      .expect(400)
+  })
+
+  it('GET /products?specs without a type context → 400', async () => {
+    await request(app.getHttpServer())
+      .get('/products?specs[tempRange][min]=1')
+      .expect(400)
+  })
+
+  it('GET /products?specs[number] non-numeric value → 400', async () => {
+    await request(app.getHttpServer())
+      .get('/products?typeSlug=e2e-type-main&specs[tempRange][min]=abc')
+      .expect(400)
+  })
+
+  it('GET /products?sort=name → 200 (sorted, published only)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/products?sort=name')
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<Product>>).data
+    const names = body.data.map((p) => p.name)
+    const sorted = [...names].sort((a, b) => a.localeCompare(b))
+    expect(names).toEqual(sorted)
+  })
+
+  it('GET /products?sort=invalid → 400', async () => {
+    await request(app.getHttpServer())
+      .get('/products?sort=cheapest')
+      .expect(400)
+  })
+
   // ── GET /products/slug/:slug ──────────────────────────────────────────────
 
   it('GET /products/slug/:slug → 200 with published product', async () => {
@@ -388,6 +511,34 @@ describe('Products (e2e)', () => {
       .expect(400)
   })
 
+  it('POST /products with a spec key not in filterableFields → 400', async () => {
+    await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'E2E Bad Spec',
+        slug: 'e2e-product-bad-spec',
+        productTypeId,
+        shortDescription: 'has an undeclared spec key',
+        specs: { undeclaredKey: 'x' },
+      })
+      .expect(400)
+  })
+
+  it('POST /products with an enum spec value not in options → 400', async () => {
+    await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'E2E Bad Enum',
+        slug: 'e2e-product-bad-enum',
+        productTypeId,
+        shortDescription: 'enum value out of range',
+        specs: { sheathMaterial: 'Unobtanium' },
+      })
+      .expect(400)
+  })
+
   // ── PATCH /products/:id ───────────────────────────────────────────────────
 
   it('PATCH /products/:id (ADMIN) → 200 with updated field', async () => {
@@ -489,9 +640,7 @@ describe('Products (e2e)', () => {
     expect(row?.deletedAt).toBeDefined()
 
     // The public route must return 404 — the product is no longer visible.
-    await request(app.getHttpServer())
-      .get(`/products/${deleteId}`)
-      .expect(404)
+    await request(app.getHttpServer()).get(`/products/${deleteId}`).expect(404)
   })
 
   it('DELETE /products/:id (no token) → 401', async () => {

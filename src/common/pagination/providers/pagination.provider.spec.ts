@@ -138,4 +138,61 @@ describe('PaginationProvider', () => {
     )
     expect(mockRepo.count).toHaveBeenCalledWith({ where })
   })
+
+  describe('paginateQueryBuilder', () => {
+    // Minimal stub of a SelectQueryBuilder: skip/take return the builder so the
+    // provider can chain them, getCount/getMany return the data under test.
+    interface QbStub {
+      skip: jest.Mock
+      take: jest.Mock
+      getCount: jest.Mock
+      getMany: jest.Mock
+    }
+    function makeQb(count: number, rows: unknown[]): QbStub {
+      const qb: QbStub = {
+        skip: jest.fn(),
+        take: jest.fn(),
+        getCount: jest.fn().mockResolvedValue(count),
+        getMany: jest.fn().mockResolvedValue(rows),
+      }
+      qb.skip.mockReturnValue(qb)
+      qb.take.mockReturnValue(qb)
+      return qb
+    }
+
+    it('applies skip and take from the page/limit', async () => {
+      const qb = makeQb(0, [])
+      // Page 3, limit 10 → skip = (3-1)*10 = 20, take = 10.
+      await provider.paginateQueryBuilder(
+        { limit: 10, page: 3 },
+        qb as never,
+        mockRequest as unknown as Request,
+      )
+
+      expect(qb.skip).toHaveBeenCalledWith(20)
+      expect(qb.take).toHaveBeenCalledWith(10)
+    })
+
+    it('builds meta and data from getCount and getMany', async () => {
+      const rows = Array.from({ length: 10 }, (_, i) => ({ id: i + 1 }))
+      const qb = makeQb(30, rows)
+
+      const result = await provider.paginateQueryBuilder(
+        { limit: 10, page: 2 },
+        qb as never,
+        mockRequest as unknown as Request,
+      )
+
+      expect(result.meta).toEqual({
+        itemsPerPage: 10,
+        totalItems: 30,
+        currentPage: 2,
+        totalPages: 3,
+        hasNextPage: true,
+        hasPrevPage: true,
+      })
+      expect(result.data).toEqual(rows)
+      expect(result.links.first).toContain('http://localhost:3000')
+    })
+  })
 })

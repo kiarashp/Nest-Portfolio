@@ -1,5 +1,6 @@
 import { INestApplication, Logger, ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { NestExpressApplication } from '@nestjs/platform-express'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
@@ -12,6 +13,12 @@ export async function appCreate(app: INestApplication): Promise<void> {
   const port = configService.get<number>('appConfig.appPort') ?? 3000
   const appUrl =
     configService.get<string>('appConfig.appUrl') ?? 'http://localhost:3000'
+
+  // Express 5 defaults to the 'simple' query parser, which does not nest bracket
+  // params. Switch to 'extended' (qs) so product spec filters like
+  // ?specs[tempRange][min]=100 parse into a nested object. qs still parses the
+  // posts tagIds array params, so this is backward-compatible.
+  ;(app as NestExpressApplication).set('query parser', 'extended')
 
   app.useGlobalPipes(
     new ValidationPipe({

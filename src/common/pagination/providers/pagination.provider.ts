@@ -1,10 +1,19 @@
 import { Injectable } from '@nestjs/common'
 import { PaginationQueryDto } from '../dtos/pagination-query.dto'
-import { FindOptionsWhere, ObjectLiteral, Repository } from 'typeorm'
+import {
+  FindOptionsWhere,
+  ObjectLiteral,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm'
 import type { Request } from 'express'
 import { Paginated } from '../interfaces/paginated.interface'
 @Injectable()
 export class PaginationProvider {
+  /**
+   * Paginates a simple where-based query. Use this when the filter can be
+   * expressed as a TypeORM FindOptionsWhere (or an array of them for OR logic).
+   */
   public async paginateQuery<T extends ObjectLiteral>(
     paginationQuery: PaginationQueryDto,
     repository: Repository<T>,
@@ -20,6 +29,44 @@ export class PaginationProvider {
       skip: (paginationQuery.page - 1) * paginationQuery.limit,
       where,
     })
+
+    return this.buildResponse(results, totalItems, paginationQuery, request)
+  }
+
+  /**
+   * Paginates a pre-built QueryBuilder. Use this when the filter needs SQL that
+   * a FindOptionsWhere can't express — jsonb containment, numeric casts, joins,
+   * custom ordering. The caller configures where/join/orderBy on the builder;
+   * this method only adds skip/take and runs count + fetch. Ordering must be set
+   * on the builder by the caller (skip/take without an ORDER BY is unstable).
+   */
+  public async paginateQueryBuilder<T extends ObjectLiteral>(
+    paginationQuery: PaginationQueryDto,
+    queryBuilder: SelectQueryBuilder<T>,
+    request: Request,
+  ): Promise<Paginated<T>> {
+    // Count first for the same consistency reason as paginateQuery above.
+    const totalItems = await queryBuilder.getCount()
+
+    const results = await queryBuilder
+      .skip((paginationQuery.page - 1) * paginationQuery.limit)
+      .take(paginationQuery.limit)
+      .getMany()
+
+    return this.buildResponse(results, totalItems, paginationQuery, request)
+  }
+
+  /**
+   * Builds the shared paginated response — meta block and absolute first/last/
+   * current/next/prev links — from a page of results and the total count. Both
+   * paginate methods delegate here so link generation stays in one place.
+   */
+  private buildResponse<T extends ObjectLiteral>(
+    results: T[],
+    totalItems: number,
+    paginationQuery: PaginationQueryDto,
+    request: Request,
+  ): Paginated<T> {
     /**
      * Create the request Urls
      */

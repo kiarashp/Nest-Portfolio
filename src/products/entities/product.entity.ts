@@ -46,8 +46,13 @@ export class Product {
   @Column({ type: 'jsonb', nullable: true })
   images?: string[] | null
 
-  // specs — type-specific attribute values; keys match filterableFields[].key on productType
-  @Index({ using: 'gin' })
+  // specs — type-specific attribute values stored as jsonb; keys must match
+  // filterableFields[].key on the product's ProductType. Filtered at query time
+  // via jsonb containment (enum/string) and numeric range casts (number). No
+  // index here: at this catalog's scale a sequential scan is fine. To index spec
+  // filtering in production, add a GIN index via a migration — TypeORM's @Index
+  // decorator cannot express `USING gin`, so it must be raw SQL:
+  //   CREATE INDEX idx_product_specs_gin ON product USING gin (specs)
   @Column({ type: 'jsonb', nullable: true })
   specs?: Record<string, unknown> | null
 

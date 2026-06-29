@@ -1,4 +1,5 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common'
+import { NestExpressApplication } from '@nestjs/platform-express'
 import { Test } from '@nestjs/testing'
 import { ThrottlerStorage } from '@nestjs/throttler'
 import helmet from 'helmet'
@@ -86,6 +87,10 @@ export async function createApp(
 
   const moduleFixture = await builder.compile()
   const app = moduleFixture.createNestApplication<INestApplication<App>>()
+
+  // Mirror the 'extended' query parser from src/app.create.ts so bracket-nested
+  // params (e.g. ?specs[tempRange][min]=100) parse into nested objects in tests.
+  ;(app as NestExpressApplication).set('query parser', 'extended')
 
   // Mirror helmet from src/app.create.ts so security header assertions work in tests.
   app.use(helmet())

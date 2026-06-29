@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -7,10 +8,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm'
 import { QueryFailedError, Repository } from 'typeorm'
 import { Product } from '../entities/product.entity'
+import { ProductType } from '../entities/product-type.entity'
 import { UpdateProductDto } from '../dto/update-product.dto'
 import { FindOneProductProvider } from './find-one-product.provider'
 import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
+import { validateSpecsAgainstType } from './validate-specs.util'
 
 @Injectable()
 export class UpdateProductProvider {
@@ -20,6 +23,9 @@ export class UpdateProductProvider {
     /** inject Product repository for persistence */
     @InjectRepository(Product)
     private readonly productsRepository: Repository<Product>,
+    /** inject ProductType repository to validate specs against filterableFields */
+    @InjectRepository(ProductType)
+    private readonly productTypesRepository: Repository<ProductType>,
     /** inject find-one provider for the 404 guard */
     private readonly findOneProductProvider: FindOneProductProvider,
     /** inject audit log service to record product updates */
@@ -52,6 +58,24 @@ export class UpdateProductProvider {
     if (dto.isPublished !== undefined) product.isPublished = dto.isPublished
     if (dto.productTypeId !== undefined)
       product.productTypeId = dto.productTypeId
+
+    // Re-validate specs whenever the specs or the type changes, so the stored
+    // values stay aligned with the (possibly new) type's filterableFields.
+    if (
+      (dto.specs !== undefined || dto.productTypeId !== undefined) &&
+      product.specs &&
+      Object.keys(product.specs).length > 0
+    ) {
+      const type = await this.productTypesRepository.findOneBy({
+        id: product.productTypeId,
+      })
+      if (!type) {
+        throw new BadRequestException(
+          `Product type with id ${product.productTypeId} does not exist`,
+        )
+      }
+      validateSpecsAgainstType(product.specs, type.filterableFields)
+    }
 
     try {
       const saved = await this.productsRepository.save(product)

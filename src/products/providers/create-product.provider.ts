@@ -8,9 +8,11 @@ import {
 import { InjectRepository } from '@nestjs/typeorm'
 import { QueryFailedError, Repository } from 'typeorm'
 import { Product } from '../entities/product.entity'
+import { ProductType } from '../entities/product-type.entity'
 import { CreateProductDto } from '../dto/create-product.dto'
 import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
+import { validateSpecsAgainstType } from './validate-specs.util'
 
 @Injectable()
 export class CreateProductProvider {
@@ -20,6 +22,9 @@ export class CreateProductProvider {
     /** inject Product repository for persistence */
     @InjectRepository(Product)
     private readonly productsRepository: Repository<Product>,
+    /** inject ProductType repository to validate specs against filterableFields */
+    @InjectRepository(ProductType)
+    private readonly productTypesRepository: Repository<ProductType>,
     /** inject audit log service to record product creation */
     private readonly auditLogService: AuditLogService,
   ) {}
@@ -33,6 +38,22 @@ export class CreateProductProvider {
     dto: CreateProductDto,
     activeUserId: number,
   ): Promise<Product> {
+    // When specs are supplied, load the target type and validate the keys/values
+    // against its filterableFields so the data can be filtered later. This is the
+    // only case that needs a pre-flight SELECT — without specs we let the FK
+    // violation (23503) below report a bad productTypeId on the happy path.
+    if (dto.specs && Object.keys(dto.specs).length > 0) {
+      const type = await this.productTypesRepository.findOneBy({
+        id: dto.productTypeId,
+      })
+      if (!type) {
+        throw new BadRequestException(
+          `Product type with id ${dto.productTypeId} does not exist`,
+        )
+      }
+      validateSpecsAgainstType(dto.specs, type.filterableFields)
+    }
+
     const product = this.productsRepository.create({
       ...dto,
       isPublished: dto.isPublished ?? false,

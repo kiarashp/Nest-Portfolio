@@ -41,6 +41,10 @@ export class ProductTypesService {
     return this.findOneProductTypeProvider.findOneByIdOrFail(id)
   }
 
+  public findBySlug(slug: string): Promise<ProductType> {
+    return this.findOneProductTypeProvider.findOneBySlugOrFail(slug)
+  }
+
   public create(
     dto: CreateProductTypeDto,
     activeUserId: number,
