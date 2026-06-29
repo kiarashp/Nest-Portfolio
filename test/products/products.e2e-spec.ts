@@ -5,6 +5,7 @@ import { DataSource, Repository } from 'typeorm'
 import { UserRole } from '../../src/auth/enums/user-role.enum'
 import { Product } from '../../src/products/entities/product.entity'
 import { ProductType } from '../../src/products/entities/product-type.entity'
+import { UploadFile } from '../../src/uploads/entities/upload-file.entity'
 import { ApiResponse, getAuthToken } from '../helpers/auth.helper'
 import { createApp } from '../helpers/create-app.helper'
 import { cleanupUsers, seedUser } from '../helpers/seed.helper'
@@ -22,10 +23,6 @@ interface Paginated<T> {
   links: Record<string, string>
 }
 
-// URL returned by the default StorageProvider mock in create-app.helper.ts
-const MOCK_IMAGE_URL =
-  'https://res.cloudinary.com/mock/image/upload/v1/avatars/test.jpg'
-
 // Minimal JPEG buffer — starts with the SOI + APP0 JFIF magic bytes that
 // the file-type package needs to detect this as image/jpeg.
 const JPEG_MAGIC = Buffer.from([
@@ -40,6 +37,19 @@ describe('Products (e2e)', () => {
 
   let productRepo: Repository<Product>
   let productTypeRepo: Repository<ProductType>
+  let uploadFileRepo: Repository<UploadFile>
+
+  // Per-call storage mocks: upload returns a unique URL each time so UploadFile
+  // rows never collide on the `path` lookup; delete is a spy we can assert on.
+  let uploadCounter = 0
+  const storageUpload = jest.fn().mockImplementation(() => {
+    uploadCounter += 1
+    return Promise.resolve({
+      url: `https://res.cloudinary.com/mock/image/upload/v1/products/test-${uploadCounter}.jpg`,
+      publicId: `products/test-${uploadCounter}`,
+    })
+  })
+  const storageDelete = jest.fn().mockResolvedValue(undefined)
 
   // IDs captured in beforeAll for shared read tests.
   let productTypeId: number
@@ -57,19 +67,31 @@ describe('Products (e2e)', () => {
   const PUBLISHED_SLUG = 'e2e-product-published'
 
   beforeAll(async () => {
-    ;({ app, dataSource } = await createApp())
+    ;({ app, dataSource } = await createApp({
+      storageMock: { upload: storageUpload, delete: storageDelete },
+    }))
 
     productRepo = dataSource.getRepository(Product)
     productTypeRepo = dataSource.getRepository(ProductType)
+    uploadFileRepo = dataSource.getRepository(UploadFile)
 
     // Pre-cleanup: delete rows left by a previous failed run so seeds never
-    // hit unique-constraint conflicts.  Products first (FK to product_type).
+    // hit unique-constraint conflicts.  Products first (FK to product_type);
+    // and each product's upload_file rows before the product (FK to product).
     for (const slug of [
       PUBLISHED_SLUG,
       'e2e-product-draft',
       'e2e-product-delete',
+      'e2e-product-with-image',
     ]) {
-      await productRepo.delete({ slug })
+      const existing = await productRepo.findOne({
+        where: { slug },
+        withDeleted: true,
+      })
+      if (existing) {
+        await uploadFileRepo.delete({ productId: existing.id })
+        await productRepo.delete({ id: existing.id })
+      }
     }
     for (const slug of [
       'e2e-type-main',
@@ -139,6 +161,12 @@ describe('Products (e2e)', () => {
   })
 
   afterAll(async () => {
+    // Remove any upload_file rows still pointing at these products first —
+    // upload_file.productId is an FK, so the product rows can't be hard-deleted
+    // while images reference them.
+    for (const id of createdProductIds) {
+      await uploadFileRepo.delete({ productId: id })
+    }
     // Delete all products first (products reference product types via FK).
     if (createdProductIds.length) {
       await productRepo.delete(createdProductIds)
@@ -573,11 +601,11 @@ describe('Products (e2e)', () => {
       .expect(404)
   })
 
-  // ── POST /products/:id/image ──────────────────────────────────────────────
+  // ── POST /products/:id/images ─────────────────────────────────────────────
 
-  it('POST /products/:id/image (ADMIN) → 201, imageUrl set on product', async () => {
+  it('POST /products/:id/images (ADMIN) → 201, returns an UploadFile linked to the product', async () => {
     const res = await request(app.getHttpServer())
-      .post(`/products/${publishedProductId}/image`)
+      .post(`/products/${publishedProductId}/images`)
       .set('Authorization', `Bearer ${adminToken}`)
       .attach('file', JPEG_MAGIC, {
         filename: 'test.jpg',
@@ -585,11 +613,24 @@ describe('Products (e2e)', () => {
       })
       .expect(201)
 
-    const p = (res.body as ApiResponse<Product>).data
-    expect(p.imageUrl).toBe(MOCK_IMAGE_URL)
+    const file = (res.body as ApiResponse<UploadFile>).data
+    expect(file.id).toBeDefined()
+    expect(file.productId).toBe(publishedProductId)
+    expect(file.path).toContain('cloudinary')
   })
 
-  it('POST /products/:id/image with oversized file → 400', async () => {
+  it('POST /products/:id/images (USER role) → 403', async () => {
+    await request(app.getHttpServer())
+      .post(`/products/${publishedProductId}/images`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'test.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(403)
+  })
+
+  it('POST /products/:id/images with oversized file → 400', async () => {
     const oversized = Buffer.alloc(6 * 1024 * 1024)
     // Write JPEG magic at the start so file-type accepts it as JPEG
     oversized[0] = 0xff
@@ -598,13 +639,87 @@ describe('Products (e2e)', () => {
     oversized[3] = 0xe0
 
     await request(app.getHttpServer())
-      .post(`/products/${publishedProductId}/image`)
+      .post(`/products/${publishedProductId}/images`)
       .set('Authorization', `Bearer ${adminToken}`)
       .attach('file', oversized, {
         filename: 'huge.jpg',
         contentType: 'image/jpeg',
       })
       .expect(400)
+  })
+
+  // ── GET /products/:id/images ──────────────────────────────────────────────
+
+  it('GET /products/:id/images (ADMIN) → 200, lists the product images', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const files = (res.body as ApiResponse<UploadFile[]>).data
+    expect(Array.isArray(files)).toBe(true)
+    // At least the image uploaded above is present, all linked to this product.
+    expect(files.length).toBeGreaterThanOrEqual(1)
+    for (const f of files) {
+      expect(f.productId).toBe(publishedProductId)
+    }
+  })
+
+  it('GET /products/:id/images (USER role) → 403', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}/images`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(403)
+  })
+
+  // ── DELETE /products/:id/images/:fileId ───────────────────────────────────
+
+  it('DELETE /products/:id/images/:fileId (ADMIN) → 200, removes the file and clears it from imageUrl', async () => {
+    // Upload an image, then point the product's featured imageUrl at it.
+    const upRes = await request(app.getHttpServer())
+      .post(`/products/${publishedProductId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'featured.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file = (upRes.body as ApiResponse<UploadFile>).data
+
+    await request(app.getHttpServer())
+      .patch(`/products/${publishedProductId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ imageUrl: file.path })
+      .expect(200)
+
+    storageDelete.mockClear()
+
+    const delRes = await request(app.getHttpServer())
+      .delete(`/products/${publishedProductId}/images/${file.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    expect(
+      (delRes.body as ApiResponse<{ deleted: boolean; id: number }>).data,
+    ).toEqual({ deleted: true, id: file.id })
+
+    // The Cloudinary asset was deleted and the upload_file row is gone.
+    expect(storageDelete).toHaveBeenCalledWith(file.publicId)
+    const row = await uploadFileRepo.findOneBy({ id: file.id })
+    expect(row).toBeNull()
+
+    // The featured imageUrl was cleared since it pointed at the deleted file.
+    const prodRes = await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}`)
+      .expect(200)
+    expect((prodRes.body as ApiResponse<Product>).data.imageUrl).toBeNull()
+  })
+
+  it('DELETE /products/:id/images/:fileId for a non-existent file → 404', async () => {
+    await request(app.getHttpServer())
+      .delete(`/products/${publishedProductId}/images/999999`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404)
   })
 
   // ── DELETE /products/:id ──────────────────────────────────────────────────
@@ -646,6 +761,47 @@ describe('Products (e2e)', () => {
 
     // The public route must return 404 — the product is no longer visible.
     await request(app.getHttpServer()).get(`/products/${deleteId}`).expect(404)
+  })
+
+  it('DELETE /products/:id purges its uploaded images from Cloudinary + DB', async () => {
+    // Create a product and upload an image tied to it.
+    const createRes = await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'E2E Product with Image',
+        slug: 'e2e-product-with-image',
+        productTypeId,
+        shortDescription: 'Has an image to be cleaned up on delete',
+        isPublished: true,
+      })
+      .expect(201)
+    const deleteId: number = (createRes.body as ApiResponse<Product>).data.id
+    createdProductIds.push(deleteId)
+
+    const upRes = await request(app.getHttpServer())
+      .post(`/products/${deleteId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'doomed.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file = (upRes.body as ApiResponse<UploadFile>).data
+
+    storageDelete.mockClear()
+
+    await request(app.getHttpServer())
+      .delete(`/products/${deleteId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    // The image's Cloudinary asset was deleted and its upload_file row removed.
+    expect(storageDelete).toHaveBeenCalledWith(file.publicId)
+    const remaining = await uploadFileRepo.find({
+      where: { productId: deleteId },
+    })
+    expect(remaining).toHaveLength(0)
   })
 
   it('DELETE /products/:id (no token) → 401', async () => {

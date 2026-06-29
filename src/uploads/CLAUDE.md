@@ -6,16 +6,19 @@ Guidance specific to this module. See the root `CLAUDE.md` for the high-level su
 
 `UploadsService` is a thin facade over two single-purpose providers (same pattern as `UsersService`):
 
-- `UploadFileProvider` — validates buffer magic bytes (not just the MIME header), uploads to the storage backend, persists the `UploadFile` row. Accepts an optional `postId` to link the upload to a post.
+- `UploadFileProvider` — validates buffer magic bytes (not just the MIME header), uploads to the storage backend, persists the `UploadFile` row. Accepts an optional `links` object to tie the row to a post or a product.
 - `DeleteFileProvider` — looks up the `UploadFile` record by URL (`path` column), deletes the asset from Cloudinary, then removes the DB row.
 
-`UploadsService.uploadFile(file, userId, folder, postId?)` and `deleteFile(url)` are the only public surface — consumers never reach into the providers directly.
+`UploadsService.uploadFile(file, userId, folder, links?)` and `deleteFile(url)` are the only public surface — consumers never reach into the providers directly. `links` is `{ postId?: number; productId?: number }` (defaults to `{}`); a row links to either a post or a product (or neither, e.g. avatars), never both. Using one options object instead of two trailing optional `number`s avoids mis-positioning the ids.
 
-## The `postId` field
+## The `postId` / `productId` fields
 
-`UploadFile` has a nullable `postId` foreign key linking to `Post`. Every `UploadFile` row is created through `POST /posts/:id/images` (via `UploadPostImageProvider`), which always passes `postId`, so there are no orphaned rows. `RemovePostProvider` loads the post with its `uploadFiles` relation and calls `uploadsService.deleteFile()` for each before deleting the post row.
+`UploadFile` has nullable `postId` and `productId` foreign keys. Every row created for a parent is tied to it so the asset can be cleaned up later:
 
-Avatars bypass `UploadFile` entirely — `AvatarOptionsProvider` injects `StorageProvider` directly and writes to `AvatarOption`, a separate table with no `postId`.
+- **Posts** — created through `POST /posts/:id/images` (`UploadPostImageProvider` passes `{ postId }`). `RemovePostProvider` loads the post with its `uploadFiles` relation and `deleteFile()`s each before deleting the post row.
+- **Products** — created through `POST /products/:id/images` (`UploadProductImageProvider` passes `{ productId }`). `DeleteProductProvider.softDelete` queries `UploadFile` by `productId` and `deleteFile()`s each before soft-deleting; `DeleteProductImageProvider` (`DELETE /products/:id/images/:fileId`) removes a single one. See `src/products/CLAUDE.md`.
+
+Avatars bypass `UploadFile` entirely — `AvatarOptionsProvider` injects `StorageProvider` directly and writes to `AvatarOption`, a separate table with no `postId`/`productId`.
 
 ## OpenAPI typing of `UploadFile`
 
@@ -42,7 +45,7 @@ Nothing else needs to change. Never import `CloudinaryProvider` from outside thi
 `UploadsModule` exports `UploadsService` and `StorageProvider`. Current consumers:
 - `UsersModule` — avatar pool management via `AvatarOptionsProvider`, which injects `StorageProvider` directly (no `UploadFile` rows created). `UploadsModule` is also imported so `StorageProvider` is available in the DI context.
 - `PostsModule` — post image upload via `UploadPostImageProvider` (folder: `posts/<postId>/`, with `postId` stored on the `UploadFile` row). Also queries `UploadFile` directly via `FindPostImagesProvider` (`GET /posts/:id/images`) — `UploadFile` is registered in `PostsModule`'s own `TypeOrmModule.forFeature` for this purpose.
-- `ProductsModule` — product image upload via `UploadProductImageProvider`, which injects `StorageProvider` directly (folder: `products`). No `UploadFile` row is created — the Cloudinary URL is stored directly on `Product.imageUrl` (same pattern as `AvatarOptionsProvider`). `ProductsModule` imports `UploadsModule` to gain access to the exported `StorageProvider` token.
+- `ProductsModule` — product image upload via `UploadProductImageProvider`, which injects `UploadsService` (folder: `products/<productId>`, with `productId` stored on the `UploadFile` row). It also queries `UploadFile` directly (`FindProductImagesProvider`, `DeleteProductImageProvider`, and image cleanup in `DeleteProductProvider`) — `UploadFile` is registered in `ProductsModule`'s own `TypeOrmModule.forFeature` for this. `ProductsModule` imports `UploadsModule` for the exported `UploadsService` (it no longer uses `StorageProvider` directly).
 
 To add a consumer that needs full upload tracking (creates `UploadFile` rows): inject `UploadsService`.
 To add a consumer that only needs raw Cloudinary access without DB tracking: inject `StorageProvider` directly.

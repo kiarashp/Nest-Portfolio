@@ -11,6 +11,9 @@ import { CreateProductProvider } from './create-product.provider'
 import { UpdateProductProvider } from './update-product.provider'
 import { DeleteProductProvider } from './delete-product.provider'
 import { UploadProductImageProvider } from './upload-product-image.provider'
+import { FindProductImagesProvider } from './find-product-images.provider'
+import { DeleteProductImageProvider } from './delete-product-image.provider'
+import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 
 @Injectable()
 export class ProductsService {
@@ -39,6 +42,14 @@ export class ProductsService {
      * inject upload product image provider
      */
     private readonly uploadProductImageProvider: UploadProductImageProvider,
+    /**
+     * inject find product images provider
+     */
+    private readonly findProductImagesProvider: FindProductImagesProvider,
+    /**
+     * inject delete product image provider
+     */
+    private readonly deleteProductImageProvider: DeleteProductImageProvider,
   ) {}
 
   public findAll(
@@ -86,7 +97,23 @@ export class ProductsService {
     file: Express.Multer.File,
     productId: number,
     activeUserId: number,
-  ): Promise<Product> {
+  ): Promise<UploadFile> {
     return this.uploadProductImageProvider.upload(file, productId, activeUserId)
+  }
+
+  public findImages(productId: number): Promise<UploadFile[]> {
+    return this.findProductImagesProvider.findProductImages(productId)
+  }
+
+  public deleteImage(
+    productId: number,
+    fileId: number,
+    activeUserId: number,
+  ): Promise<{ deleted: boolean; id: number }> {
+    return this.deleteProductImageProvider.deleteImage(
+      productId,
+      fileId,
+      activeUserId,
+    )
   }
 }

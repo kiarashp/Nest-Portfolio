@@ -26,11 +26,13 @@ import {
 } from '@nestjs/swagger'
 import { ProductsService } from './providers/products.service'
 import { Product } from './entities/product.entity'
+import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { CreateProductDto } from './dto/create-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
 import { GetProductsDto } from './dto/get-products.dto'
 import { DeleteResultDto } from 'src/common/dto/delete-result.dto'
 import {
+  ApiArrayDataResponse,
   ApiDataResponse,
   ApiPaginatedResponse,
 } from 'src/common/swagger/api-response.helpers'
@@ -131,17 +133,19 @@ export class ProductsController {
   }
 
   /**
-   * upload the main product image — sets imageUrl on the product record
+   * upload an image for a product (admin only) — stores an UploadFile row linked
+   * to the product and returns it. The frontend then sets imageUrl (featured) or
+   * adds the URL to images (gallery) via PATCH /products/:id.
    */
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Upload main product image (admin only)' })
+  @ApiOperation({ summary: 'Upload a product image (admin only)' })
   @ApiConsumes('multipart/form-data')
-  @ApiDataResponse(Product, {
+  @ApiDataResponse(UploadFile, {
     status: 201,
-    description: 'Image uploaded; product returned with updated imageUrl',
+    description: 'Image uploaded; UploadFile record returned',
   })
   @ApiResponse({ status: 400, description: 'Invalid file type or size' })
-  @Post(':id/image')
+  @Post(':id/images')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   public uploadImage(
     @UploadedFile(
@@ -157,6 +161,40 @@ export class ProductsController {
     @ActiveUser('sub') adminId: number,
   ) {
     return this.productsService.uploadImage(file, productId, adminId)
+  }
+
+  /**
+   * list all images uploaded for a product (admin only) — used by the frontend
+   * image picker to choose the featured image and build the gallery
+   */
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'List all images uploaded for a product (admin only)',
+  })
+  @ApiArrayDataResponse(UploadFile, {
+    description: 'Array of UploadFile records',
+  })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  @Get(':id/images')
+  public findImages(@Param('id', ParseIntPipe) productId: number) {
+    return this.productsService.findImages(productId)
+  }
+
+  /**
+   * delete a single uploaded image from a product (admin only) — removes it from
+   * Cloudinary + DB and clears it from imageUrl/images if referenced
+   */
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Delete a product image (admin only)' })
+  @ApiDataResponse(DeleteResultDto)
+  @ApiResponse({ status: 404, description: 'Product or image not found' })
+  @Delete(':id/images/:fileId')
+  public removeImage(
+    @Param('id', ParseIntPipe) productId: number,
+    @Param('fileId', ParseIntPipe) fileId: number,
+    @ActiveUser('sub') adminId: number,
+  ) {
+    return this.productsService.deleteImage(productId, fileId, adminId)
   }
 
   /**

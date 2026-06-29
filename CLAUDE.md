@@ -119,6 +119,7 @@ Entity relations:
 - `Post` 1—1 `MetaOption` (cascade + eager)
 - `Post` N—N `Tag` (eager, owning side with `@JoinTable`)
 - `Post` 1—N `UploadFile` (non-eager — only loaded explicitly, e.g. on post deletion for cleanup). `Post` also has a `@CreateDateColumn() createdAt: Date` used by the `startDate`/`endDate` filters on `GET /posts`.
+- `Product` 1—N `UploadFile` (non-eager, via nullable `UploadFile.productId` — mirrors `postId`; loaded explicitly for the image picker, single-image delete, and cleanup on product soft-delete)
 - `User` 1—N `UploadFile` (non-nullable — every upload is tied to the uploading user)
 - `AvatarOption` — standalone entity (`src/users/entities/avatar-option.entity.ts`), no FK to `User`. Columns: `id`, `url`, `publicId`, `createdAt`. Admins populate the pool via `POST /users/avatar-options`; users pick one with `PATCH /users/avatar`.
 - `ContactSubmission` — standalone entity (`src/contact/entities/contact-submission.entity.ts`), no FK to any other table. Columns: `id`, `name`, `email`, `subject`, `message`, `createdAt`. Every submission is persisted permanently so the owner can review them even if an email notification is missed.
@@ -265,7 +266,7 @@ Because the e2e suites share one database and run in parallel, **a pagination te
 
 ### Uploads
 
-See `src/uploads/CLAUDE.md` for module internals, the `UploadFile` entity, and the `StorageProvider` swap pattern. Key cross-module facts: `UploadsModule` exports `StorageProvider` so `UsersModule` and `ProductsModule` can inject it directly (avatar options and product images) without going through `UploadsService`. Every `UploadFile` row carries a `postId` — cascade-deleted when the post is removed, so there are no orphaned uploads.
+See `src/uploads/CLAUDE.md` for module internals, the `UploadFile` entity, and the `StorageProvider` swap pattern. Key cross-module facts: `UploadsModule` exports both `UploadsService` and `StorageProvider`. `UsersModule` injects `StorageProvider` directly for avatar options (no `UploadFile` row). `PostsModule` and `ProductsModule` go through `UploadsService` so each image becomes a tracked `UploadFile` row — posts pass `{ postId }`, products pass `{ productId }` — and clean them up on deletion (posts on hard-delete, products on soft-delete). Avatars are the only consumer that stores a bare URL with no `UploadFile` row.
 
 ### Audit logging
 

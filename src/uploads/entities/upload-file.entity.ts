@@ -10,6 +10,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { User } from 'src/users/entities/user.entity'
 import { Post } from 'src/posts/entities/post.entity'
+import { Product } from 'src/products/entities/product.entity'
 import { FileType } from '../enums/file-type.enum'
 
 @Entity()
@@ -62,6 +63,15 @@ export class UploadFile {
   @ManyToOne(() => Post, (post) => post.uploadFiles, { nullable: true })
   @JoinColumn({ name: 'postId' })
   post?: Post
+  // product id — null for uploads not tied to a product. A row links to either a
+  // post or a product (or neither, e.g. avatars), never both.
+  @ApiPropertyOptional({ example: 7, nullable: true })
+  @Column({ type: 'int', nullable: true })
+  productId?: number
+  // product — relation, not serialized into the images response; left undecorated
+  @ManyToOne(() => Product, { nullable: true })
+  @JoinColumn({ name: 'productId' })
+  product?: Product
   // created at
   @ApiProperty()
   @CreateDateColumn()

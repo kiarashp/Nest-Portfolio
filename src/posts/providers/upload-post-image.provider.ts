@@ -48,7 +48,7 @@ export class UploadPostImageProvider {
       file,
       activeUser.sub,
       `posts/${postId}`,
-      postId,
+      { postId },
     )
     this.logger.log(
       `Image uploaded for post — postId=${postId}, fileId=${result.id}, uploaderId=${activeUser.sub}`,

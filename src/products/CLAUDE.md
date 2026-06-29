@@ -29,7 +29,9 @@ src/products/
     create-product.provider.ts
     update-product.provider.ts
     delete-product.provider.ts
-    upload-product-image.provider.ts
+    upload-product-image.provider.ts   — uploads via UploadsService, returns UploadFile
+    find-product-images.provider.ts    — lists a product's UploadFile rows (admin picker)
+    delete-product-image.provider.ts   — deletes one image + clears imageUrl/images
     validate-specs.util.ts      — shared spec validation helpers (no DI)
     products.service.ts         — thin facade over product providers
   product-types.controller.ts
@@ -72,7 +74,7 @@ In `ProductsController`, three routes must be declared **before** `GET /:id`:
 
 1. `GET /slug/:slug` — if declared after `/:id`, NestJS tries to pass the literal `"slug"` through `ParseIntPipe` and throws 400.
 2. `GET /admin` — same reason: `"admin"` fails `ParseIntPipe`.
-3. `POST /:id/image` — `ParseIntPipe` is on the `:id` segment, not the `image` segment, so this one is fine in any order relative to `/:id`. But the `POST /` (create) must come before `GET /:id` is not an issue since they use different HTTP methods.
+3. `POST /:id/images`, `GET /:id/images`, `DELETE /:id/images/:fileId` — `ParseIntPipe` is on the `:id`/`:fileId` segments, so these are fine in any order relative to `/:id` (longer path and/or different HTTP method).
 
 ## FindOneProductProvider — four methods
 
@@ -99,9 +101,18 @@ This allows a client to send `null` to explicitly clear a nullable field (e.g. r
 
 ## Image upload pattern
 
-`UploadProductImageProvider` injects `StorageProvider` directly — it does **not** go through `UploadsService` and does **not** create an `UploadFile` row. The Cloudinary URL is stored on `product.imageUrl`. This is the same pattern used by `AvatarOptionsProvider` in `UsersModule`.
+Product images are tracked as `UploadFile` rows (the same model posts use), **not** bare URLs. This is
+what lets Cloudinary assets be cleaned up when a product is deleted.
 
-`ProductsModule` imports `UploadsModule` to get access to the exported `StorageProvider` DI token. Without this import, the `StorageProvider` token is unknown and NestJS throws a dependency resolution error at startup.
+- `UploadProductImageProvider` goes through `UploadsService.uploadFile(file, adminId, ` products/${id} `, { productId })`, which creates an `UploadFile` row carrying `productId` + `publicId`. It returns the `UploadFile` — it does **not** set `imageUrl`/`images`.
+- The flow is **decoupled** (like post images): the frontend uploads via `POST /products/:id/images`, gets back the URL, then sets `imageUrl` (featured) and/or `images` (gallery) via `PATCH /products/:id`. `UploadFile` = tracking/cleanup; the product's `imageUrl`/`images` columns = presentation pointers.
+- `FindProductImagesProvider` (`GET /products/:id/images`) lists a product's uploaded files for the admin picker. Product image management is ADMIN-only, so there is no per-user ownership check.
+- `DeleteProductImageProvider` (`DELETE /products/:id/images/:fileId`) deletes one file from Cloudinary + DB and clears it from `imageUrl`/`images` if referenced. The `:fileId` must belong to the route's product, else 404.
+- `DeleteProductProvider.softDelete` loads every `UploadFile` for the product and `uploadsService.deleteFile()`s each **before** soft-deleting the row. There is no restore endpoint, so purging the assets on soft-delete is safe.
+
+`Product` images are linked via `UploadFile.productId` (a nullable FK mirroring `postId`). `ProductsModule` registers `UploadFile` in its own `TypeOrmModule.forFeature` so the providers can inject that repository, and imports `UploadsModule` for the exported `UploadsService`. A `Product` cannot be hard-deleted while `upload_file` rows still reference it (FK with no cascade) — soft-delete purges them first; tests must delete the rows before hard-deleting products.
+
+`imageUrl`/`images` remain plain URL fields on the create/update DTOs. Cleanup iterates `UploadFile` rows by `productId`, so it is correct regardless of what those fields point at; an arbitrary external URL with no `UploadFile` row simply won't be cleaned (only uploaded assets are tracked).
 
 ## Error mapping in write providers
 
