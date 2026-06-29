@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Nested guidance: `src/auth/CLAUDE.md` (RBAC, guards), `src/mail/CLAUDE.md`, `src/audit-log/CLAUDE.md`, `src/uploads/CLAUDE.md`, `src/products/CLAUDE.md`, `test/CLAUDE.md`.
+
 ## Commands
 
 Package manager is **pnpm** (see `pnpm-workspace.yaml` / `.npmrc`).
@@ -165,149 +167,31 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 
 **`RefreshTokenDto` optional field pattern:** `refreshToken` in `RefreshTokenDto` is `@IsOptional()` so the global `ValidationPipe` does not reject browser requests that send no body. The controller enforces presence — if neither cookie nor body provides a token it throws `UnauthorizedException`. Downstream (`AuthService.refreshTokens`, `RefreshTokensProvider.refreshTokens`) take `{ refreshToken: string }` (not the DTO) because by that point the controller has already resolved and guaranteed the string.
 
-### App routes
+### Routes
 
-| Route | Auth | Notes |
-|---|---|---|
-| `GET /health` | None (public) | Terminus health check — pings the TypeORM connection via `TypeOrmHealthIndicator`. Returns 200 `{ status: 'ok', info: { database: { status: 'up' } }, ... }` wrapped in the data envelope when the DB is reachable; returns 503 when it is not. Used by Coolify container health polling. Implemented in `AppController.check()` using `HealthCheckService` from `@nestjs/terminus`; `TerminusModule` is imported in `AppModule`. |
+Exact routes, auth levels, and request/response shapes live in the controllers — read the relevant `*.controller.ts` rather than duplicating them here. The non-obvious rules below aren't visible from a controller alone. RBAC details are in `src/auth/CLAUDE.md`.
 
-### Auth routes
+**Route-ordering gotchas** (literal segment must be declared before `/:id` so `ParseIntPipe` doesn't swallow it):
+- `users`: `/me`, `/avatar-options`, `PATCH /me` before `/:id`
+- `tags`: `DELETE /tags/soft/:id` before `DELETE /tags/:id`
+- `posts`: `/my` before `/:id`
+- `products`: `/slug/:slug` and `/admin` before `/:id`
 
-| Route | Auth | Notes |
-|---|---|---|
-| `POST /auth/sign-in` | None (public) | Returns `{ accessToken, refreshToken }` + sets HttpOnly refresh cookie. Throttled 5 / 60s. |
-| `POST /auth/refresh-tokens` | None (public) | Accepts refresh token from cookie (browser) or body (mobile). Rotates both tokens. Throttled 10 / 60s. |
-| `POST /auth/sign-out` | None (public) | Clears the HttpOnly refresh cookie. |
-| `GET /auth/verify-email` | None (public) | Verifies email address via token from verification email. |
-| `POST /auth/resend-verification` | None (public) | Re-sends the verification email. Throttled 3 / 300s. |
-| `POST /auth/forgot-password` | None (public) | Sends a password reset email. Always returns the same message to prevent enumeration. Throttled 3 / 300s. |
-| `POST /auth/reset-password` | None (public) | Sets a new password using the token from the reset email. Throttled 5 / 60s. |
-| `POST /auth/change-password` | Bearer (any role) | Changes the password for the logged-in user after verifying the current one. Rejects Google-only accounts. Throttled 5 / 60s. |
-| `POST /auth/google` | None (public) | Google OAuth sign-in — accepts a Google ID token, creates or finds the local user, issues tokens. |
+**Tags conflict handling:** `UpdateTagProvider` catches PostgreSQL error 23505 (unique constraint) as `ConflictException`; all other save errors surface as `RequestTimeoutException`.
 
-### Contact routes
+**MetaOptions creation:** always created via `POST /posts` nested body — there is intentionally no `POST /meta-options` endpoint because it could only produce orphaned rows. Write routes restrict EDITOR and AUTHOR to their own posts' meta-options; only ADMIN bypasses. Logic: load with `{ post: { author: true } }`, then `if activeUser.role !== ADMIN && post.author.id !== activeUser.sub → ForbiddenException`.
 
-| Route | Auth | Notes |
-|---|---|---|
-| `POST /contact` | None (public) | Saves submission to DB, emails owner notification. Throttled 3 / 300s. All fields required; `name`, `subject`, `message` are trimmed before `@IsNotEmpty` so whitespace-only strings are rejected. |
+**MetaOptions directory note:** new providers live in `src/meta-options/providers/` (correct spelling). The legacy service lives in the misspelled `src/meta-options/provieders/` — known but harmless.
 
-### Users routes
+**Draft visibility (Posts):** public routes (`GET /posts`, `/:id`, `/slug/:slug`) hardcode `status = PUBLISHED` at the DB level inside `FindAllPostsProvider` / `FindOnePostProvider.findOnePublishedByIdOrFail` — drafts return 404 not 403, callers cannot override. `GET /posts/my` bypasses this (Bearer-gated, any role). Write routes use `findOneByIdOrFail` (any status).
 
-| Route | Auth | Notes |
-|---|---|---|
-| `POST /users` | None (public) | Registration — triggers email verification flow |
-| `GET /users` | ADMIN | Paginated list. Accepts `?limit` and `?page` via `PaginationQueryDto` (defaults: limit=10, page=1). Delegates to `FindAllUsersProvider` → `PaginationProvider`. Returns `Paginated<User>` — access the array as `res.data.data`. |
-| `GET /users/me` | Bearer (any role) | Returns the caller's own profile |
-| `GET /users/avatar-options` | None (public) | Lists all `AvatarOption` rows — frontend uses this to render the avatar picker |
-| `GET /users/:id/profile` | None (public) | Public author profile — 404 for USER-role accounts |
-| `GET /users/:id` | ADMIN | Lookup any user by ID — **not** accessible to regular users; use `/me` for self |
-| `PATCH /users/me` | Bearer (any role) | Updates the caller's own `firstName`, `lastName`, `bio` (`PatchUserProfileDto`) |
-| `PATCH /users/avatar` | Bearer (any role) | Selects a predefined avatar — JSON body `{ avatarOptionId: number }`, sets `user.avatarUrl` to the option's Cloudinary URL |
-| `PATCH /users/:id/role` | ADMIN | Elevate or downgrade a user's role |
-| `PATCH /users/:id` | ADMIN | Full update — can change `firstName`, `lastName`, `email` (uniqueness checked), `password` (hashed) |
-| `POST /users/avatar-options` | ADMIN | Upload a new avatar image (multipart, 5MB, jpeg/png/webp) → saves to Cloudinary + DB |
-| `DELETE /users/avatar-options/:id` | ADMIN | Remove an avatar option — deletes from Cloudinary and the DB row |
-| `DELETE /users/:id` | ADMIN | Remove a user |
+**Draft visibility (Products):** public routes hardcode `isPublished = true` in `FindAllProductsProvider` / `FindOneProductProvider`. `GET /products/admin` bypasses it (ADMIN only).
 
-`GET /users/me`, `GET /users/avatar-options`, and `PATCH /users/me` must each be declared before their `/:id` counterparts in the controller so NestJS routes the literal segment before trying to parse it as an integer ID via `ParseIntPipe`.
+**`GetPostsDto` query params** (shared by `GET /posts` and `/posts/my`): `limit`/`page`; `startDate`/`endDate` (Between/MoreThanOrEqual/LessThanOrEqual on `Post.createdAt`, `GET /posts` only); `status` (`/posts/my` only); `tagIds[]` (OR logic, `GET /posts` only — Transform converts string scalar to `number[]`); `authorId`; `q` (1–100 chars, case-insensitive ILIKE on title+content, composes as `(title OR content) AND (tag1 OR tag2)`).
 
-### Tags routes
+**`GetProductsDto` query params:** `limit`/`page`; `productTypeId` (`@Type(() => Number)` converts query string); `q` (1–100 chars, ILIKE on name+shortDescription, composes as `(name OR shortDescription) AND productTypeId`).
 
-| Route | Auth | Notes |
-|---|---|---|
-| `GET /tags` | None (public) | Returns all tags as a flat array (no pagination). Capped at 200 rows. |
-| `POST /tags` | AUTHOR / ADMIN | Create a tag — `name` and `slug` required, both unique. |
-| `PATCH /tags/:id` | AUTHOR / ADMIN | Partial update — any subset of `name`, `slug`, `description`, `schema`, `featuredImage`. Returns 404 if not found, 409 if `name` or `slug` collides with an existing tag. |
-| `DELETE /tags/soft/:id` | AUTHOR / ADMIN | Soft delete — sets `deletedAt`, row stays in DB. |
-| `DELETE /tags/:id` | AUTHOR / ADMIN | Hard delete — row is permanently removed. |
-
-`DELETE /tags/soft/:id` must be declared before `DELETE /tags/:id` in the controller so NestJS matches the literal `soft` segment before attempting `ParseIntPipe` on it.
-
-**Conflict handling in `UpdateTagProvider`:** unique constraint violations (`PostgreSQL error 23505`) are caught explicitly as `ConflictException`. All other save errors are surfaced as `RequestTimeoutException`.
-
-### Meta-options routes
-
-| Route | Auth | Notes |
-|---|---|---|
-| `GET /meta-options/:id` | EDITOR / AUTHOR / ADMIN | Returns a MetaOption by ID (includes linked `post` and `author`). No ownership check — any authenticated EDITOR/AUTHOR/ADMIN may read. 404 if not found. |
-| `PATCH /meta-options/:id` | EDITOR / AUTHOR / ADMIN | Updates `metaValue`. Only the linked post's author or ADMIN may write — all others receive 403. 404 if not found. |
-| `DELETE /meta-options/:id` | EDITOR / AUTHOR / ADMIN | Deletes the MetaOption row without deleting its post. Same 403/404 rules as PATCH. |
-
-**Creation:** MetaOptions are always created through `POST /posts` via a nested `metaOptions: { metaValue }` in the body — TypeORM cascade handles the insert. There is intentionally no `POST /meta-options` endpoint: it was removed because it could only produce orphaned rows (the MetaOption owns the FK, so there is no API to assign an existing MetaOption to a Post after the fact).
-
-**Ownership model:** Unlike post write routes where AUTHOR can act on any post, MetaOption write routes restrict both EDITOR and AUTHOR to their own posts' meta-options. Only ADMIN bypasses this. Logic lives in `UpdateMetaOptionProvider` and `DeleteMetaOptionProvider`: load with `{ post: { author: true } }`, then `if activeUser.role !== ADMIN && post.author.id !== activeUser.sub → ForbiddenException`.
-
-**Directory note:** new providers live in `src/meta-options/providers/` (correct spelling). The legacy service lives in the misspelled `src/meta-options/provieders/` directory — this inconsistency is known but harmless.
-
-### Posts routes
-
-| Route | Auth | Notes |
-|---|---|---|
-| `GET /posts` | None (public) | Paginated list of published posts only. Accepts `?limit`, `?page`, `?tagIds[]=<id>` (repeat for OR logic), `?authorId=<id>`, `?q=<keyword>` (case-insensitive partial match on title or content). |
-| `GET /posts/my` | Bearer (any role) | Paginated list of the caller's own posts — all statuses (draft, review, scheduled, published). Optional `?status=draft\|review\|scheduled\|published` to filter to one. Declared before `/:id` to avoid `ParseIntPipe` collision. |
-| `GET /posts/slug/:slug` | None (public) | Single published post by slug. 404 if draft. |
-| `GET /posts/:id` | None (public) | Single published post by DB ID. 404 if draft. |
-| `POST /posts` | EDITOR / AUTHOR / ADMIN | Create a post. `title`, `slug`, and `status` are optional — omit them to get defaults (`"Untitled"`, `"draft-<uuid>"`, `"draft"`). Only `postType` is required. Intended for draft-first CMS flows: create the draft immediately on form open, then upload images and auto-save content before publishing. |
-| `PATCH /posts/:id` | EDITOR / AUTHOR / ADMIN | Update a post. EDITORs restricted to own posts. |
-| `POST /posts/:id/tags` | EDITOR / AUTHOR / ADMIN | Add tags to a post without replacing existing ones — body `{ tagIds: number[] }`. Tags already on the post are skipped. EDITORs restricted to own posts. |
-| `DELETE /posts/:id/tags` | EDITOR / AUTHOR / ADMIN | Remove tags from a post — body `{ tagIds: number[] }`. Tags not on the post are simply skipped. EDITORs restricted to own posts. |
-| `GET /posts/:id/images` | EDITOR / AUTHOR / ADMIN | List all `UploadFile` records uploaded for a post. EDITORs restricted to own posts. Returns the full `UploadFile` array including `path` (Cloudinary URL) — frontend uses this to populate an image picker and set `featuredImage` via `PATCH /posts/:id`. |
-| `POST /posts/:id/images` | EDITOR / AUTHOR / ADMIN | Upload an image for a post. EDITORs restricted to own posts. |
-| `DELETE /posts/:id` | EDITOR / AUTHOR / ADMIN | Delete a post. EDITORs restricted to own posts. |
-
-**Draft visibility rules:**
-
-Public routes (`GET /posts`, `GET /posts/:id`, `GET /posts/slug/:slug`) enforce `status = PUBLISHED` at the DB level — drafts are invisible and return 404, not 403. The filter is hardcoded inside `FindAllPostsProvider` and `FindOnePostProvider.findOnePublishedByIdOrFail`; callers cannot override it.
-
-`GET /posts/my` bypasses the published-only filter intentionally so CMS users can see their unpublished work. It is gated behind Bearer auth — unauthenticated callers get 401.
-
-Authenticated write routes (`PATCH`, `DELETE`, `POST /images`) use `FindOnePostProvider.findOneByIdOrFail` internally, which returns any status — authors need to edit drafts.
-
-**`GetPostsDto` query params** (shared by `GET /posts` and `GET /posts/my`):
-- `limit` / `page` — pagination (via `PaginationQueryDto`)
-- `startDate` / `endDate` — optional date range filter on `Post.createdAt`. Query strings are converted to `Date` objects by `@Transform` before `@IsDate` validates them. `FindAllPostsProvider` applies `Between`, `MoreThanOrEqual`, or `LessThanOrEqual` depending on which values are present; open-ended ranges (one side only) are supported. Used only by `GET /posts`; ignored by `GET /posts/my`.
-- `status` — used only by `GET /posts/my`; ignored by `FindAllPostsProvider` (which hardcodes PUBLISHED)
-- `tagIds` — array of tag IDs, OR logic (`?tagIds=1&tagIds=2` returns posts with tag 1 OR tag 2). Used only by `GET /posts`; ignored by `GET /posts/my`. Transform converts string scalars to `number[]` before validation.
-- `authorId` — filter by author user ID. Used only by `GET /posts`.
-- `q` — keyword search (1–100 chars). Case-insensitive `ILIKE '%q%'` applied to both `title` and `content` as OR branches. Composes with all other filters: `FindAllPostsProvider` builds a cross-product of search branches × tag branches so `(title OR content) AND (tag1 OR tag2)` semantics are preserved. Draft posts are still excluded. Used only by `GET /posts`; ignored by `GET /posts/my`.
-
-### Audit log routes
-
-| Route | Auth | Notes |
-|---|---|---|
-| `GET /audit-logs` | ADMIN | Paginated list of audit records. Accepts `?limit`, `?page`, `?entity=<name>` (exact match, e.g. `Post`), `?action=<action>` (exact match, e.g. `CREATE`). Returns `Paginated<AuditLog>`. |
-
-### Product Types routes
-
-| Route | Auth | Notes |
-|---|---|---|
-| `GET /product-types` | None (public) | Returns all product types ordered by name (no pagination). Used by the frontend type picker and filter UI. |
-| `GET /product-types/:id` | None (public) | Single product type by ID. Includes `filterableFields` array. 404 if not found. |
-| `POST /product-types` | ADMIN | Create a product type — `name` and `slug` required (both unique), `filterableFields` optional (jsonb array). 409 on name/slug collision. |
-| `PATCH /product-types/:id` | ADMIN | Partial update — any subset of `name`, `slug`, `filterableFields`. 404 if not found, 409 on collision. |
-| `DELETE /product-types/:id` | ADMIN | Hard delete. 409 if any products still reference this type — caller must delete or reassign products first. |
-
-### Products routes
-
-| Route | Auth | Notes |
-|---|---|---|
-| `GET /products` | None (public) | Paginated list of **published** products only. Accepts `?limit`, `?page`, `?productTypeId=<id>`, `?q=<keyword>` (case-insensitive partial match on name or shortDescription). |
-| `GET /products/slug/:slug` | None (public) | Single **published** product by slug. 404 if draft or not found. Declared before `/:id` to prevent `ParseIntPipe` collision. |
-| `GET /products/admin` | ADMIN | Paginated list of **all** products including drafts and soft-deleted-excluded (soft-deleted rows are still excluded — TypeORM respects `@DeleteDateColumn`). Accepts same query params as `GET /products`. Declared before `/:id`. |
-| `GET /products/:id` | None (public) | Single **published** product by DB ID. 404 if draft or not found. |
-| `POST /products` | ADMIN | Create a product. Only `productTypeId` and `shortDescription` are required. `isPublished` defaults false — draft-first flow. 409 on duplicate slug/SKU, 400 on invalid `productTypeId` (FK violation caught and mapped). |
-| `PATCH /products/:id` | ADMIN | Partial update. Uses `!== undefined` (not `??`) to allow explicit `null` to clear nullable fields (`imageUrl`, `specs`, etc.). 404 if not found, 409 on slug/SKU collision. |
-| `POST /products/:id/image` | ADMIN | Upload the product's main image (`multipart/form-data`, field `file`, max 5 MB, jpeg/png/webp). Sets `product.imageUrl` to the Cloudinary URL. No `UploadFile` row is created — `StorageProvider` is injected directly (same pattern as `AvatarOptionsProvider`). Returns the updated product. |
-| `DELETE /products/:id` | ADMIN | Soft-delete — sets `deletedAt`, row stays in DB. Product disappears from all public routes. Returns `{ deleted: true, id }`. |
-
-**Draft visibility rules (Products):**
-
-Public routes (`GET /products`, `GET /products/:id`, `GET /products/slug/:slug`) enforce `isPublished = true` at the DB level via `FindAllProductsProvider` and `FindOneProductProvider.findOnePublishedByIdOrFail` / `findOneBySlugOrFail`. Drafts are invisible and return 404, not 403. `GET /products/admin` bypasses this filter so admins can see and edit unpublished products.
-
-**`GetProductsDto` query params:**
-- `limit` / `page` — pagination (via `PaginationQueryDto`)
-- `productTypeId` — filter by product type ID (`@Type(() => Number)` converts query string to number)
-- `q` — keyword (1–100 chars), case-insensitive `ILIKE '%q%'` on both `name` and `shortDescription` as OR branches. Composes with `productTypeId`: `(name OR shortDescription) AND productTypeId`.
+**Health check:** `GET /health` is public — Terminus `TypeOrmHealthIndicator`, returns 200 `{ status: 'ok' }` or 503. Used by Coolify.
 
 ### Serialization
 
@@ -325,11 +209,13 @@ Public routes (`GET /products`, `GET /products/:id`, `GET /products/slug/:slug`)
 
 If a new controller or endpoint needs to expose admin-only fields, add `@SerializeOptions({ groups: ['admin'] })` to it.
 
+A single route can opt *out* of a controller's admin default with `@SerializeOptions({ groups: ['public'] })` — any group name other than `'admin'` hides the admin-only fields (there is no `@Expose({ groups: ['public'] })` on the entity; `'public'` just means "not admin"). `GET /users/:id/profile` uses this to expose a public author view from the otherwise admin-grouped `UsersController`.
+
 ### Pagination
 
 `common/pagination` exports a singleton `PaginationProvider` that builds absolute `first/last/current/next/prev` links. Domain providers call `paginationProvider.paginateQuery(paginationQueryDto, repository, where, request)` rather than reimplementing pagination per module. The `request` argument (Express `Request`) is threaded from the controller via `@Req()` down through the service facade and into the provider — it is used only to build the link URLs (`protocol`, `headers.host`, `url`). The `where` parameter filters both the result set and the total count used for page calculations; it accepts either a single condition object or an array of condition objects — when an array is passed, TypeORM treats each element as an OR branch (a row is returned if it matches any one of them).
 
-**Important:** `PaginationProvider` must remain a plain singleton (`@Injectable()` with no scope override). Injecting `REQUEST` or any other request-scoped token into it would bubble the REQUEST scope up through every service that uses it (e.g. `UsersService`, `PostsService`) and break lifecycle hooks (`OnModuleInit`) on any service that depends on those — this was a past bug that caused `GoogleAuthenticationService.onModuleInit` to never fire.
+**Important:** `PaginationProvider` must stay a plain singleton — never inject `REQUEST` or any request-scoped token. Doing so bubbles REQUEST scope through every consuming service and silently breaks `OnModuleInit` hooks downstream (this previously stopped `GoogleAuthenticationService.onModuleInit` from firing).
 
 `count()` runs before `find()` intentionally. The two queries are not wrapped in a transaction, so under concurrent writes `totalItems` and `data.length` can diverge. Running count first means a concurrent delete produces `totalItems >= data.length` (the safe direction for callers and for the e2e assertion). A concurrent insert would go the other way, but inserts happen at test setup time, not while pagination tests execute.
 
@@ -358,91 +244,15 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 
 ### Mail
 
-`src/mail` is a dedicated module for transactional email. It uses raw `nodemailer` (SMTP) + EJS templates. `MailModule` is not global — import it explicitly in any feature module that needs to send email.
-
-**Structure:**
-- `mail.config.ts` — `registerAs('mail', ...)` namespace; reads `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` from env.
-- `providers/nodemailer.provider.ts` — custom DI token `NODEMAILER_TRANSPORTER`; creates the nodemailer transporter once via `useFactory`.
-- `providers/send-mail.provider.ts` — core send logic: renders an EJS template then calls `transporter.sendMail()`. Template path resolves to `dist/mail/templates/<name>.ejs` at runtime.
-- `providers/send-welcome-mail.provider.ts` — welcome email.
-- `providers/send-verification-mail.provider.ts` — email address verification.
-- `providers/send-password-reset-mail.provider.ts` — password reset link.
-- `providers/send-contact-notification.provider.ts` — contact form notification to the site owner; reads recipient address from `mail.defaultFrom` (same as `MAIL_FROM` env var — no separate env var needed).
-- `mail.service.ts` — thin facade; exposes `sendMail`, `sendWelcomeMail`, `sendVerificationMail`, `sendPasswordResetMail`, `sendContactNotification`.
-- `templates/` — EJS files; one per email type (`welcome.ejs`, `verification.ejs`, `password-reset.ejs`, `contact.ejs`). Variables injected via the `context` field of `MailOptions`.
-
-**Adding a new email type:**
-1. Add a `<name>.ejs` file in `src/mail/templates/`.
-2. Create `src/mail/providers/send-<name>-mail.provider.ts` — inject `SendMailProvider`, call `.send()` with the right template and context.
-3. Register the new provider in `mail.module.ts` `providers: [...]`.
-4. Add a `send<Name>Mail()` method to `MailService` that delegates to the new provider.
-
-**Templates and build:** `nest-cli.json` is configured with `assets: [{ include: "mail/templates/**/*.ejs", watchAssets: true }]` so EJS files are copied to `dist/` on build and watched in dev mode. If you add a new template subdirectory, update the glob in `nest-cli.json`.
-
-**Dev testing:** Use [Mailtrap](https://mailtrap.io) sandbox — set `MAIL_HOST=sandbox.smtp.mailtrap.io`, `MAIL_PORT=2525`, `MAIL_SECURE=false` and your Mailtrap credentials in `.env.development`. Sent emails appear in the Mailtrap inbox without reaching real recipients.
-
-**Current wiring:**
-- `UsersModule` imports `MailModule`. `CreateUserProvider` emits `AppEvents.USER_CREATED`; `UserEventsListener` (`src/users/listeners/user-events.listener.ts`) handles it and calls `mailService.sendVerificationMail()`.
-- `ContactModule` imports `MailModule`. `ContactProvider` emits `AppEvents.CONTACT_SUBMITTED`; `ContactEventsListener` (`src/contact/listeners/contact-events.listener.ts`) handles it and calls `mailService.sendContactNotification()`.
-- Other providers in `UsersModule` that send mail (`ResendVerificationProvider`, `ForgotPasswordProvider`, `ResetPasswordProvider`) still call `MailService` directly — they are synchronous flows where the email is the primary response signal (e.g. the user is waiting for the reset link).
+`src/mail` is a NestJS module for transactional email using raw nodemailer (SMTP) + EJS templates. Not global — import it explicitly. See `src/mail/CLAUDE.md` for module structure, how to add a new email type, template build configuration, and the current wiring between event listeners and mail providers.
 
 ### Uploads
 
-`src/uploads` is a dedicated, reusable module for Cloudinary image uploads. It exports `UploadsService`, which is consumed by `PostsModule` and `UsersModule`. `ProductsModule` also imports `UploadsModule` to access `StorageProvider` directly for product image uploads.
-
-- `UploadFile` entity (`src/uploads/entities/upload-file.entity.ts`) records every upload: `name`, `path` (Cloudinary `secure_url`), `publicId`, `type` (`FileType` enum), `mime`, `size`, `userId`, and optional `postId`. When `postId` is set, the upload is linked to that post and will be deleted from Cloudinary when the post is deleted.
-- `UploadsService` is split into two providers: `UploadFileProvider` (validates buffer magic bytes, uploads to storage, persists the row) and `DeleteFileProvider` (looks up by URL, deletes from Cloudinary, removes the DB row).
-- `StorageProvider` is an abstract class (not an interface) so it can serve as a NestJS DI token at runtime. `CloudinaryProvider` is its only current implementation, registered via `{ provide: StorageProvider, useClass: CloudinaryProvider }` in `UploadsModule`. Swap backends by changing only that line.
-- Post image upload route: `POST /posts/:id/images` — requires `EDITOR / AUTHOR / ADMIN`. EDITORs can only upload to their own posts. Returns the `UploadFile` record; the client decides whether to use the URL as `featuredImage` via `PATCH /posts/:id`. All `UploadFile` rows are created through this route, so every row always has a `postId` and is cascade-deleted when the post is removed — there are no orphaned uploads.
-- Post image list route: `GET /posts/:id/images` — returns all `UploadFile` rows for a post. EDITORs restricted to own posts (same rule as upload). Used by the frontend image picker so the user can select a previously uploaded image as `featuredImage` without re-uploading.
-- Avatar pool management: `POST /users/avatar-options` — ADMIN only. Uploads an image to Cloudinary via `StorageProvider` and saves `{ url, publicId }` as an `AvatarOption` row. No `UploadFile` row is created — `StorageProvider` is injected directly by `AvatarOptionsProvider` rather than going through `UploadsService`.
-- `UploadsModule` exports `StorageProvider` so `UsersModule` can inject it without duplicating Cloudinary setup.
+See `src/uploads/CLAUDE.md` for module internals, the `UploadFile` entity, and the `StorageProvider` swap pattern. Key cross-module facts: `UploadsModule` exports `StorageProvider` so `UsersModule` and `ProductsModule` can inject it directly (avatar options and product images) without going through `UploadsService`. Every `UploadFile` row carries a `postId` — cascade-deleted when the post is removed, so there are no orphaned uploads.
 
 ### Audit logging
 
-`src/audit-log` is a cross-cutting module that writes a permanent record of every write operation. It never blocks a request — `AuditLogService.log()` wraps `repository.save()` in a try/catch and swallows errors.
-
-**Structure:**
-- `entities/audit-log.entity.ts` — the `audit_logs` table (see Entity relations above).
-- `enums/audit-action.enum.ts` — `CREATE | UPDATE | DELETE | SOFT_DELETE`.
-- `providers/audit-log.service.ts` — `log(userId, action, entity, entityId)` (write) and `findAll(dto)` (paginated read for the admin endpoint).
-- `audit-log.controller.ts` — `GET /audit-logs`, ADMIN only.
-- `audit-log.module.ts` — exports `AuditLogService`; imports `PaginationModule`.
-
-**Current instrumented providers (22):**
-
-| Provider | action | entity | userId source |
-|---|---|---|---|
-| `CreateUserProvider` | CREATE | 'User' | `newUser.id` (null actor — self-registration) |
-| `RemoveOneByIdProvider` | DELETE | 'User' | `activeUserId` (threaded from controller) |
-| `ChangeUserRoleProvider` | UPDATE | 'User' | `activeUserId` (threaded from controller) |
-| `PatchUserProvider` | UPDATE | 'User' | `activeUserId` (threaded from controller) |
-| `PatchUserProfileProvider` | UPDATE | 'User' | `userId` (self-update, actor = target) |
-| `AvatarOptionsProvider.create` | CREATE | 'AvatarOption' | `activeUserId` (threaded from controller) |
-| `AvatarOptionsProvider.remove` | DELETE | 'AvatarOption' | `activeUserId` (threaded from controller) |
-| `CreatePostProvider` | CREATE | 'Post' | `activeUser.sub` |
-| `UpdatePostProvider` | UPDATE | 'Post' | `activeUser.sub` |
-| `RemovePostProvider` | DELETE | 'Post' | `activeUser.sub` |
-| `TagsService.create` | CREATE | 'Tag' | `activeUserId` (threaded from controller) |
-| `TagsService.delete` | DELETE | 'Tag' | `activeUserId` (threaded from controller) |
-| `TagsService.softDelete` | SOFT_DELETE | 'Tag' | `activeUserId` (threaded from controller) |
-| `UpdateMetaOptionProvider` | UPDATE | 'MetaOption' | `activeUser.sub` |
-| `DeleteMetaOptionProvider` | DELETE | 'MetaOption' | `activeUser.sub` |
-| `CreateProductTypeProvider` | CREATE | 'ProductType' | `activeUserId` (threaded from controller) |
-| `UpdateProductTypeProvider` | UPDATE | 'ProductType' | `activeUserId` (threaded from controller) |
-| `DeleteProductTypeProvider` | DELETE | 'ProductType' | `activeUserId` (threaded from controller) |
-| `CreateProductProvider` | CREATE | 'Product' | `activeUserId` (threaded from controller) |
-| `UpdateProductProvider` | UPDATE | 'Product' | `activeUserId` (threaded from controller) |
-| `UploadProductImageProvider` | UPDATE | 'Product' | `activeUserId` (threaded from controller) |
-| `DeleteProductProvider` | SOFT_DELETE | 'Product' | `activeUserId` (threaded from controller) |
-
-**Signature threading:** Several providers originally received only the target entity's `id`. For audit purposes, `activeUserId: number` was added as a final parameter and threaded through the service facade and controller. The pattern is: controller reads `@ActiveUser('sub') activeUserId: number`, passes it to the service method, which passes it to the provider. Affected chains: `RemoveOneByIdProvider`, `ChangeUserRoleProvider`, `PatchUserProvider`, `AvatarOptionsProvider.create/remove`, and `TagsService.create/delete/softDelete`.
-
-**Adding audit logging to a new provider:**
-1. Import `AuditLogModule` in the domain module if not already imported.
-2. Inject `AuditLogService` into the provider's constructor.
-3. Call `await this.auditLogService.log(userId, AuditAction.ACTION, 'EntityName', entityId)` after the successful DB write.
-4. If the provider doesn't currently receive `activeUserId`, add it as a parameter and thread it through the service facade and controller (see Signature threading above).
+`src/audit-log` writes a permanent record after every write operation. `AuditLogService.log()` swallows errors — it never blocks a request. See `src/audit-log/CLAUDE.md` for module structure, how to add audit logging to a new provider, and the signature-threading pattern. `AuditLogModule` must be imported in any domain module whose providers write audit records.
 
 ### TypeORM gotchas
 
