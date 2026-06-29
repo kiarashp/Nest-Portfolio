@@ -152,13 +152,18 @@ describe('Products (e2e)', () => {
 
   // ── GET /product-types ────────────────────────────────────────────────────
 
-  it('GET /product-types (public) → 200 with an array', async () => {
+  it('GET /product-types (public) → 200 with an array including productCount', async () => {
     const res = await request(app.getHttpServer())
       .get('/product-types')
       .expect(200)
-    expect(Array.isArray((res.body as ApiResponse<ProductType[]>).data)).toBe(
-      true,
-    )
+    const types = (res.body as ApiResponse<ProductType[]>).data
+    expect(Array.isArray(types)).toBe(true)
+
+    // The seeded type has one published product, so its count is at least 1.
+    const seeded = types.find((t) => t.id === productTypeId)
+    expect(seeded).toBeDefined()
+    expect(typeof seeded?.productCount).toBe('number')
+    expect(seeded?.productCount).toBeGreaterThanOrEqual(1)
   })
 
   // ── GET /product-types/:id ────────────────────────────────────────────────

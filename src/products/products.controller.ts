@@ -25,9 +25,15 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 import { ProductsService } from './providers/products.service'
+import { Product } from './entities/product.entity'
 import { CreateProductDto } from './dto/create-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
 import { GetProductsDto } from './dto/get-products.dto'
+import { DeleteResultDto } from 'src/common/dto/delete-result.dto'
+import {
+  ApiDataResponse,
+  ApiPaginatedResponse,
+} from 'src/common/swagger/api-response.helpers'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { AuthType } from 'src/auth/enums/auth-type.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
@@ -44,7 +50,7 @@ export class ProductsController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Create a product (admin only)' })
-  @ApiResponse({ status: 201, description: 'Product created' })
+  @ApiDataResponse(Product, { status: 201, description: 'Product created' })
   @ApiResponse({ status: 409, description: 'Slug or SKU already in use' })
   @Post()
   public create(
@@ -59,6 +65,7 @@ export class ProductsController {
    */
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'List published products' })
+  @ApiPaginatedResponse(Product)
   @Get()
   public findAll(@Query() dto: GetProductsDto, @Req() request: Request) {
     return this.productsService.findAll(dto, request)
@@ -70,6 +77,7 @@ export class ProductsController {
    */
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Get a published product by slug' })
+  @ApiDataResponse(Product)
   @ApiResponse({
     status: 404,
     description: 'Product not found or not published',
@@ -85,6 +93,7 @@ export class ProductsController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'List all products including drafts (admin only)' })
+  @ApiPaginatedResponse(Product)
   @Get('admin')
   public findAllAdmin(@Query() dto: GetProductsDto, @Req() request: Request) {
     return this.productsService.findAllAdmin(dto, request)
@@ -95,6 +104,7 @@ export class ProductsController {
    */
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Get a published product by id' })
+  @ApiDataResponse(Product)
   @ApiResponse({
     status: 404,
     description: 'Product not found or not published',
@@ -109,6 +119,7 @@ export class ProductsController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update a product (admin only)' })
+  @ApiDataResponse(Product)
   @ApiResponse({ status: 409, description: 'Slug or SKU already in use' })
   @Patch(':id')
   public update(
@@ -125,8 +136,8 @@ export class ProductsController {
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Upload main product image (admin only)' })
   @ApiConsumes('multipart/form-data')
-  @ApiResponse({
-    status: 200,
+  @ApiDataResponse(Product, {
+    status: 201,
     description: 'Image uploaded; product returned with updated imageUrl',
   })
   @ApiResponse({ status: 400, description: 'Invalid file type or size' })
@@ -153,6 +164,7 @@ export class ProductsController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Soft-delete a product (admin only)' })
+  @ApiDataResponse(DeleteResultDto)
   @Delete(':id')
   public remove(
     @Param('id', ParseIntPipe) id: number,

@@ -10,8 +10,14 @@ import {
 } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ProductTypesService } from './providers/product-types.service'
+import { ProductType } from './entities/product-type.entity'
 import { CreateProductTypeDto } from './dto/create-product-type.dto'
 import { UpdateProductTypeDto } from './dto/update-product-type.dto'
+import { DeleteResultDto } from 'src/common/dto/delete-result.dto'
+import {
+  ApiArrayDataResponse,
+  ApiDataResponse,
+} from 'src/common/swagger/api-response.helpers'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { AuthType } from 'src/auth/enums/auth-type.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
@@ -28,6 +34,7 @@ export class ProductTypesController {
    */
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'List all product types' })
+  @ApiArrayDataResponse(ProductType)
   @Get()
   public findAll() {
     return this.productTypesService.findAll()
@@ -39,6 +46,7 @@ export class ProductTypesController {
    */
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Get a product type by slug' })
+  @ApiDataResponse(ProductType)
   @ApiResponse({ status: 404, description: 'Product type not found' })
   @Get('slug/:slug')
   public findBySlug(@Param('slug') slug: string) {
@@ -50,6 +58,7 @@ export class ProductTypesController {
    */
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'Get a product type by id' })
+  @ApiDataResponse(ProductType)
   @ApiResponse({ status: 404, description: 'Product type not found' })
   @Get(':id')
   public findOne(@Param('id', ParseIntPipe) id: number) {
@@ -61,7 +70,10 @@ export class ProductTypesController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Create a product type (admin only)' })
-  @ApiResponse({ status: 201, description: 'Product type created' })
+  @ApiDataResponse(ProductType, {
+    status: 201,
+    description: 'Product type created',
+  })
   @ApiResponse({ status: 409, description: 'Name or slug already in use' })
   @Post()
   public create(
@@ -76,6 +88,7 @@ export class ProductTypesController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update a product type (admin only)' })
+  @ApiDataResponse(ProductType)
   @ApiResponse({ status: 409, description: 'Name or slug already in use' })
   @Patch(':id')
   public update(
@@ -91,6 +104,7 @@ export class ProductTypesController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete a product type (admin only)' })
+  @ApiDataResponse(DeleteResultDto)
   @ApiResponse({
     status: 409,
     description: 'Products still reference this type',

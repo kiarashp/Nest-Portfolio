@@ -45,6 +45,8 @@ Columns: `id`, `name` (unique varchar 256), `slug` (unique varchar 256), `filter
 
 `filterableFields` stores a `FilterableField[]` array that drives the filter UI. Each entry has `key`, `label`, `type` (`'number' | 'enum' | 'string'`), optional `unit`, optional `options` (enum choices). The `FilterableField` interface is exported from this file — import it when you need to type-annotate the array.
 
+`productCount` is a **transient** field (not a DB column) — number of published products in the type. It is populated only by `GET /product-types` (`FindAllProductTypesProvider`) for the landing-page cards; other reads leave it undefined.
+
 The `products` inverse relation (`@OneToMany`) is non-eager and is never auto-loaded. Always query products through their own repository rather than accessing `productType.products`.
 
 ### Product (`src/products/entities/product.entity.ts`)
@@ -110,6 +112,18 @@ This allows a client to send `null` to explicitly clear a nullable field (e.g. r
 
 The FK check in `CreateProductProvider` avoids a pre-flight `SELECT` on the happy path: the product is inserted and only if PostgreSQL raises 23503 is a `BadRequestException` thrown. This is intentional — do not add a pre-flight `findOneProductTypeOrFail` call.
 
+## FindAllProductTypesProvider — published product count
+
+`GET /product-types` returns every type (ordered by name) with a `productCount` of its **published**
+products, for the landing cards. The provider does this in **two queries, not one-per-type**: it
+fetches the types, then runs a single grouped count
+(`SELECT productTypeId, COUNT(*) ... WHERE isPublished = true GROUP BY productTypeId`) and maps the
+results on (defaulting to `0`). Soft-deleted products are excluded by TypeORM's default soft-delete
+handling. It injects the `Product` repository alongside the `ProductType` repository for this.
+
+Note: `loadRelationCountAndMap` would be the one-liner alternative, but the installed `typeorm@1.0.0`
+removed it — use the explicit grouped query instead.
+
 ## Product type deletion safety
 
 `DeleteProductTypeProvider` calls `productsRepository.count({ where: { productTypeId: id } })` before deleting. If any products reference the type, it throws `ConflictException` (409). The caller must delete or reassign those products first. This is a hard delete — there is no soft-delete for product types.
@@ -151,6 +165,21 @@ Unknown keys, non-object `specs`, non-numeric number values, or out-of-range enu
 
 All seven write providers call `auditLogService.log(activeUserId, action, entity, entityId)` after each successful DB operation. `activeUserId` flows from the controller `@ActiveUser('sub')` decorator through the service facade into the provider. See the root `CLAUDE.md` audit log table for the full list.
 
+## OpenAPI response typing
+
+Both controllers document their response bodies with the shared helpers in
+`src/common/swagger/api-response.helpers.ts` (`ApiDataResponse`, `ApiArrayDataResponse`,
+`ApiPaginatedResponse`), and the `Product`/`ProductType` entities carry `@ApiProperty` on every
+response field. This makes the generated `openapi-types.ts` expose real response shapes (the
+`{ apiVersion, data }` envelope, paginated for the list routes) instead of `content?: never`.
+`FilterableFieldDto` is also decorated so the frontend gets a typed filter-metadata shape.
+Nullable fields pass an explicit `type` (e.g. `@ApiPropertyOptional({ type: String, nullable: true })`)
+because a `string | null` union otherwise emits `Object` metadata and renders as an empty object.
+This is currently the only fully response-typed module — see the root `CLAUDE.md` Serialization
+section for the rationale and how to extend it.
+
 ## Data-source registration
 
 `Product` and `ProductType` are registered in `src/database/data-source.ts` (used by the TypeORM migration CLI). They must be kept in sync with the entities listed in `TypeOrmModule.forFeature` in `products.module.ts`. When adding a column or relation, generate a migration — see the root `CLAUDE.md` Migrations section.
+
+The two tables are created by `src/database/migrations/*-AddProductTables.ts` (they were added after the initial schema). `productCount` and the `productType`/`filterableFields` typing are not schema changes, so they need no migration.

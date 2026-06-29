@@ -123,7 +123,7 @@ Entity relations:
 - `AvatarOption` — standalone entity (`src/users/entities/avatar-option.entity.ts`), no FK to `User`. Columns: `id`, `url`, `publicId`, `createdAt`. Admins populate the pool via `POST /users/avatar-options`; users pick one with `PATCH /users/avatar`.
 - `ContactSubmission` — standalone entity (`src/contact/entities/contact-submission.entity.ts`), no FK to any other table. Columns: `id`, `name`, `email`, `subject`, `message`, `createdAt`. Every submission is persisted permanently so the owner can review them even if an email notification is missed.
 - `AuditLog` — standalone entity (`src/audit-log/entities/audit-log.entity.ts`), no FK to any other table. Columns: `id`, `userId` (nullable int — null for self-service operations like registration), `action` (varchar 32), `entity` (varchar 64), `entityId` (int), `createdAt`. Written by providers after every successful write; never deleted.
-- `ProductType` 1—N `Product` (non-eager — the inverse `products` relation is never loaded automatically; always query products directly). `ProductType` entity (`src/products/entities/product-type.entity.ts`) exports the `FilterableField` interface used in `filterableFields` (jsonb column).
+- `ProductType` 1—N `Product` (non-eager — the inverse `products` relation is never loaded automatically; always query products directly). `ProductType` entity (`src/products/entities/product-type.entity.ts`) exports the `FilterableField` interface used in `filterableFields` (jsonb column). It also has a transient (non-column) `productCount` populated only by `GET /product-types` — the published-product count per type, for landing cards.
 - `Product` N—1 `ProductType` (eager — `productType` is always included in product responses). `Product` entity (`src/products/entities/product.entity.ts`) has `@DeleteDateColumn deletedAt` for soft-delete, a `specs` jsonb column (no DB index — TypeORM's `@Index` cannot express a `USING gin` index; add one via a raw-SQL migration if production scale needs it), and a B-tree `@Index(['productTypeId'])` at class level for type-based filtering. Soft-deleted products are automatically excluded from all TypeORM queries unless `withDeleted: true` is passed.
 
 ### Request pipeline (global, wired in `app.module.ts`)
@@ -212,6 +212,16 @@ If a new controller or endpoint needs to expose admin-only fields, add `@Seriali
 
 A single route can opt *out* of a controller's admin default with `@SerializeOptions({ groups: ['public'] })` — any group name other than `'admin'` hides the admin-only fields (there is no `@Expose({ groups: ['public'] })` on the entity; `'public'` just means "not admin"). `GET /users/:id/profile` uses this to expose a public author view from the otherwise admin-grouped `UsersController`.
 
+### OpenAPI response typing
+
+The `@nestjs/swagger` introspection plugin is intentionally **not** enabled (no `plugins` in `nest-cli.json`), so Swagger only documents what is **manually decorated**. Request DTOs carry `@ApiProperty`; most response/entity shapes do not, so their generated types show `content?: never`.
+
+The **products** module is the exception and the template for doing this elsewhere: its entities (`Product`, `ProductType`) carry `@ApiProperty`, and its controllers use the reusable helpers in `src/common/swagger/api-response.helpers.ts` — `ApiDataResponse(Model)`, `ApiArrayDataResponse(Model)`, `ApiPaginatedResponse(Model)` — which describe the global `{ apiVersion, data }` envelope (and the nested `Paginated` shape) so the generated `openapi-types.ts` exposes real response types. Soft-delete/delete endpoints use `DeleteResultDto` (`src/common/dto/delete-result.dto.ts`).
+
+Two gotchas when decorating entities: a nullable union like `string | null` makes TypeScript emit `Object` metadata, so pass an explicit `type` (e.g. `@ApiPropertyOptional({ type: String, nullable: true })`) or the field renders as an empty object. And before decorating an entity with `@Exclude()` fields (e.g. `User`), add `@ApiHideProperty()` to those fields so secrets are not advertised in the schema.
+
+`PaginationQueryDto` now carries `@ApiPropertyOptional` on `page`/`limit`, so paging params appear in the typed query for every paginated endpoint.
+
 ### Pagination
 
 `common/pagination` exports a singleton `PaginationProvider` that builds absolute `first/last/current/next/prev` links. Domain providers call `paginationProvider.paginateQuery(paginationQueryDto, repository, where, request)` rather than reimplementing pagination per module. The `request` argument (Express `Request`) is threaded from the controller via `@Req()` down through the service facade and into the provider — it is used only to build the link URLs (`protocol`, `headers.host`, `url`). The `where` parameter filters both the result set and the total count used for page calculations; it accepts either a single condition object or an array of condition objects — when an array is passed, TypeORM treats each element as an OR branch (a row is returned if it matches any one of them).
@@ -220,7 +230,9 @@ For filters that a `where` object can't express (jsonb access, numeric casts, jo
 
 **Important:** `PaginationProvider` must stay a plain singleton — never inject `REQUEST` or any request-scoped token. Doing so bubbles REQUEST scope through every consuming service and silently breaks `OnModuleInit` hooks downstream (this previously stopped `GoogleAuthenticationService.onModuleInit` from firing).
 
-`count()` runs before `find()` intentionally. The two queries are not wrapped in a transaction, so under concurrent writes `totalItems` and `data.length` can diverge. Running count first means a concurrent delete produces `totalItems >= data.length` (the safe direction for callers and for the e2e assertion). A concurrent insert would go the other way, but inserts happen at test setup time, not while pagination tests execute.
+`count()` runs before `find()` and the two queries are not wrapped in a transaction, so under concurrent writes `totalItems` and `data.length` can diverge by a row. This is intentional and accepted — list-count metadata is approximate under concurrency (standard for paginated APIs); the divergence is transient and self-heals on the next request. Do **not** add a transaction or clamp to "fix" it.
+
+Because the e2e suites share one database and run in parallel, **a pagination test must never assert `totalItems >= data.length`** against a table other suites write to (e.g. `user`): a parallel suite can insert a row between this query's `count()` and `find()`. Assert a race-free lower bound instead — e.g. request `limit=1` and check `totalItems >= <number of rows this suite seeded>`. See `test/users-list.e2e-spec.ts`. (The same assertion is safe in `products.e2e-spec.ts` only because no other suite writes products.)
 
 ### Events
 
@@ -260,6 +272,8 @@ See `src/uploads/CLAUDE.md` for module internals, the `UploadFile` entity, and t
 ### TypeORM gotchas
 
 - **Relations must use object syntax** (TypeORM v0.3 breaking change): `relations: { author: true, uploadFiles: true }` — the old array form `relations: ['author']` is silently ignored and returns `undefined` instead of the related entity.
+- **Version is `typeorm@1.0.0`**, which **removed `loadRelationCountAndMap`**. To attach a relation count, run an explicit grouped count query (see `FindAllProductTypesProvider`) rather than reaching for that method.
+- **Eager relations are not auto-loaded by a `QueryBuilder`** (only by repository `find*`). When using `createQueryBuilder`, `leftJoinAndSelect` the eager relation explicitly (see `FindAllProductsProvider`).
 
 ### Code style
 

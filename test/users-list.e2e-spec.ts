@@ -110,19 +110,22 @@ describe('GET /users — pagination (e2e)', () => {
     expect(overlap).toHaveLength(0)
   })
 
-  it('meta.totalItems reflects the real count, not a capped value', async () => {
-    // Ask for all users in one page (large limit). The key invariant is that
-    // totalItems must not be less than the number of rows actually returned —
-    // which would happen if the count query incorrectly applied the `take` limit.
-    // We do not assert strict equality because parallel test suites can insert or
-    // delete users between the find() and count() calls inside PaginationProvider.
+  it('meta.totalItems reflects the real count, not the page limit', async () => {
+    // Request a single row (limit=1). A correct count() ignores the take limit
+    // and reports the real total, which is always >= the 2 users seeded above.
+    // If count() wrongly applied the take limit, totalItems would be 1.
+    //
+    // We assert a lower bound (>= 2), never `totalItems >= data.length`: the user
+    // table is shared by every e2e suite, so a parallel insert between count() and
+    // find() can make find() return more rows than count() saw. totalItems only
+    // grows, so the lower bound is race-free.
     const res = await request(app.getHttpServer())
-      .get('/users?limit=100&page=1')
+      .get('/users?limit=1&page=1')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200)
 
     const body = (res.body as ApiResponse<Paginated<User>>).data
-    expect(body.meta.totalItems).toBeGreaterThanOrEqual(body.data.length)
-    expect(body.data.length).toBeGreaterThanOrEqual(2) // at minimum the 2 users seeded above
+    expect(body.data.length).toBe(1) // the page limit is respected
+    expect(body.meta.totalItems).toBeGreaterThanOrEqual(2) // count is not capped at the limit
   })
 })
