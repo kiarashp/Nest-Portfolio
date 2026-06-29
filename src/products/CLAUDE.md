@@ -174,7 +174,7 @@ Unknown keys, non-object `specs`, non-numeric number values, or out-of-range enu
 
 ## Audit logging
 
-All seven write providers call `auditLogService.log(activeUserId, action, entity, entityId)` after each successful DB operation. `activeUserId` flows from the controller `@ActiveUser('sub')` decorator through the service facade into the provider. See the root `CLAUDE.md` audit log table for the full list.
+Every write provider calls `auditLogService.log(activeUserId, action, entity, entityId)` after each successful DB operation — the five product-type/product CRUD providers, plus the three image providers (`UploadProductImageProvider` and `DeleteProductImageProvider` both log `UPDATE Product`; `DeleteProductProvider` logs `SOFT_DELETE Product`). `activeUserId` flows from the controller `@ActiveUser('sub')` decorator through the service facade into the provider.
 
 ## OpenAPI response typing
 

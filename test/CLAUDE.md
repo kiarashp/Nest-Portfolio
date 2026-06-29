@@ -64,6 +64,14 @@ const token: string = user!.passwordResetToken!
 
 When calling `userRepo.update()` or `userRepo.save()` without capturing the return value, no annotation is needed — the error only fires on assignment.
 
+## Cleaning up FK-linked rows
+
+When a spec hard-deletes rows in `afterAll`/pre-cleanup, delete child rows before their parent or the FK constraint fails. The non-obvious case is uploaded images: `upload_file.productId` and `upload_file.postId` are FKs with no cascade, so a product/post cannot be `repo.delete()`d while image rows still reference it. The products spec (`test/products/products.e2e-spec.ts`) deletes `upload_file` rows by `productId` first, then the products. (Soft-deleting a product through the API purges its images automatically — this only bites the raw-repo hard-deletes in test cleanup.)
+
+## First test:e2e run after an entity change
+
+The e2e suites run in parallel and each boots `AppModule` with `DB_SYNC=true`, so the **first** `test:e2e` run after you add/change a column or relation does the schema DDL concurrently across ~20 suites. That contention can spuriously time out a `beforeAll` (`createApp`) in a suite or two and cascade into FK errors. It is not a real failure — just re-run `test:e2e`; once the schema is synced the per-suite sync is a no-op and the run is stable. To verify a single suite in isolation, run it through the script so the required env is set: `pnpm exec cross-env NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-e2e.json <path>` (a bare `pnpm jest` skips `NODE_OPTIONS`, which breaks `FileTypeValidator`'s ESM `file-type` load and makes image uploads return 400).
+
 ## Spec file pattern
 
 `createApp()` owns the full module build. Do not call `Test.createTestingModule` in specs.
