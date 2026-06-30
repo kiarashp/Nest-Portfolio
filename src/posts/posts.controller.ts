@@ -76,6 +76,7 @@ export class PostsController {
   /**
    * get all published posts (public)
    */
+  @ApiOperation({ summary: 'List published posts' })
   @ApiPaginatedResponse(PostEntity)
   @Auth(AuthType.None)
   @Get()
@@ -86,6 +87,7 @@ export class PostsController {
   /**
    * get a single published post by slug (public)
    */
+  @ApiOperation({ summary: 'Get a published post by slug' })
   @ApiDataResponse(PostEntity)
   @Auth(AuthType.None)
   @Get('slug/:slug')
@@ -125,6 +127,7 @@ export class PostsController {
   /**
    * get a single published post by id (public)
    */
+  @ApiOperation({ summary: 'Get a published post by ID' })
   @ApiDataResponse(PostEntity)
   @Auth(AuthType.None)
   @Get(':id')

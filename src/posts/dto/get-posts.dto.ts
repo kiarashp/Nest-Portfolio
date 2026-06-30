@@ -16,20 +16,42 @@ import { PostStatus } from '../enums/postStatus.enum'
 
 class GetPostsBaseDto {
   // start date — query param arrives as a string, transform converts it to a Date before validation
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date',
+    description: 'ISO 8601 — filter posts created on or after this date',
+    example: '2024-01-01',
+  })
   @Transform(({ value }: { value: unknown }) => new Date(value as string))
   @IsDate()
   @IsOptional()
   startDate?: Date
   // end date
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date',
+    description: 'ISO 8601 — filter posts created on or before this date',
+    example: '2024-12-31',
+  })
   @Transform(({ value }: { value: unknown }) => new Date(value as string))
   @IsDate()
   @IsOptional()
   endDate?: Date
-  // filter by post status — used by GET /posts/my only
+  // filter by post status — used by GET /posts/my and /posts/admin
+  @ApiPropertyOptional({
+    enum: PostStatus,
+    description: 'Filter by post status — used by /posts/my and /posts/admin',
+  })
   @IsEnum(PostStatus)
   @IsOptional()
   status?: PostStatus
   // filter by one or more tag IDs — OR logic, ?tagIds=1&tagIds=2 matches either tag
+  @ApiPropertyOptional({
+    type: [Number],
+    description:
+      'Filter by tag IDs — OR logic, returns posts matching any listed tag',
+    example: [1, 2],
+  })
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => {
     // query strings arrive as strings or string arrays — normalise to number[]
@@ -45,6 +67,11 @@ class GetPostsBaseDto {
   @IsPositive({ each: true })
   tagIds?: number[]
   // filter by author user ID
+  @ApiPropertyOptional({
+    type: Number,
+    description: 'Filter by author user ID',
+    example: 1,
+  })
   @IsOptional()
   @IsInt()
   @IsPositive()

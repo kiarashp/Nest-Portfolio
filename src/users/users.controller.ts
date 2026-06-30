@@ -85,6 +85,7 @@ export class UsersController {
   @Auth(AuthType.None)
   @Post()
   @Throttle({ default: { limit: 5, ttl: 600_000 } })
+  @ApiOperation({ summary: 'Register a new user' })
   @ApiDataResponse(AdminUser, { status: 201, description: 'User registered' })
   public createUser(@Body() createUserDto: CreateUserDto) {
     return this.usersService.craeteUser(createUserDto)
