@@ -44,6 +44,10 @@ createPost(...) {}
 - `UpdatePostProvider.update()` — throws `ForbiddenException` if `EDITOR` and `post.author.id !== activeUser.sub`
 - `RemovePostProvider.remove()` — same check
 - `UploadPostImageProvider.uploadPostImage()` — same check
+- `FindPostImagesProvider.findPostImages()` — same check (read access to image list)
+- `DeletePostImageProvider.deletePostImage()` — same check
+
+`GET /posts/admin` (list all posts, all statuses, all authors) is accessible to AUTHOR + ADMIN — consistent with their unrestricted write access. EDITOR gets 403; they use `GET /posts/my` to see their own posts.
 
 **Meta-option write routes (EDITOR and AUTHOR restriction):**
 
