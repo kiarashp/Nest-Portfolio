@@ -5,6 +5,8 @@ import { UserRole } from 'src/auth/enums/user-role.enum'
 import { AuditLogService } from './providers/audit-log.service'
 import { GetAuditLogsDto } from './dto/get-audit-logs.dto'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ApiPaginatedResponse } from 'src/common/swagger/api-response.helpers'
+import { AuditLog } from './entities/audit-log.entity'
 
 @Controller('audit-logs')
 @ApiTags('Audit Logs')
@@ -22,6 +24,7 @@ export class AuditLogController {
   @Get()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List audit log entries (admin only)' })
+  @ApiPaginatedResponse(AuditLog)
   public findAll(@Query() dto: GetAuditLogsDto, @Req() request: Request) {
     return this.auditLogService.findAll(dto, request)
   }

@@ -16,8 +16,16 @@ import { AuthType } from 'src/auth/enums/auth-type.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
+import { ApiTags } from '@nestjs/swagger'
+import {
+  ApiArrayDataResponse,
+  ApiDataResponse,
+} from 'src/common/swagger/api-response.helpers'
+import { DeleteResultDto } from 'src/common/dto/delete-result.dto'
+import { Tag } from './entities/tag.entity'
 
 @Controller('tags')
+@ApiTags('Tags')
 export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 
@@ -26,6 +34,7 @@ export class TagsController {
    */
   @Auth(AuthType.None)
   @Get()
+  @ApiArrayDataResponse(Tag)
   public async findAllTags() {
     return await this.tagsService.findAll()
   }
@@ -35,6 +44,7 @@ export class TagsController {
    */
   @Roles(UserRole.AUTHOR, UserRole.ADMIN)
   @Post()
+  @ApiDataResponse(Tag, { status: 201, description: 'Tag created' })
   public async createTag(
     @Body() createTagDto: CreateTagDto,
     @ActiveUser('sub') activeUserId: number,
@@ -47,6 +57,7 @@ export class TagsController {
    */
   @Roles(UserRole.AUTHOR, UserRole.ADMIN)
   @Patch(':id')
+  @ApiDataResponse(Tag, { description: 'Tag updated' })
   public async updateTag(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateTagDto: UpdateTagDto,
@@ -59,6 +70,7 @@ export class TagsController {
    */
   @Roles(UserRole.AUTHOR, UserRole.ADMIN)
   @Delete('soft/:id')
+  @ApiDataResponse(DeleteResultDto, { description: 'Tag soft-deleted' })
   public async softDeleteTag(
     @Param('id', ParseIntPipe) id: number,
     @ActiveUser('sub') activeUserId: number,
@@ -71,6 +83,7 @@ export class TagsController {
    */
   @Roles(UserRole.AUTHOR, UserRole.ADMIN)
   @Delete(':id')
+  @ApiDataResponse(DeleteResultDto, { description: 'Tag deleted' })
   public async deleteTag(
     @Param('id', ParseIntPipe) id: number,
     @ActiveUser('sub') activeUserId: number,

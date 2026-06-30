@@ -32,6 +32,15 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
+import {
+  ApiArrayDataResponse,
+  ApiDataResponse,
+  ApiPaginatedResponse,
+} from 'src/common/swagger/api-response.helpers'
+import { MessageResponseDto } from 'src/common/dto/message-response.dto'
+import { AdminUser } from './dto/admin-user.dto'
+import { PublicAuthor } from './dto/public-author.dto'
+import { AvatarOption } from './entities/avatar-option.entity'
 import { CreateManyUsersDto } from './dtos/create-many-users.dto'
 import { AuthType } from 'src/auth/enums/auth-type.enum'
 import { Auth } from 'src/auth/decorators/auth.decorator'
@@ -57,7 +66,9 @@ export class UsersController {
   @Roles(UserRole.ADMIN)
   @Get()
   @ApiOperation({ summary: 'Get all users with pagination and limit' })
-  @ApiResponse({ status: 200, description: 'Users fetched successfully' })
+  @ApiPaginatedResponse(AdminUser, {
+    description: 'Users fetched successfully',
+  })
   @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
   @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
   public getAllUsers(
@@ -73,6 +84,7 @@ export class UsersController {
   @Auth(AuthType.None)
   @Post()
   @Throttle({ default: { limit: 5, ttl: 600_000 } })
+  @ApiDataResponse(AdminUser, { status: 201, description: 'User registered' })
   public createUser(@Body() createUserDto: CreateUserDto) {
     return this.usersService.craeteUser(createUserDto)
   }
@@ -82,6 +94,10 @@ export class UsersController {
    */
   @Roles(UserRole.ADMIN)
   @Post('create-many')
+  @ApiArrayDataResponse(AdminUser, {
+    status: 201,
+    description: 'The created users',
+  })
   public createManyUsers(@Body() createManyUsersDto: CreateManyUsersDto) {
     return this.usersService.createMany(createManyUsersDto)
   }
@@ -91,6 +107,7 @@ export class UsersController {
    * Must be defined before :id to prevent 'me' being parsed as an integer.
    */
   @Get('me')
+  @ApiDataResponse(AdminUser)
   public getMe(@ActiveUser() activeUser: ActiveUserData) {
     return this.usersService.findOneById(activeUser.sub)
   }
@@ -102,7 +119,9 @@ export class UsersController {
   @Get('avatar-options')
   @Auth(AuthType.None)
   @ApiOperation({ summary: 'List available predefined avatar options' })
-  @ApiResponse({ status: 200, description: 'Array of avatar options' })
+  @ApiArrayDataResponse(AvatarOption, {
+    description: 'Array of avatar options',
+  })
   public getAvatarOptions() {
     return this.usersService.getAvatarOptions()
   }
@@ -116,7 +135,10 @@ export class UsersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Add a new avatar option (admin only)' })
   @ApiConsumes('multipart/form-data')
-  @ApiResponse({ status: 201, description: 'Avatar option created' })
+  @ApiDataResponse(AvatarOption, {
+    status: 201,
+    description: 'Avatar option created',
+  })
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   public async createAvatarOption(
     @UploadedFile(
@@ -141,7 +163,7 @@ export class UsersController {
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remove an avatar option (admin only)' })
-  @ApiResponse({ status: 200, description: 'Avatar option removed' })
+  @ApiDataResponse(MessageResponseDto, { description: 'Avatar option removed' })
   @ApiResponse({ status: 404, description: 'Option not found' })
   public async removeAvatarOption(
     @Param('id', ParseIntPipe) id: number,
@@ -161,7 +183,7 @@ export class UsersController {
   @ApiOperation({
     summary: 'Get public profile for a content author or editor',
   })
-  @ApiResponse({ status: 200, description: 'Public profile' })
+  @ApiDataResponse(PublicAuthor, { description: 'Public profile' })
   @ApiResponse({
     status: 404,
     description: 'Not found or user is not a content author',
@@ -179,6 +201,7 @@ export class UsersController {
    */
   @Roles(UserRole.ADMIN)
   @Get(':id')
+  @ApiDataResponse(AdminUser)
   public getUser(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.findOneById(id)
   }
@@ -190,7 +213,7 @@ export class UsersController {
   @Patch('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: "Update the current user's profile" })
-  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+  @ApiDataResponse(AdminUser, { description: 'Profile updated successfully' })
   public updateMe(
     @ActiveUser() activeUser: ActiveUserData,
     @Body() patchUserProfileDto: PatchUserProfileDto,
@@ -207,7 +230,7 @@ export class UsersController {
   @Patch('avatar')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Select a predefined avatar' })
-  @ApiResponse({ status: 200, description: 'Avatar updated successfully' })
+  @ApiDataResponse(AdminUser, { description: 'Avatar updated successfully' })
   @ApiResponse({ status: 400, description: 'Unknown avatar option id' })
   public async selectAvatar(
     @Body() dto: SelectAvatarDto,
@@ -221,6 +244,7 @@ export class UsersController {
    */
   @Roles(UserRole.ADMIN)
   @Patch(':id/role')
+  @ApiDataResponse(AdminUser, { description: 'Role updated' })
   public changeUserRole(
     @Param('id', ParseIntPipe) id: number,
     @Body() changeUserRoleDto: ChangeUserRoleDto,
@@ -238,6 +262,7 @@ export class UsersController {
    */
   @Roles(UserRole.ADMIN)
   @Patch(':id')
+  @ApiDataResponse(AdminUser, { description: 'User updated' })
   public updateUser(
     @Param('id', ParseIntPipe) id: number,
     @Body() patchUserDto: PatchUserDto,
@@ -251,6 +276,7 @@ export class UsersController {
    */
   @Roles(UserRole.ADMIN)
   @Delete(':id')
+  @ApiDataResponse(MessageResponseDto, { description: 'User deleted' })
   public deleteUser(
     @Param('id', ParseIntPipe) id: number,
     @ActiveUser('sub') activeUserId: number,
