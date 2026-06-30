@@ -83,6 +83,14 @@ export class PostsService {
     return await this.findAllPostsProvider.findAll(getPostsDto, request)
   }
 
+  /** Returns all posts across all statuses and authors — admin-only. */
+  public async findAllAdmin(
+    getPostsDto: GetPostsDto,
+    request: Request,
+  ): Promise<Paginated<Post>> {
+    return await this.findAllPostsProvider.findAllAdmin(getPostsDto, request)
+  }
+
   /** Returns the caller's own posts across all statuses, with an optional status filter. */
   public async findMyPosts(
     userId: number,

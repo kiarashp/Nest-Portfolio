@@ -32,19 +32,26 @@ export class FindAllPostsProvider {
   ) {}
 
   /**
-   * Returns a paginated list of published posts only.
-   * Draft, scheduled, and review posts are never returned to public callers.
-   * Supports optional filtering by one or more tag IDs (OR logic) and by author ID.
+   * Builds the TypeORM where conditions array from the DTO.
+   * When publishedOnly is true the base condition locks status to PUBLISHED (public route).
+   * When false (admin route) status is either from the DTO filter or unrestricted.
    */
-  public async findAll(
+  private buildWhereConditions(
     getPostsDto: GetPostsDto,
-    request: Request,
-  ): Promise<Paginated<Post>> {
-    // always filter to published posts only; add author filter if provided
-    const base: FindOptionsWhere<Post> = { status: PostStatus.PUBLISHED }
+    publishedOnly: boolean,
+  ): FindOptionsWhere<Post>[] {
+    const base: FindOptionsWhere<Post> = {}
+
+    if (publishedOnly) {
+      base.status = PostStatus.PUBLISHED
+    } else if (getPostsDto.status) {
+      base.status = getPostsDto.status
+    }
+
     if (getPostsDto.authorId) {
       base.author = { id: getPostsDto.authorId }
     }
+
     // Wire date range filter onto createdAt — supports open-ended ranges (one side only)
     if (getPostsDto.startDate && getPostsDto.endDate) {
       base.createdAt = Between(getPostsDto.startDate, getPostsDto.endDate)
@@ -69,13 +76,44 @@ export class FindAllPostsProvider {
       : [{}]
 
     // Cross-product of search × tag branches merged with base gives correct
-    // AND semantics: PUBLISHED AND (title OR content) AND (tag1 OR tag2).
-    const where: FindOptionsWhere<Post>[] = searchBranches.flatMap((sf) =>
+    // AND semantics: (status) AND (title OR content) AND (tag1 OR tag2).
+    return searchBranches.flatMap((sf) =>
       tagBranches.map((tb) => ({ ...base, ...sf, ...tb })),
     )
+  }
 
+  /**
+   * Returns a paginated list of published posts only.
+   * Draft, scheduled, and review posts are never returned to public callers.
+   * Supports optional filtering by one or more tag IDs (OR logic) and by author ID.
+   */
+  public async findAll(
+    getPostsDto: GetPostsDto,
+    request: Request,
+  ): Promise<Paginated<Post>> {
+    const where = this.buildWhereConditions(getPostsDto, true)
     this.logger.debug(
       `Finding posts — page=${getPostsDto.page ?? 1}, limit=${getPostsDto.limit ?? 10}`,
+    )
+    return await this.paginationProvider.paginateQuery(
+      { page: getPostsDto.page, limit: getPostsDto.limit },
+      this.postsRepository,
+      where,
+      request,
+    )
+  }
+
+  /**
+   * Admin variant — returns all posts regardless of status.
+   * Pass status in the DTO to narrow to a specific status; omit it to get everything.
+   */
+  public async findAllAdmin(
+    getPostsDto: GetPostsDto,
+    request: Request,
+  ): Promise<Paginated<Post>> {
+    const where = this.buildWhereConditions(getPostsDto, false)
+    this.logger.debug(
+      `Admin: finding posts — page=${getPostsDto.page ?? 1}, limit=${getPostsDto.limit ?? 10}`,
     )
     return await this.paginationProvider.paginateQuery(
       { page: getPostsDto.page, limit: getPostsDto.limit },

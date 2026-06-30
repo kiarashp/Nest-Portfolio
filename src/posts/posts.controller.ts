@@ -109,6 +109,20 @@ export class PostsController {
   }
 
   /**
+   * list all posts including drafts — author and admin dashboard view
+   */
+  @ApiOperation({
+    summary: 'List all posts including drafts (author and admin)',
+  })
+  @ApiAuth({ roles: [UserRole.AUTHOR, UserRole.ADMIN] })
+  @ApiPaginatedResponse(PostEntity)
+  @Roles(UserRole.AUTHOR, UserRole.ADMIN)
+  @Get('admin')
+  findAllAdmin(@Query() getPostsDto: GetPostsDto, @Req() request: Request) {
+    return this.postsService.findAllAdmin(getPostsDto, request)
+  }
+
+  /**
    * get a single published post by id (public)
    */
   @ApiDataResponse(PostEntity)

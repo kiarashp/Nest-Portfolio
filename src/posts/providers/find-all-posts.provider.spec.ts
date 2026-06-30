@@ -69,6 +69,20 @@ describe('FindAllPostsProvider', () => {
     return calls[0][2]
   }
 
+  // Runs findAllAdmin and returns the where argument passed to paginateQuery.
+  async function getAdminWhereArg(
+    dto: Partial<GetPostsDto>,
+  ): Promise<FindOptionsWhere<Post>[]> {
+    paginationProvider.paginateQuery.mockClear()
+    await provider.findAllAdmin(dto as GetPostsDto, mockRequest)
+    const calls = paginationProvider.paginateQuery.mock.calls as [
+      unknown,
+      unknown,
+      FindOptionsWhere<Post>[],
+    ][]
+    return calls[0][2]
+  }
+
   // ── Base filter ───────────────────────────────────────────────────────────
 
   it('no filters → single branch with status=PUBLISHED only', async () => {
@@ -162,5 +176,50 @@ describe('FindAllPostsProvider', () => {
     const end = new Date('2025-12-31')
     const where = await getWhereArg({ endDate: end })
     expect(where[0].createdAt).toEqual(LessThanOrEqual(end))
+  })
+
+  // ── findAllAdmin — status behaviour ───────────────────────────────────────
+
+  it('findAllAdmin: no filters → single branch with no status constraint', async () => {
+    const where = await getAdminWhereArg({})
+    expect(where).toHaveLength(1)
+    expect(where[0]).toEqual({})
+  })
+
+  it('findAllAdmin: status=DRAFT → single branch with status=DRAFT', async () => {
+    const where = await getAdminWhereArg({ status: PostStatus.DRAFT })
+    expect(where).toHaveLength(1)
+    expect(where[0]).toEqual({ status: PostStatus.DRAFT })
+  })
+
+  it('findAllAdmin: authorId → appears in branch with no status constraint', async () => {
+    const where = await getAdminWhereArg({ authorId: 3 })
+    expect(where).toHaveLength(1)
+    expect(where[0]).toEqual({ author: { id: 3 } })
+  })
+
+  it('findAllAdmin: q → two branches (title, content) with no status constraint', async () => {
+    const where = await getAdminWhereArg({ q: 'admin' })
+    expect(where).toHaveLength(2)
+    expect(where[0]).toEqual({ title: ILike('%admin%') })
+    expect(where[1]).toEqual({ content: ILike('%admin%') })
+  })
+
+  it('findAllAdmin: tagIds → one branch per tag with no status constraint', async () => {
+    const where = await getAdminWhereArg({ tagIds: [10, 20] })
+    expect(where).toHaveLength(2)
+    expect(where[0]).toEqual({ tags: { id: 10 } })
+    expect(where[1]).toEqual({ tags: { id: 20 } })
+  })
+
+  it('findAllAdmin: status=REVIEW + q → two branches both scoped to REVIEW', async () => {
+    const where = await getAdminWhereArg({
+      status: PostStatus.REVIEW,
+      q: 'tool',
+    })
+    expect(where).toHaveLength(2)
+    for (const branch of where) {
+      expect(branch.status).toBe(PostStatus.REVIEW)
+    }
   })
 })
