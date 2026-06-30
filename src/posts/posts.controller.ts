@@ -22,7 +22,6 @@ import { PostsService } from './providers/posts.service'
 import { CreatePostDto } from './dto/create-post.dto'
 import { PatchPostDto } from './dto/update-post.dto'
 import {
-  ApiBearerAuth,
   ApiConsumes,
   ApiOperation,
   ApiResponse,
@@ -45,6 +44,11 @@ import {
   ApiDataResponse,
   ApiPaginatedResponse,
 } from 'src/common/swagger/api-response.helpers'
+import { ApiAuth } from 'src/common/swagger/api-auth.helpers'
+
+// Roles allowed to write posts; EDITOR is additionally restricted to their own posts.
+const POST_WRITE_ROLES = [UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN]
+const POST_OWNERSHIP = 'EDITOR limited to their own posts'
 
 @Controller('posts')
 @ApiTags('Posts')
@@ -55,6 +59,7 @@ export class PostsController {
    * create a new post
    */
   @ApiOperation({ summary: 'Create a new post' })
+  @ApiAuth({ roles: POST_WRITE_ROLES })
   @ApiDataResponse(PostEntity, {
     status: 201,
     description: 'The post has been successfully created',
@@ -91,6 +96,8 @@ export class PostsController {
   /**
    * get all posts by the authenticated user (all statuses)
    */
+  @ApiOperation({ summary: 'Get all posts by the authenticated user' })
+  @ApiAuth()
   @ApiPaginatedResponse(PostEntity)
   @Get('my')
   findMyPosts(
@@ -115,6 +122,7 @@ export class PostsController {
    * update a post
    */
   @ApiOperation({ summary: 'Update a post' })
+  @ApiAuth({ roles: POST_WRITE_ROLES, ownership: POST_OWNERSHIP })
   @ApiDataResponse(PostEntity, {
     description: 'The post has been successfully updated',
   })
@@ -132,11 +140,10 @@ export class PostsController {
    * add tags to a post without replacing the existing tag set
    */
   @ApiOperation({ summary: 'Add tags to a post' })
+  @ApiAuth({ roles: POST_WRITE_ROLES, ownership: POST_OWNERSHIP })
   @ApiDataResponse(PostEntity, { description: 'Tags added successfully' })
   @ApiResponse({ status: 400, description: 'Invalid tag IDs' })
-  @ApiResponse({ status: 403, description: 'Not the post author' })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  @ApiBearerAuth()
   @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
   @Post(':id/tags')
   addTags(
@@ -151,10 +158,9 @@ export class PostsController {
    * remove tags from a post — idempotent if tag is not currently on the post
    */
   @ApiOperation({ summary: 'Remove tags from a post' })
+  @ApiAuth({ roles: POST_WRITE_ROLES, ownership: POST_OWNERSHIP })
   @ApiDataResponse(PostEntity, { description: 'Tags removed successfully' })
-  @ApiResponse({ status: 403, description: 'Not the post author' })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  @ApiBearerAuth()
   @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
   @Delete(':id/tags')
   removeTags(
@@ -169,12 +175,11 @@ export class PostsController {
    * list all images uploaded for a post — used by the frontend image picker
    */
   @ApiOperation({ summary: 'List all images uploaded for a post' })
+  @ApiAuth({ roles: POST_WRITE_ROLES, ownership: POST_OWNERSHIP })
   @ApiArrayDataResponse(UploadFile, {
     description: 'Array of UploadFile records',
   })
-  @ApiResponse({ status: 403, description: 'Not the post author' })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  @ApiBearerAuth()
   @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
   @Get(':id/images')
   findPostImages(
@@ -189,14 +194,13 @@ export class PostsController {
    */
   @ApiOperation({ summary: 'Upload an image for a post' })
   @ApiConsumes('multipart/form-data')
+  @ApiAuth({ roles: POST_WRITE_ROLES, ownership: POST_OWNERSHIP })
   @ApiDataResponse(UploadFile, {
     status: 201,
     description: 'Image uploaded successfully',
   })
   @ApiResponse({ status: 400, description: 'Invalid file' })
-  @ApiResponse({ status: 403, description: 'Not the post author' })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  @ApiBearerAuth()
   @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
   @Post(':id/images')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
@@ -220,10 +224,9 @@ export class PostsController {
    * delete a single image from a post
    */
   @ApiOperation({ summary: 'Delete a single image from a post' })
+  @ApiAuth({ roles: POST_WRITE_ROLES, ownership: POST_OWNERSHIP })
   @ApiDataResponse(DeleteResultDto)
-  @ApiResponse({ status: 403, description: 'Not the post author' })
   @ApiResponse({ status: 404, description: 'Post or image not found' })
-  @ApiBearerAuth()
   @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
   @Delete(':id/images/:fileId')
   removePostImage(
@@ -237,6 +240,8 @@ export class PostsController {
   /**
    * delete a post
    */
+  @ApiOperation({ summary: 'Delete a post' })
+  @ApiAuth({ roles: POST_WRITE_ROLES, ownership: POST_OWNERSHIP })
   @ApiDataResponse(DeleteResultDto)
   @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
   @Delete(':id')

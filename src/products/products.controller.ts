@@ -36,6 +36,7 @@ import {
   ApiDataResponse,
   ApiPaginatedResponse,
 } from 'src/common/swagger/api-response.helpers'
+import { ApiAuth } from 'src/common/swagger/api-auth.helpers'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { AuthType } from 'src/auth/enums/auth-type.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
@@ -52,6 +53,7 @@ export class ProductsController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Create a product (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(Product, { status: 201, description: 'Product created' })
   @ApiResponse({ status: 409, description: 'Slug or SKU already in use' })
   @Post()
@@ -95,6 +97,7 @@ export class ProductsController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'List all products including drafts (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiPaginatedResponse(Product)
   @Get('admin')
   public findAllAdmin(@Query() dto: GetProductsDto, @Req() request: Request) {
@@ -121,6 +124,7 @@ export class ProductsController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update a product (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(Product)
   @ApiResponse({ status: 409, description: 'Slug or SKU already in use' })
   @Patch(':id')
@@ -139,6 +143,7 @@ export class ProductsController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Upload a product image (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiConsumes('multipart/form-data')
   @ApiDataResponse(UploadFile, {
     status: 201,
@@ -171,6 +176,7 @@ export class ProductsController {
   @ApiOperation({
     summary: 'List all images uploaded for a product (admin only)',
   })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiArrayDataResponse(UploadFile, {
     description: 'Array of UploadFile records',
   })
@@ -186,6 +192,7 @@ export class ProductsController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete a product image (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(DeleteResultDto)
   @ApiResponse({ status: 404, description: 'Product or image not found' })
   @Delete(':id/images/:fileId')
@@ -202,6 +209,7 @@ export class ProductsController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Soft-delete a product (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(DeleteResultDto)
   @Delete(':id')
   public remove(

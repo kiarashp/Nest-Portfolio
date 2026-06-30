@@ -25,7 +25,6 @@ import { CreateUserDto } from './dtos/create-user.dtos'
 import { PatchUserDto } from './dtos/patch-user.dto'
 import { UsersService } from './providers/users.service'
 import {
-  ApiBearerAuth,
   ApiConsumes,
   ApiOperation,
   ApiQuery,
@@ -37,6 +36,7 @@ import {
   ApiDataResponse,
   ApiPaginatedResponse,
 } from 'src/common/swagger/api-response.helpers'
+import { ApiAuth } from 'src/common/swagger/api-auth.helpers'
 import { MessageResponseDto } from 'src/common/dto/message-response.dto'
 import { AdminUser } from './dto/admin-user.dto'
 import { PublicAuthor } from './dto/public-author.dto'
@@ -66,6 +66,7 @@ export class UsersController {
   @Roles(UserRole.ADMIN)
   @Get()
   @ApiOperation({ summary: 'Get all users with pagination and limit' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiPaginatedResponse(AdminUser, {
     description: 'Users fetched successfully',
   })
@@ -94,6 +95,8 @@ export class UsersController {
    */
   @Roles(UserRole.ADMIN)
   @Post('create-many')
+  @ApiOperation({ summary: 'Create multiple users (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiArrayDataResponse(AdminUser, {
     status: 201,
     description: 'The created users',
@@ -107,6 +110,8 @@ export class UsersController {
    * Must be defined before :id to prevent 'me' being parsed as an integer.
    */
   @Get('me')
+  @ApiOperation({ summary: "Get the current user's own profile" })
+  @ApiAuth()
   @ApiDataResponse(AdminUser)
   public getMe(@ActiveUser() activeUser: ActiveUserData) {
     return this.usersService.findOneById(activeUser.sub)
@@ -132,7 +137,7 @@ export class UsersController {
    */
   @Post('avatar-options')
   @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiOperation({ summary: 'Add a new avatar option (admin only)' })
   @ApiConsumes('multipart/form-data')
   @ApiDataResponse(AvatarOption, {
@@ -161,7 +166,7 @@ export class UsersController {
    */
   @Delete('avatar-options/:id')
   @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiOperation({ summary: 'Remove an avatar option (admin only)' })
   @ApiDataResponse(MessageResponseDto, { description: 'Avatar option removed' })
   @ApiResponse({ status: 404, description: 'Option not found' })
@@ -201,6 +206,8 @@ export class UsersController {
    */
   @Roles(UserRole.ADMIN)
   @Get(':id')
+  @ApiOperation({ summary: 'Get a single user by id (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(AdminUser)
   public getUser(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.findOneById(id)
@@ -211,7 +218,7 @@ export class UsersController {
    * Must be declared before :id to prevent 'me' being parsed as an integer.
    */
   @Patch('me')
-  @ApiBearerAuth()
+  @ApiAuth()
   @ApiOperation({ summary: "Update the current user's profile" })
   @ApiDataResponse(AdminUser, { description: 'Profile updated successfully' })
   public updateMe(
@@ -228,7 +235,7 @@ export class UsersController {
    * Select a predefined avatar for the currently logged-in user.
    */
   @Patch('avatar')
-  @ApiBearerAuth()
+  @ApiAuth()
   @ApiOperation({ summary: 'Select a predefined avatar' })
   @ApiDataResponse(AdminUser, { description: 'Avatar updated successfully' })
   @ApiResponse({ status: 400, description: 'Unknown avatar option id' })
@@ -244,6 +251,8 @@ export class UsersController {
    */
   @Roles(UserRole.ADMIN)
   @Patch(':id/role')
+  @ApiOperation({ summary: "Change a user's role (admin only)" })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(AdminUser, { description: 'Role updated' })
   public changeUserRole(
     @Param('id', ParseIntPipe) id: number,
@@ -262,6 +271,8 @@ export class UsersController {
    */
   @Roles(UserRole.ADMIN)
   @Patch(':id')
+  @ApiOperation({ summary: 'Update a user (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(AdminUser, { description: 'User updated' })
   public updateUser(
     @Param('id', ParseIntPipe) id: number,
@@ -276,6 +287,8 @@ export class UsersController {
    */
   @Roles(UserRole.ADMIN)
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a user (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(MessageResponseDto, { description: 'User deleted' })
   public deleteUser(
     @Param('id', ParseIntPipe) id: number,

@@ -27,8 +27,14 @@ import { ChangePasswordDto } from './dtos/change-password.dto'
 import { ActiveUser } from './decorators/active-user.decorator'
 import type { ActiveUserData } from './interfaces/active-user-data.interface'
 import jwtConfig from './config/jwt.config'
+import { ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ApiDataResponse } from 'src/common/swagger/api-response.helpers'
+import { ApiAuth } from 'src/common/swagger/api-auth.helpers'
+import { AuthTokensDto } from './dtos/auth-tokens.dto'
+import { MessageResponseDto } from 'src/common/dto/message-response.dto'
 
 @Controller('auth')
+@ApiTags('Auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -53,6 +59,8 @@ export class AuthController {
   @Post('sign-in')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Sign in with email and password' })
+  @ApiDataResponse(AuthTokensDto, { description: 'Access and refresh tokens' })
   public async signIn(
     @Body() signInDto: SignInDto,
     @Res({ passthrough: true }) res: Response,
@@ -73,6 +81,10 @@ export class AuthController {
   @Post('refresh-tokens')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Exchange a refresh token for a new token pair' })
+  @ApiDataResponse(AuthTokensDto, {
+    description: 'New access and refresh tokens',
+  })
   public async refreshTokens(
     @Body() refreshTokenDto: RefreshTokenDto,
     @Req() req: Request,
@@ -96,6 +108,10 @@ export class AuthController {
   @Auth(AuthType.None)
   @Post('sign-out')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Clear the refresh token cookie (browser sign-out)',
+  })
+  @ApiDataResponse(MessageResponseDto)
   public signOut(@Res({ passthrough: true }) res: Response) {
     res.clearCookie('refreshToken', {
       httpOnly: true,
@@ -109,6 +125,8 @@ export class AuthController {
   @Auth(AuthType.None)
   @Get('verify-email')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify an email address from the emailed token' })
+  @ApiDataResponse(MessageResponseDto)
   public async verifyEmail(@Query() dto: VerifyEmailDto) {
     return this.authService.verifyEmail(dto.token)
   }
@@ -117,6 +135,8 @@ export class AuthController {
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: 300_000 } })
+  @ApiOperation({ summary: 'Resend the email verification link' })
+  @ApiDataResponse(MessageResponseDto)
   public async resendVerification(@Body() dto: ResendVerificationDto) {
     return this.authService.resendVerificationEmail(dto.email)
   }
@@ -125,6 +145,8 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: 300_000 } })
+  @ApiOperation({ summary: 'Start the password reset flow' })
+  @ApiDataResponse(MessageResponseDto)
   public async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email)
   }
@@ -133,6 +155,8 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Set a new password using the reset token' })
+  @ApiDataResponse(MessageResponseDto)
   public async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword)
   }
@@ -144,6 +168,9 @@ export class AuthController {
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Change the current user’s password' })
+  @ApiAuth()
+  @ApiDataResponse(MessageResponseDto)
   public async changePassword(
     @Body() dto: ChangePasswordDto,
     @ActiveUser() activeUser: ActiveUserData,

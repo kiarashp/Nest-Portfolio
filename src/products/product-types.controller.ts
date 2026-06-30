@@ -18,6 +18,7 @@ import {
   ApiArrayDataResponse,
   ApiDataResponse,
 } from 'src/common/swagger/api-response.helpers'
+import { ApiAuth } from 'src/common/swagger/api-auth.helpers'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { AuthType } from 'src/auth/enums/auth-type.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
@@ -70,6 +71,7 @@ export class ProductTypesController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Create a product type (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(ProductType, {
     status: 201,
     description: 'Product type created',
@@ -88,6 +90,7 @@ export class ProductTypesController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update a product type (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(ProductType)
   @ApiResponse({ status: 409, description: 'Name or slug already in use' })
   @Patch(':id')
@@ -104,6 +107,7 @@ export class ProductTypesController {
    */
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete a product type (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(DeleteResultDto)
   @ApiResponse({
     status: 409,
