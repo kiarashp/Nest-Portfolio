@@ -73,14 +73,15 @@ export class Post {
     nullable: true,
   })
   schema?: string
-  //   featuredImage
+  //   featuredImage — nullable so it can be explicitly cleared (e.g. when the
+  //   image it points at is deleted via DELETE /posts/:id/images/:fileId)
   @ApiPropertyOptional({ type: String, nullable: true })
   @Column({
     type: 'varchar',
     length: 1024,
     nullable: true,
   })
-  featuredImage?: string
+  featuredImage?: string | null
   //   publishOn
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   @Column({

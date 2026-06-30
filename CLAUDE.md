@@ -118,7 +118,7 @@ Entity relations:
 - `User` 1—N `Post` (eager-loaded author on `Post`)
 - `Post` 1—1 `MetaOption` (cascade + eager)
 - `Post` N—N `Tag` (eager, owning side with `@JoinTable`)
-- `Post` 1—N `UploadFile` (non-eager — only loaded explicitly, e.g. on post deletion for cleanup). `Post` also has a `@CreateDateColumn() createdAt: Date` used by the `startDate`/`endDate` filters on `GET /posts`.
+- `Post` 1—N `UploadFile` (non-eager — loaded explicitly for the image picker, single-image delete, and cleanup on post deletion). `Post` also has a `@CreateDateColumn() createdAt: Date` used by the `startDate`/`endDate` filters on `GET /posts`. `Post.featuredImage` is nullable (`string | null`) so it can be explicitly cleared when the image it points at is deleted.
 - `Product` 1—N `UploadFile` (non-eager, via nullable `UploadFile.productId` — mirrors `postId`; loaded explicitly for the image picker, single-image delete, and cleanup on product soft-delete)
 - `User` 1—N `UploadFile` (non-nullable — every upload is tied to the uploading user)
 - `AvatarOption` — standalone entity (`src/users/entities/avatar-option.entity.ts`), no FK to `User`. Columns: `id`, `url`, `publicId`, `createdAt`. Admins populate the pool via `POST /users/avatar-options`; users pick one with `PATCH /users/avatar`.
@@ -266,7 +266,7 @@ Because the e2e suites share one database and run in parallel, **a pagination te
 
 ### Uploads
 
-See `src/uploads/CLAUDE.md` for module internals, the `UploadFile` entity, and the `StorageProvider` swap pattern. Key cross-module facts: `UploadsModule` exports both `UploadsService` and `StorageProvider`. `UsersModule` injects `StorageProvider` directly for avatar options (no `UploadFile` row). `PostsModule` and `ProductsModule` go through `UploadsService` so each image becomes a tracked `UploadFile` row — posts pass `{ postId }`, products pass `{ productId }` — and clean them up on deletion (posts on hard-delete, products on soft-delete). Avatars are the only consumer that stores a bare URL with no `UploadFile` row.
+See `src/uploads/CLAUDE.md` for module internals, the `UploadFile` entity, and the `StorageProvider` swap pattern. Key cross-module facts: `UploadsModule` exports both `UploadsService` and `StorageProvider`. `UsersModule` injects `StorageProvider` directly for avatar options (no `UploadFile` row). `PostsModule` and `ProductsModule` go through `UploadsService` so each image becomes a tracked `UploadFile` row — posts pass `{ postId }`, products pass `{ productId }` — and clean them up on deletion (posts on hard-delete, products on soft-delete). Both modules also support deleting a single already-uploaded image: `DELETE /posts/:id/images/:fileId` (EDITOR/AUTHOR/ADMIN, editors limited to their own posts; clears `featuredImage` if it pointed there) and `DELETE /products/:id/images/:fileId` (ADMIN-only; clears `imageUrl`/`images`). Avatars are the only consumer that stores a bare URL with no `UploadFile` row.
 
 ### Audit logging
 

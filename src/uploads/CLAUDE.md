@@ -15,7 +15,7 @@ Guidance specific to this module. See the root `CLAUDE.md` for the high-level su
 
 `UploadFile` has nullable `postId` and `productId` foreign keys. Every row created for a parent is tied to it so the asset can be cleaned up later:
 
-- **Posts** — created through `POST /posts/:id/images` (`UploadPostImageProvider` passes `{ postId }`). `RemovePostProvider` loads the post with its `uploadFiles` relation and `deleteFile()`s each before deleting the post row.
+- **Posts** — created through `POST /posts/:id/images` (`UploadPostImageProvider` passes `{ postId }`). `RemovePostProvider` loads the post with its `uploadFiles` relation and `deleteFile()`s each before deleting the post row; `DeletePostImageProvider` (`DELETE /posts/:id/images/:fileId`) removes a single one and clears `featuredImage` if it pointed there. Editors may only delete images on posts they authored.
 - **Products** — created through `POST /products/:id/images` (`UploadProductImageProvider` passes `{ productId }`). `DeleteProductProvider.softDelete` queries `UploadFile` by `productId` and `deleteFile()`s each before soft-deleting; `DeleteProductImageProvider` (`DELETE /products/:id/images/:fileId`) removes a single one. See `src/products/CLAUDE.md`.
 
 Avatars bypass `UploadFile` entirely — `AvatarOptionsProvider` injects `StorageProvider` directly and writes to `AvatarOption`, a separate table with no `postId`/`productId`.
@@ -44,7 +44,7 @@ Nothing else needs to change. Never import `CloudinaryProvider` from outside thi
 
 `UploadsModule` exports `UploadsService` and `StorageProvider`. Current consumers:
 - `UsersModule` — avatar pool management via `AvatarOptionsProvider`, which injects `StorageProvider` directly (no `UploadFile` rows created). `UploadsModule` is also imported so `StorageProvider` is available in the DI context.
-- `PostsModule` — post image upload via `UploadPostImageProvider` (folder: `posts/<postId>/`, with `postId` stored on the `UploadFile` row). Also queries `UploadFile` directly via `FindPostImagesProvider` (`GET /posts/:id/images`) — `UploadFile` is registered in `PostsModule`'s own `TypeOrmModule.forFeature` for this purpose.
+- `PostsModule` — post image upload via `UploadPostImageProvider` (folder: `posts/<postId>/`, with `postId` stored on the `UploadFile` row). Also queries `UploadFile` directly via `FindPostImagesProvider` (`GET /posts/:id/images`) and `DeletePostImageProvider` (`DELETE /posts/:id/images/:fileId`) — `UploadFile` is registered in `PostsModule`'s own `TypeOrmModule.forFeature` for this purpose.
 - `ProductsModule` — product image upload via `UploadProductImageProvider`, which injects `UploadsService` (folder: `products/<productId>`, with `productId` stored on the `UploadFile` row). It also queries `UploadFile` directly (`FindProductImagesProvider`, `DeleteProductImageProvider`, and image cleanup in `DeleteProductProvider`) — `UploadFile` is registered in `ProductsModule`'s own `TypeOrmModule.forFeature` for this. `ProductsModule` imports `UploadsModule` for the exported `UploadsService` (it no longer uses `StorageProvider` directly).
 
 To add a consumer that needs full upload tracking (creates `UploadFile` rows): inject `UploadsService`.

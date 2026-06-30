@@ -17,6 +17,7 @@ import { UploadPostImageProvider } from './upload-post-image.provider'
 import { FindMyPostsProvider } from './find-my-posts.provider'
 import { ManagePostTagsProvider } from './manage-post-tags.provider'
 import { FindPostImagesProvider } from './find-post-images.provider'
+import { DeletePostImageProvider } from './delete-post-image.provider'
 import { PostTagsDto } from '../dto/post-tags.dto'
 
 @Injectable()
@@ -62,6 +63,10 @@ export class PostsService {
      * inject find post images provider
      */
     private readonly findPostImagesProvider: FindPostImagesProvider,
+    /**
+     * inject delete post image provider
+     */
+    private readonly deletePostImageProvider: DeletePostImageProvider,
   ) {}
 
   public async create(
@@ -129,6 +134,19 @@ export class PostsService {
     activeUser: ActiveUserData,
   ): Promise<UploadFile[]> {
     return await this.findPostImagesProvider.findPostImages(postId, activeUser)
+  }
+
+  /** Deletes a single image from a post and clears featuredImage if it pointed there. */
+  public async deletePostImage(
+    postId: number,
+    fileId: number,
+    activeUser: ActiveUserData,
+  ): Promise<{ deleted: boolean; id: number }> {
+    return await this.deletePostImageProvider.deletePostImage(
+      postId,
+      fileId,
+      activeUser,
+    )
   }
 
   /** Adds tags to a post without replacing existing ones. */

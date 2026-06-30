@@ -217,6 +217,24 @@ export class PostsController {
   }
 
   /**
+   * delete a single image from a post
+   */
+  @ApiOperation({ summary: 'Delete a single image from a post' })
+  @ApiDataResponse(DeleteResultDto)
+  @ApiResponse({ status: 403, description: 'Not the post author' })
+  @ApiResponse({ status: 404, description: 'Post or image not found' })
+  @ApiBearerAuth()
+  @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
+  @Delete(':id/images/:fileId')
+  removePostImage(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('fileId', ParseIntPipe) fileId: number,
+    @ActiveUser() activeUser: ActiveUserData,
+  ) {
+    return this.postsService.deletePostImage(id, fileId, activeUser)
+  }
+
+  /**
    * delete a post
    */
   @ApiDataResponse(DeleteResultDto)

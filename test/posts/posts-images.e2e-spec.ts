@@ -1,0 +1,209 @@
+import { INestApplication } from '@nestjs/common'
+import request from 'supertest'
+import { App } from 'supertest/types'
+import { DataSource, Repository } from 'typeorm'
+import { UserRole } from '../../src/auth/enums/user-role.enum'
+import { Post } from '../../src/posts/entities/post.entity'
+import { UploadFile } from '../../src/uploads/entities/upload-file.entity'
+import { ApiResponse, getAuthToken } from '../helpers/auth.helper'
+import { createApp } from '../helpers/create-app.helper'
+import { cleanupUsers, seedUser } from '../helpers/seed.helper'
+
+// Minimal JPEG buffer — starts with the SOI + APP0 JFIF magic bytes that
+// the file-type package needs to detect this as image/jpeg.
+const JPEG_MAGIC = Buffer.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+])
+
+describe('Posts images (e2e)', () => {
+  let app: INestApplication<App>
+  let dataSource: DataSource
+
+  let adminToken: string
+  let authorToken: string
+  let editorToken: string
+
+  let postRepo: Repository<Post>
+  let uploadFileRepo: Repository<UploadFile>
+
+  // Post authored by AUTHOR — the editor does not own it, so editor deletes 403.
+  let postId: number
+
+  // Per-call storage mocks: upload returns a unique URL each time so UploadFile
+  // rows never collide on the `path` lookup; delete is a spy we can assert on.
+  let uploadCounter = 0
+  const storageUpload = jest.fn().mockImplementation(() => {
+    uploadCounter += 1
+    return Promise.resolve({
+      url: `https://res.cloudinary.com/mock/image/upload/v1/posts/test-${uploadCounter}.jpg`,
+      publicId: `posts/test-${uploadCounter}`,
+    })
+  })
+  const storageDelete = jest.fn().mockResolvedValue(undefined)
+
+  const ADMIN_EMAIL = 'posts-images-admin@e2e.test'
+  const AUTHOR_EMAIL = 'posts-images-author@e2e.test'
+  const EDITOR_EMAIL = 'posts-images-editor@e2e.test'
+  const PASSWORD = 'Password1!'
+
+  const POST_SLUG = 'e2e-posts-images-post'
+
+  beforeAll(async () => {
+    ;({ app, dataSource } = await createApp({
+      storageMock: { upload: storageUpload, delete: storageDelete },
+    }))
+
+    postRepo = dataSource.getRepository(Post)
+    uploadFileRepo = dataSource.getRepository(UploadFile)
+
+    // Pre-cleanup: delete rows left by a previous failed run so seeds never hit
+    // unique-constraint conflicts. Each post's upload_file rows go first (FK to
+    // post), then the post itself (FK to users).
+    const existing = await postRepo.findOne({ where: { slug: POST_SLUG } })
+    if (existing) {
+      await uploadFileRepo.delete({ postId: existing.id })
+      await postRepo.delete({ id: existing.id })
+    }
+    await cleanupUsers(dataSource, [ADMIN_EMAIL, AUTHOR_EMAIL, EDITOR_EMAIL])
+
+    // Seed three users with different roles.
+    await seedUser(dataSource, {
+      email: ADMIN_EMAIL,
+      password: PASSWORD,
+      firstName: 'PostsImagesAdmin',
+      role: UserRole.ADMIN,
+    })
+    await seedUser(dataSource, {
+      email: AUTHOR_EMAIL,
+      password: PASSWORD,
+      firstName: 'PostsImagesAuthor',
+      role: UserRole.AUTHOR,
+    })
+    await seedUser(dataSource, {
+      email: EDITOR_EMAIL,
+      password: PASSWORD,
+      firstName: 'PostsImagesEditor',
+      role: UserRole.EDITOR,
+    })
+
+    adminToken = await getAuthToken(app, ADMIN_EMAIL, PASSWORD)
+    authorToken = await getAuthToken(app, AUTHOR_EMAIL, PASSWORD)
+    editorToken = await getAuthToken(app, EDITOR_EMAIL, PASSWORD)
+
+    // AUTHOR creates the post all the image tests operate on.
+    const createRes = await request(app.getHttpServer())
+      .post('/posts')
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({
+        title: 'E2E Posts Images Post',
+        postType: 'post',
+        slug: POST_SLUG,
+        status: 'published',
+      })
+    postId = (createRes.body as ApiResponse<Post>).data.id
+  })
+
+  afterAll(async () => {
+    // Remove image rows before the post (FK), then the post, then the users.
+    await uploadFileRepo.delete({ postId })
+    await postRepo.delete({ id: postId })
+    await cleanupUsers(dataSource, [ADMIN_EMAIL, AUTHOR_EMAIL, EDITOR_EMAIL])
+    await app.close()
+  })
+
+  // ── POST /posts/:id/images ──────────────────────────────────────────────
+
+  it('POST /posts/:id/images (ADMIN) → 201, returns an UploadFile linked to the post', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`/posts/${postId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'test.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+
+    const file = (res.body as ApiResponse<UploadFile>).data
+    expect(file.id).toBeDefined()
+    expect(file.postId).toBe(postId)
+    expect(file.path).toContain('cloudinary')
+  })
+
+  // ── DELETE /posts/:id/images/:fileId ────────────────────────────────────
+
+  it('DELETE /posts/:id/images/:fileId (ADMIN) → 200, removes the file and clears featuredImage', async () => {
+    // Upload an image, then point the post's featuredImage at it.
+    const upRes = await request(app.getHttpServer())
+      .post(`/posts/${postId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'featured.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file = (upRes.body as ApiResponse<UploadFile>).data
+
+    await request(app.getHttpServer())
+      .patch(`/posts/${postId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ featuredImage: file.path })
+      .expect(200)
+
+    storageDelete.mockClear()
+
+    const delRes = await request(app.getHttpServer())
+      .delete(`/posts/${postId}/images/${file.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    expect(
+      (delRes.body as ApiResponse<{ deleted: boolean; id: number }>).data,
+    ).toEqual({ deleted: true, id: file.id })
+
+    // The Cloudinary asset was deleted and the upload_file row is gone.
+    expect(storageDelete).toHaveBeenCalledWith(file.publicId)
+    const row: UploadFile | null = await uploadFileRepo.findOneBy({
+      id: file.id,
+    })
+    expect(row).toBeNull()
+
+    // The featuredImage was cleared since it pointed at the deleted file.
+    const post: Post | null = await postRepo.findOneBy({ id: postId })
+    expect(post!.featuredImage).toBeNull()
+  })
+
+  it('DELETE /posts/:id/images/:fileId for a non-existent file → 404', async () => {
+    await request(app.getHttpServer())
+      .delete(`/posts/${postId}/images/999999`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404)
+  })
+
+  it('DELETE /posts/:id/images/:fileId (EDITOR on a post they do not own) → 403', async () => {
+    // Upload an image as the author so there is a real file to target.
+    const upRes = await request(app.getHttpServer())
+      .post(`/posts/${postId}/images`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'editor-forbidden.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file = (upRes.body as ApiResponse<UploadFile>).data
+
+    storageDelete.mockClear()
+
+    // The editor did not author this post, so the delete is forbidden and the
+    // file is left untouched.
+    await request(app.getHttpServer())
+      .delete(`/posts/${postId}/images/${file.id}`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .expect(403)
+
+    expect(storageDelete).not.toHaveBeenCalled()
+    const row: UploadFile | null = await uploadFileRepo.findOneBy({
+      id: file.id,
+    })
+    expect(row).not.toBeNull()
+  })
+})
