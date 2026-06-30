@@ -102,7 +102,6 @@ describe('Posts CRUD (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'E2E Published Post',
-        postType: 'post',
         slug: 'e2e-published-post',
         status: 'published',
         tags: [tagId],
@@ -117,7 +116,6 @@ describe('Posts CRUD (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'E2E Draft Post',
-        postType: 'post',
         slug: 'e2e-draft-post',
         status: 'draft',
       })
@@ -130,7 +128,6 @@ describe('Posts CRUD (e2e)', () => {
       .set('Authorization', `Bearer ${editorToken}`)
       .send({
         title: 'E2E Editor Post',
-        postType: 'post',
         slug: 'e2e-editor-post',
         status: 'published',
       })
@@ -142,7 +139,6 @@ describe('Posts CRUD (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'E2E Post To Delete',
-        postType: 'post',
         slug: 'e2e-post-to-delete',
         status: 'published',
       })
@@ -181,7 +177,6 @@ describe('Posts CRUD (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'E2E Inline Create Post',
-        postType: 'post',
         slug: 'e2e-inline-create-post',
         status: 'draft',
       })
@@ -198,7 +193,6 @@ describe('Posts CRUD (e2e)', () => {
       .post('/posts')
       .send({
         title: 'Unauthorized',
-        postType: 'post',
         slug: 'e2e-unauth',
         status: 'draft',
       })
@@ -211,19 +205,10 @@ describe('Posts CRUD (e2e)', () => {
       .set('Authorization', `Bearer ${userToken}`)
       .send({
         title: 'User Post',
-        postType: 'post',
         slug: 'e2e-user-post',
         status: 'draft',
       })
       .expect(403)
-  })
-
-  it('POST /posts (missing required postType) → 400', async () => {
-    await request(app.getHttpServer())
-      .post('/posts')
-      .set('Authorization', `Bearer ${authorToken}`)
-      .send({ title: 'No PostType', slug: 'e2e-no-posttype', status: 'draft' })
-      .expect(400)
   })
 
   // ── GET /posts (public, paginated, published only) ─────────────────────────

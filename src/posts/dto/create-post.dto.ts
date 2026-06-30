@@ -4,7 +4,6 @@ import {
   IsEnum,
   IsInt,
   IsJSON,
-  IsNotEmpty,
   IsOptional,
   IsString,
   IsUrl,
@@ -12,7 +11,6 @@ import {
   MinLength,
 } from 'class-validator'
 import { PostStatus } from '../enums/postStatus.enum'
-import { PostType } from '../enums/postType.enum'
 import { CreatePostMetaOptionsDto } from '../../meta-options/dto/create-post-meta-options.dto'
 import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
@@ -28,15 +26,6 @@ export class CreatePostDto {
   @MaxLength(512)
   @IsOptional()
   title?: string
-  // postType
-  @ApiProperty({
-    enum: PostType,
-    description: 'Possible values: post, page, story, series',
-    example: 'post',
-  })
-  @IsEnum(PostType)
-  @IsNotEmpty()
-  postType!: PostType
   // slug — omit to auto-generate a unique draft slug
   @ApiPropertyOptional({
     description: 'The slug of the post',

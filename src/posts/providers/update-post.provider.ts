@@ -75,7 +75,6 @@ export class UpdatePostProvider {
 
     // Step 4: apply the updates.
     post.title = patchPostDto.title ?? post.title
-    post.postType = patchPostDto.postType ?? post.postType
     post.slug = patchPostDto.slug ?? post.slug
     post.status = patchPostDto.status ?? post.status
     post.content = patchPostDto.content ?? post.content

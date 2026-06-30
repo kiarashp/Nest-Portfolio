@@ -79,7 +79,6 @@ describe('GET /posts (keyword search) (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: `Post with ${TITLE_TERM} in title`,
-        postType: 'post',
         slug: 'search-e2e-title',
         status: 'published',
       })
@@ -91,7 +90,6 @@ describe('GET /posts (keyword search) (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'Search E2E Content Post',
-        postType: 'post',
         slug: 'search-e2e-content',
         status: 'published',
         content: `This post has ${CONTENT_TERM} in its body`,
@@ -104,7 +102,6 @@ describe('GET /posts (keyword search) (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: `Tagged post with ${TITLE_TERM}`,
-        postType: 'post',
         slug: 'search-e2e-tagged',
         status: 'published',
         tags: [tagId],
@@ -117,7 +114,6 @@ describe('GET /posts (keyword search) (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: `Draft with ${TITLE_TERM}`,
-        postType: 'post',
         slug: 'search-e2e-draft',
         status: 'draft',
       })

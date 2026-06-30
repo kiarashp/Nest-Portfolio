@@ -97,7 +97,6 @@ describe('POST|DELETE /posts/:id/tags (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'Tags Spec Author Post',
-        postType: 'post',
         slug: 'tags-spec-author-post',
         status: 'published',
         tags: [tagAId],
@@ -109,7 +108,6 @@ describe('POST|DELETE /posts/:id/tags (e2e)', () => {
       .set('Authorization', `Bearer ${editorToken}`)
       .send({
         title: 'Tags Spec Editor Post',
-        postType: 'post',
         slug: 'tags-spec-editor-post',
         status: 'published',
       })

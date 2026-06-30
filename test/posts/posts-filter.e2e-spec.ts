@@ -101,7 +101,6 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'Filter Post Tag A',
-        postType: 'post',
         slug: 'filter-post-tag-a',
         status: 'published',
         tags: [tagAId],
@@ -113,7 +112,6 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'Filter Post Tag AB',
-        postType: 'post',
         slug: 'filter-post-tag-ab',
         status: 'published',
         tags: [tagAId, tagBId],
@@ -125,7 +123,6 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'Filter Post Tag B',
-        postType: 'post',
         slug: 'filter-post-tag-b',
         status: 'published',
         tags: [tagBId],
@@ -138,7 +135,6 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
       .set('Authorization', `Bearer ${editorToken}`)
       .send({
         title: 'Filter Post No Tags',
-        postType: 'post',
         slug: 'filter-post-no-tags',
         status: 'published',
       })
@@ -150,7 +146,6 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'Filter Post Draft',
-        postType: 'post',
         slug: 'filter-post-draft',
         status: 'draft',
         tags: [tagAId],

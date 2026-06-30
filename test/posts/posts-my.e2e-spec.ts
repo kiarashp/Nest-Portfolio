@@ -74,7 +74,6 @@ describe('GET /posts/my (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'My Published Post',
-        postType: 'post',
         slug: 'my-posts-published',
         status: 'published',
       })
@@ -85,7 +84,6 @@ describe('GET /posts/my (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'My Draft Post',
-        postType: 'post',
         slug: 'my-posts-draft',
         status: 'draft',
       })
@@ -97,7 +95,6 @@ describe('GET /posts/my (e2e)', () => {
       .set('Authorization', `Bearer ${editorToken}`)
       .send({
         title: 'Editor Post',
-        postType: 'post',
         slug: 'my-posts-editor',
         status: 'published',
       })

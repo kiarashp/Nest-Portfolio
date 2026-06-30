@@ -96,7 +96,6 @@ describe('Posts images (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'E2E Posts Images Post',
-        postType: 'post',
         slug: POST_SLUG,
         status: 'published',
       })

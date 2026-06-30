@@ -10,7 +10,6 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { PostType } from '../enums/postType.enum'
 import { PostStatus } from '../enums/postStatus.enum'
 import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 import { User } from 'src/users/entities/user.entity'
@@ -32,15 +31,6 @@ export class Post {
     nullable: false,
   })
   title!: string
-  //   postType
-  @ApiProperty({ enum: PostType, example: PostType.POST })
-  @Column({
-    type: 'enum',
-    enum: PostType,
-    nullable: false,
-    default: PostType.POST,
-  })
-  postType!: PostType
   //   slug
   @ApiProperty({ example: 'my-first-post' })
   @Column({

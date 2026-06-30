@@ -65,7 +65,6 @@ describe('MetaOptions (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .send({
         title: 'E2E Meta Options Post',
-        postType: 'post',
         slug: 'e2e-meta-options-post',
         status: 'draft',
         metaOptions: { metaValue: META_VALUE },
