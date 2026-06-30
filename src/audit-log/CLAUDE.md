@@ -9,7 +9,7 @@ Guidance specific to this module. See the root `CLAUDE.md` for the high-level su
 - `entities/audit-log.entity.ts` — `audit_logs` table. Columns: `id`, `userId` (nullable int — null for self-service operations like registration), `action` (varchar 32), `entity` (varchar 64), `entityId` (int), `createdAt`. No FK to any other table; rows are never deleted.
 - `enums/audit-action.enum.ts` — `CREATE | UPDATE | DELETE | SOFT_DELETE`.
 - `providers/audit-log.service.ts` — `log(userId, action, entity, entityId)` (write) and `findAll(dto)` (paginated read for the admin endpoint).
-- `audit-log.controller.ts` — `GET /audit-logs`, ADMIN only; accepts `?entity` and `?action` filters (exact match).
+- `audit-log.controller.ts` — `GET /audit-logs`, ADMIN only; accepts `?entity` and `?action` filters (exact match). Documents auth/role in the spec via `@ApiAuth({ roles: [UserRole.ADMIN] })` and the response via `@ApiPaginatedResponse(AuditLog)` (the `AuditLog` entity is `@ApiProperty`-decorated) — see the root `CLAUDE.md` OpenAPI section.
 - `audit-log.module.ts` — exports `AuditLogService`; imports `PaginationModule`.
 
 ## Instrumented providers

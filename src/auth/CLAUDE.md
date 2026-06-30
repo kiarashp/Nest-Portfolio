@@ -68,6 +68,10 @@ This stricter model is intentional: MetaOption holds per-post SEO metadata and t
 
 **`RefreshTokensProvider.refreshTokens`** takes `{ refreshToken: string }` (not `RefreshTokenDto`) because by the time the controller calls it the token is already a guaranteed string. It throws `UnauthorizedException('Invalid refresh token')` on a bad/expired JWT, re-derives the user via `usersService.findOneById(payload.sub)`, and re-issues both tokens (rotation — no revocation list exists yet).
 
+## OpenAPI documentation
+
+Both auth controllers are grouped under `@ApiTags('Auth')` and every handler carries an `@ApiOperation` summary. Responses are typed via the shared helpers (see the root `CLAUDE.md` OpenAPI section): `sign-in`, `refresh-tokens`, and Google `authenticate` return `AuthTokensDto` (`src/auth/dtos/auth-tokens.dto.ts` — documents the `{ accessToken, refreshToken }` shape from `interfaces/generated-tokens.ts`); `sign-out`, `verify-email`, `resend-verification`, `forgot-password`, `reset-password`, and `change-password` return `MessageResponseDto`. All of these are still wrapped by `DataResponseInterceptor` as `{ apiVersion, data }`, so the helpers apply normally. Only `POST /auth/change-password` is Bearer-protected, so it alone carries `@ApiAuth()` (bearer + 401); every other auth route is `@Auth(AuthType.None)` (public) and gets no `ApiAuth`.
+
 ## Module dependency: Auth → Users (one-way, no cycle)
 
 `AuthModule` imports `UsersModule` and `CryptoModule`. `UsersModule` imports only `CryptoModule` — it does not import `AuthModule`. There is no circular dependency and no `forwardRef()` anywhere in these two modules.

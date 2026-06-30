@@ -190,6 +190,12 @@ The **posts** module is also fully response-typed using these same helpers — s
 `CLAUDE.md` Serialization section for the rationale, the `PublicAuthor` embedded-author pattern,
 and how to extend this to other modules.
 
+Both controllers' write/admin routes (everything except the public reads) are ADMIN-only and
+carry `@ApiAuth({ roles: [UserRole.ADMIN] })` from `src/common/swagger/api-auth.helpers.ts`,
+which documents the Bearer requirement plus `401`/`403` (the `403` description names the required
+role) — see the root `CLAUDE.md` OpenAPI section. Products have no per-row ownership, so no
+`ownership` note is passed. The `409` conflict responses stay as separate `@ApiResponse` decorators.
+
 ## Data-source registration
 
 `Product` and `ProductType` are registered in `src/database/data-source.ts` (used by the TypeORM migration CLI). They must be kept in sync with the entities listed in `TypeOrmModule.forFeature` in `products.module.ts`. When adding a column or relation, generate a migration — see the root `CLAUDE.md` Migrations section.

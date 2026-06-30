@@ -54,3 +54,26 @@ No engagement tracking. Needs:
 - `POST /newsletter/unsubscribe` (public) — unsubscribes via token
 - Admin send-blast endpoint out of scope for now
 
+---
+
+### Decide: should `GET /meta-options/:id` be ownership-gated?
+
+**Current behavior (intentional):** `GET /meta-options/:id` is role-gated
+(EDITOR/AUTHOR/ADMIN) but **not** ownership-gated — any of those roles can read any
+meta-option regardless of who owns the linked post. The write routes
+(`PATCH`/`DELETE`) *are* ownership-gated (non-ADMIN limited to their own posts'
+meta-options). This asymmetry is deliberate and is asserted by an explicit test:
+`test/meta-options/meta-options.e2e-spec.ts` → "GET /meta-options/:id (as non-owner
+AUTHOR) → 200 — read is not ownership-gated".
+
+This was flagged during the OpenAPI auth-docs audit. Meta-option data is per-post SEO
+metadata (low sensitivity), so leaving reads open is defensible, but if we want reads
+to match the write ownership model:
+- Thread `@ActiveUser()` into `MetaOptionsController.findOne` → `MetaOptionsService.findOne`
+  → a guarded lookup, reusing the same check as `UpdateMetaOptionProvider`
+  (`activeUser.role !== ADMIN && metaOption.post.author.id !== activeUser.sub` → 403).
+  `FindOneMetaOptionProvider.findOneById` already eager-loads `post.author`, so no new query.
+- Update the e2e test above (the non-owner case flips from 200 to 403) and the
+  `@ApiAuth` ownership note on the `GET` route in `meta-options.controller.ts`.
+- Decision needed first: is cross-author read of SEO metadata actually a problem? If not, leave as-is.
+
