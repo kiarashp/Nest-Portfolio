@@ -1,6 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common'
-import { Throttle } from '@nestjs/throttler'
+import { SkipThrottle, Throttle } from '@nestjs/throttler'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { isDevelopmentEnvironment } from 'src/common/throttle/is-development.util'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { AuthType } from 'src/auth/enums/auth-type.enum'
 import { CreateContactDto } from './dtos/create-contact.dto'
@@ -21,6 +22,7 @@ export class ContactController {
    */
   @Auth(AuthType.None)
   @Throttle({ default: { limit: 3, ttl: 300_000 } })
+  @SkipThrottle({ default: isDevelopmentEnvironment })
   @HttpCode(HttpStatus.CREATED)
   @Post()
   @ApiOperation({ summary: 'Submit a contact form message' })

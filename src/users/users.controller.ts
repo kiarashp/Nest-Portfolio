@@ -20,7 +20,8 @@ import {
 import type { Request } from 'express'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
-import { Throttle } from '@nestjs/throttler'
+import { SkipThrottle, Throttle } from '@nestjs/throttler'
+import { isDevelopmentEnvironment } from 'src/common/throttle/is-development.util'
 import { CreateUserDto } from './dtos/create-user.dtos'
 import { PatchUserDto } from './dtos/patch-user.dto'
 import { UsersService } from './providers/users.service'
@@ -85,6 +86,7 @@ export class UsersController {
   @Auth(AuthType.None)
   @Post()
   @Throttle({ default: { limit: 5, ttl: 600_000 } })
+  @SkipThrottle({ default: isDevelopmentEnvironment })
   @ApiOperation({ summary: 'Register a new user' })
   @ApiDataResponse(AdminUser, { status: 201, description: 'User registered' })
   public createUser(@Body() createUserDto: CreateUserDto) {

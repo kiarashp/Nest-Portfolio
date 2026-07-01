@@ -29,9 +29,11 @@ pnpm run test:debug          # node --inspect-brk for debugging a jest run
 
 pnpm run doc                 # compodoc, served on port 3001, output to ./documentation
 
-pnpm run seed:admin          # create or promote the first admin user — works against any NODE_ENV, including production
+pnpm run seed:admin          # create or promote the first admin user — reads whatever NODE_ENV is already set in your shell (defaults to .env if unset); works against any env, including production
 pnpm run seed:dev            # seed an editor/author/user (plus the admin), tags, posts, product types, and products —
-                             # idempotent, safe to re-run; works against any NODE_ENV like seed:admin (see Database seeds section below)
+                             # idempotent, safe to re-run; hardcodes NODE_ENV=development (loads .env.development) — see Database seeds section below
+pnpm run seed:prod           # same script as seed:dev, but hardcodes NODE_ENV=production (loads .env.production) —
+                             # WARNING: writes the same hardcoded placeholder tags/posts/products into production, publicly visible; edit the literals in dev-data.seed.ts first
 
 pnpm run generate:schema     # boot the NestJS app (no HTTP server), write openapi.json, exit — requires dev DB running
 pnpm run generate:types      # the one you normally run: chains generate:schema then openapi-typescript → openapi-types.ts
@@ -105,12 +107,13 @@ Seed scripts live in `src/database/seeds/`. They use `NestFactory.createApplicat
 - Safe to run multiple times
 
 ```bash
-pnpm run seed:admin   # uses NODE_ENV=development → .env.development
+NODE_ENV=development pnpm run seed:admin   # NODE_ENV isn't baked into this script — set it explicitly, or it
+                                            # falls back to whatever's already in your shell (or plain .env if unset)
 ```
 
 `SeedModule` (`src/database/seeds/seed.module.ts`) is a minimal module — only `ConfigModule` + `TypeOrmModule`. It skips Joi validation intentionally (the seed only needs DB vars). All entities must be listed explicitly in `entities: [...]` because `autoLoadEntities` only works when all feature modules are loaded.
 
-**Data seed** (`src/database/seeds/dev-data.seed.ts`) — works against any environment, exactly like `admin.seed.ts` (point `NODE_ENV` at the target env, it reads that env's DB credentials; there is no production guard):
+**Data seed** (`src/database/seeds/dev-data.seed.ts`) — runs against whichever env its npm script hardcodes (`seed:dev` → `NODE_ENV=development`, `seed:prod` → `NODE_ENV=production`; there is no production guard in the script itself, only in which script you choose to run):
 - Ensures the admin user exists (same `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD` env vars and upsert-or-promote logic as `admin.seed.ts`), plus one editor/author/user account via `SEED_EDITOR_EMAIL`/`SEED_EDITOR_PASSWORD`, `SEED_AUTHOR_EMAIL`/`SEED_AUTHOR_PASSWORD`, `SEED_USER_EMAIL`/`SEED_USER_PASSWORD` — same pattern as the admin vars (email defaults to an obvious placeholder, password is required; the script fails fast listing every missing `*_PASSWORD` var before writing anything)
 - Seeds ~4 tags, ~4 posts (mixed `PostStatus`, tagged, authored by the seeded editor/author), 2 `ProductType`s (Thermocouples, Cables) with `filterableFields`, and ~6 `Product`s with matching `specs` — **this content is hardcoded placeholder example copy** (precision-tools starter catalog with `placehold.co` images). If you run this against production, edit the tag/post/product-type/product literals in the script first — they are created exactly as written, published and publicly visible.
 - Idempotent — every record is looked up by its unique email/slug first and skipped if already present
@@ -122,7 +125,11 @@ SEED_ADMIN_EMAIL=you@example.com   SEED_ADMIN_PASSWORD=yourpassword   \
 SEED_EDITOR_EMAIL=ed@example.com   SEED_EDITOR_PASSWORD=yourpassword  \
 SEED_AUTHOR_EMAIL=au@example.com   SEED_AUTHOR_PASSWORD=yourpassword  \
 SEED_USER_EMAIL=user@example.com   SEED_USER_PASSWORD=yourpassword    \
-pnpm run seed:dev   # NODE_ENV selects the target env's .env.<NODE_ENV> file, same as admin.seed.ts
+pnpm run seed:dev   # loads .env.development (NODE_ENV=development is baked into the script)
+
+# same command, but loads .env.production instead — only run this after editing the
+# hardcoded tag/post/product-type/product literals in dev-data.seed.ts, they go live as-is
+pnpm run seed:prod
 ```
 
 `DevSeedModule` (`src/database/seeds/dev-seed.module.ts`) extends the minimal pattern: it imports `TagsModule`, `PostsModule`, and `ProductsModule` for their real service layer, plus `EventEmitterModule.forRoot()` — required because `PostsModule` pulls in `UsersModule`, and `CreateUserProvider` depends on `EventEmitter2`, which is normally only registered globally by `AppModule`. Its `entities: [...]` list also includes `AvatarOption` and `AuditLog` (pulled in transitively by `UsersModule` and `AuditLogModule`) alongside `Product`/`ProductType` — `seed.module.ts` itself is untouched and still used only by `admin.seed.ts`.
@@ -176,6 +183,8 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 | `POST /contact` | 3 / 300s |
 
 `ttl` is in milliseconds. To skip throttling on a route entirely, use `@SkipThrottle()`. To tighten limits on a new sensitive endpoint, add `@Throttle({ default: { limit, ttl } })` directly on the handler — no module changes needed.
+
+**Dev-only bypass:** every endpoint in the table above also carries `@SkipThrottle({ default: isDevelopmentEnvironment })` (`src/common/throttle/is-development.util.ts`), so when `NODE_ENV=development` (i.e. `pnpm run start:dev`) none of these routes are throttled at all — this lets frontend/Playwright test suites hit the local dev backend repeatedly (e.g. registering many test users) without tripping rate limits. The condition is deliberately `NODE_ENV === 'development'`, not `!== 'production'`: the backend's own e2e suite runs with `NODE_ENV=test` and `test/auth/throttle.e2e-spec.ts` asserts real 429s at these limits, so `test` (and `staging`) must keep the production behavior unchanged. `@Throttle()`/`@SkipThrottle()` args are evaluated at class-definition time, before `ConfigService` exists, so `isDevelopmentEnvironment` reads `process.env.NODE_ENV` directly — the same exception `app.module.ts` already takes when picking `envFilePath`.
 
 ### Auth
 

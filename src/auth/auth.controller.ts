@@ -13,7 +13,8 @@ import {
 } from '@nestjs/common'
 import type { ConfigType } from '@nestjs/config'
 import type { Request, Response } from 'express'
-import { Throttle } from '@nestjs/throttler'
+import { SkipThrottle, Throttle } from '@nestjs/throttler'
+import { isDevelopmentEnvironment } from 'src/common/throttle/is-development.util'
 import { AuthService } from './providers/auth.service'
 import { SignInDto } from './dtos/signin.dto'
 import { Auth } from './decorators/auth.decorator'
@@ -59,6 +60,7 @@ export class AuthController {
   @Post('sign-in')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @SkipThrottle({ default: isDevelopmentEnvironment })
   @ApiOperation({ summary: 'Sign in with email and password' })
   @ApiDataResponse(AuthTokensDto, { description: 'Access and refresh tokens' })
   public async signIn(
@@ -81,6 +83,7 @@ export class AuthController {
   @Post('refresh-tokens')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @SkipThrottle({ default: isDevelopmentEnvironment })
   @ApiOperation({ summary: 'Exchange a refresh token for a new token pair' })
   @ApiDataResponse(AuthTokensDto, {
     description: 'New access and refresh tokens',
@@ -135,6 +138,7 @@ export class AuthController {
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: 300_000 } })
+  @SkipThrottle({ default: isDevelopmentEnvironment })
   @ApiOperation({ summary: 'Resend the email verification link' })
   @ApiDataResponse(MessageResponseDto)
   public async resendVerification(@Body() dto: ResendVerificationDto) {
@@ -145,6 +149,7 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: 300_000 } })
+  @SkipThrottle({ default: isDevelopmentEnvironment })
   @ApiOperation({ summary: 'Start the password reset flow' })
   @ApiDataResponse(MessageResponseDto)
   public async forgotPassword(@Body() dto: ForgotPasswordDto) {
@@ -155,6 +160,7 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @SkipThrottle({ default: isDevelopmentEnvironment })
   @ApiOperation({ summary: 'Set a new password using the reset token' })
   @ApiDataResponse(MessageResponseDto)
   public async resetPassword(@Body() dto: ResetPasswordDto) {
@@ -168,6 +174,7 @@ export class AuthController {
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @SkipThrottle({ default: isDevelopmentEnvironment })
   @ApiOperation({ summary: 'Change the current user’s password' })
   @ApiAuth()
   @ApiDataResponse(MessageResponseDto)
