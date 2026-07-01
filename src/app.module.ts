@@ -28,12 +28,22 @@ import { TerminusModule } from '@nestjs/terminus'
 import { EventEmitterModule } from '@nestjs/event-emitter'
 import { AuditLogModule } from './audit-log/audit-log.module'
 import { ProductsModule } from './products/products.module'
+import { isDevelopmentEnvironment } from './common/throttle/is-development.util'
 
 const ENV = process.env.NODE_ENV
 
 @Module({
   imports: [
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
+    // Global default limit is relaxed under NODE_ENV=development so local
+    // Playwright/frontend test runs aren't rate-limited on every route (e.g.
+    // GET /users/me) — test/staging/production keep the real 60/60s limit.
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60_000,
+        limit: isDevelopmentEnvironment ? 1_000_000 : 60,
+      },
+    ]),
     TerminusModule,
     EventEmitterModule.forRoot(),
     UsersModule,

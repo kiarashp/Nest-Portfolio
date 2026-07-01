@@ -167,7 +167,7 @@ Entity relations:
 
 ### Rate limiting
 
-`@nestjs/throttler` is configured in `AppModule` with a single named throttler (`default`, 60 req / 60s per IP). `ThrottlerGuard` is the first `APP_GUARD` so rate limits fire before any DB access. Limits use an in-memory store (no Redis needed).
+`@nestjs/throttler` is configured in `AppModule` with a single named throttler (`default`, 60 req / 60s per IP in test/staging/production — see the dev-only bypass below). `ThrottlerGuard` is the first `APP_GUARD` so rate limits fire before any DB access. Limits use an in-memory store (no Redis needed). This global default is what protects routes with no per-route `@Throttle()` override, e.g. `GET /users/me`.
 
 Auth endpoints override the global default with `@Throttle({ default: { limit, ttl } })`:
 
@@ -184,7 +184,7 @@ Auth endpoints override the global default with `@Throttle({ default: { limit, t
 
 `ttl` is in milliseconds. To skip throttling on a route entirely, use `@SkipThrottle()`. To tighten limits on a new sensitive endpoint, add `@Throttle({ default: { limit, ttl } })` directly on the handler — no module changes needed.
 
-**Dev-only bypass:** every endpoint in the table above also carries `@SkipThrottle({ default: isDevelopmentEnvironment })` (`src/common/throttle/is-development.util.ts`), so when `NODE_ENV=development` (i.e. `pnpm run start:dev`) none of these routes are throttled at all — this lets frontend/Playwright test suites hit the local dev backend repeatedly (e.g. registering many test users) without tripping rate limits. The condition is deliberately `NODE_ENV === 'development'`, not `!== 'production'`: the backend's own e2e suite runs with `NODE_ENV=test` and `test/auth/throttle.e2e-spec.ts` asserts real 429s at these limits, so `test` (and `staging`) must keep the production behavior unchanged. `@Throttle()`/`@SkipThrottle()` args are evaluated at class-definition time, before `ConfigService` exists, so `isDevelopmentEnvironment` reads `process.env.NODE_ENV` directly — the same exception `app.module.ts` already takes when picking `envFilePath`.
+**Dev-only bypass:** every endpoint in the table above also carries `@SkipThrottle({ default: isDevelopmentEnvironment })` (`src/common/throttle/is-development.util.ts`), so when `NODE_ENV=development` (i.e. `pnpm run start:dev`) none of these routes are throttled at all — this lets frontend/Playwright test suites hit the local dev backend repeatedly (e.g. registering many test users) without tripping rate limits. The **global default** throttler gets the same treatment a different way: `ThrottlerModule.forRoot` in `app.module.ts` sets `limit: isDevelopmentEnvironment ? 1_000_000 : 60` (decorators can't express a global module-level bypass, so the numeric limit itself is raised instead of using `@SkipThrottle`) — this is what protects routes with no per-route `@Throttle()`, like `GET /users/me`, which otherwise 429s under heavy parallel test load. The condition is deliberately `NODE_ENV === 'development'`, not `!== 'production'`: the backend's own e2e suite runs with `NODE_ENV=test` and `test/auth/throttle.e2e-spec.ts` asserts real 429s at these limits, so `test` (and `staging`) must keep the production behavior unchanged. `@Throttle()`/`@SkipThrottle()` args (and the `ThrottlerModule.forRoot` array) are evaluated at class/module-definition time, before `ConfigService` exists, so `isDevelopmentEnvironment` reads `process.env.NODE_ENV` directly — the same exception `app.module.ts` already takes when picking `envFilePath`.
 
 ### Auth
 
