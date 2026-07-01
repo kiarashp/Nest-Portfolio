@@ -9,6 +9,7 @@ import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { CreatePostProvider } from './create-post.provider'
 import { FindOnePostProvider } from './find-one-post.provider'
+import { FindOnePostForEditProvider } from './find-one-post-for-edit.provider'
 import { FindAllPostsProvider } from './find-all-posts.provider'
 import { FindPostBySlugProvider } from './find-post-by-slug.provider'
 import { UpdatePostProvider } from './update-post.provider'
@@ -31,6 +32,10 @@ export class PostsService {
      * inject find one post provider
      */
     private readonly findOnePostProvider: FindOnePostProvider,
+    /**
+     * inject find one post for edit provider
+     */
+    private readonly findOnePostForEditProvider: FindOnePostForEditProvider,
     /**
      * inject find all posts provider
      */
@@ -106,6 +111,14 @@ export class PostsService {
 
   public async findOne(id: number): Promise<Post> {
     return await this.findOnePostProvider.findOnePublishedByIdOrFail(id)
+  }
+
+  /** Returns a post by ID regardless of status — staff edit form use only. */
+  public async findOneForEdit(
+    id: number,
+    activeUser: ActiveUserData,
+  ): Promise<Post> {
+    return await this.findOnePostForEditProvider.findOneForEdit(id, activeUser)
   }
 
   public async findBySlug(slug: string): Promise<Post> {

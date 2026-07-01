@@ -136,6 +136,26 @@ export class PostsController {
   }
 
   /**
+   * get a single post by id regardless of status — used by the staff edit form,
+   * since GET /posts/:id only returns published posts
+   */
+  @ApiOperation({
+    summary:
+      'Get a single post by ID, any status (author and admin dashboard view)',
+  })
+  @ApiAuth({ roles: POST_WRITE_ROLES, ownership: POST_OWNERSHIP })
+  @ApiDataResponse(PostEntity)
+  @ApiResponse({ status: 404, description: 'Post not found' })
+  @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
+  @Get(':id/admin')
+  findOneForEdit(
+    @Param('id', ParseIntPipe) id: number,
+    @ActiveUser() activeUser: ActiveUserData,
+  ) {
+    return this.postsService.findOneForEdit(id, activeUser)
+  }
+
+  /**
    * update a post
    */
   @ApiOperation({ summary: 'Update a post' })

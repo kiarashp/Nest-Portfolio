@@ -9,6 +9,7 @@ import { TagsModule } from 'src/tags/tags.module'
 import { PaginationModule } from 'src/common/pagination/pagination.module'
 import { CreatePostProvider } from './providers/create-post.provider'
 import { FindOnePostProvider } from './providers/find-one-post.provider'
+import { FindOnePostForEditProvider } from './providers/find-one-post-for-edit.provider'
 import { FindAllPostsProvider } from './providers/find-all-posts.provider'
 import { FindPostBySlugProvider } from './providers/find-post-by-slug.provider'
 import { UpdatePostProvider } from './providers/update-post.provider'
@@ -28,6 +29,7 @@ import { UploadFile } from 'src/uploads/entities/upload-file.entity'
     PostsService,
     CreatePostProvider,
     FindOnePostProvider,
+    FindOnePostForEditProvider,
     FindAllPostsProvider,
     FindPostBySlugProvider,
     UpdatePostProvider,

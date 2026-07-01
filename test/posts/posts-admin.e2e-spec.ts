@@ -218,4 +218,57 @@ describe('GET /posts/admin (e2e)', () => {
     )
     expect(ids).not.toContain(authorDraftPostId)
   })
+
+  // ── GET /posts/:id/admin ────────────────────────────────────────────────
+
+  it('GET /posts/:id/admin (unauthenticated) → 401', async () => {
+    await request(app.getHttpServer())
+      .get(`/posts/${authorDraftPostId}/admin`)
+      .expect(401)
+  })
+
+  it('GET /posts/:id/admin (ADMIN) → 200 and returns a draft post', async () => {
+    // This is the whole point of the endpoint: GET /posts/:id (published-only)
+    // 404s on a draft, but /admin fetches it regardless of status.
+    const res = await request(app.getHttpServer())
+      .get(`/posts/${authorDraftPostId}/admin`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const post = (res.body as ApiResponse<Post>).data
+    expect(post.id).toBe(authorDraftPostId)
+    expect(post.status).toBe('draft')
+  })
+
+  it('GET /posts/:id/admin (AUTHOR) → 200 for a draft authored by someone else', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/posts/${authorDraftPostId}/admin`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .expect(200)
+
+    const post = (res.body as ApiResponse<Post>).data
+    expect(post.id).toBe(authorDraftPostId)
+  })
+
+  it('GET /posts/:id/admin (EDITOR) → 403 for a draft authored by someone else', async () => {
+    await request(app.getHttpServer())
+      .get(`/posts/${authorDraftPostId}/admin`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .expect(403)
+  })
+
+  it('GET /posts/:id/admin → 404 for a non-existent post', async () => {
+    await request(app.getHttpServer())
+      .get('/posts/999999999/admin')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404)
+  })
+
+  it('GET /posts/:id (published-only) → 404 on the same draft that /admin can fetch', async () => {
+    // Confirms the gap this endpoint fills: the public single-post route
+    // cannot be used to load a draft for editing.
+    await request(app.getHttpServer())
+      .get(`/posts/${authorDraftPostId}`)
+      .expect(404)
+  })
 })
