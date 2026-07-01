@@ -1,16 +1,24 @@
 /**
- * Dev-data seed script. Dev-only — never run this against production.
+ * Data seed script. Works against any environment, exactly like admin.seed.ts
+ * — point NODE_ENV at the target env and it reads that env's DB credentials.
  *
- * Fills a fresh dev database with one user per role, a handful of tags and
- * posts, and a small product catalog, so the app can be exercised end-to-end
+ * Fills the database with one user per role, a handful of tags and posts,
+ * and a small product catalog, so the app can be exercised end-to-end
  * without manually clicking through every form:
  *
- *   SEED_ADMIN_EMAIL=you@example.com \
- *   SEED_ADMIN_PASSWORD=yourpassword  \
+ *   SEED_ADMIN_EMAIL=you@example.com   SEED_ADMIN_PASSWORD=yourpassword   \
+ *   SEED_EDITOR_EMAIL=ed@example.com   SEED_EDITOR_PASSWORD=yourpassword  \
+ *   SEED_AUTHOR_EMAIL=au@example.com   SEED_AUTHOR_PASSWORD=yourpassword  \
+ *   SEED_USER_EMAIL=user@example.com   SEED_USER_PASSWORD=yourpassword    \
  *   pnpm run seed:dev
  *
  * Safe to run multiple times — every record is created idempotently
  * (looked up by its unique email/slug first, skipped if it already exists).
+ *
+ * The tags/posts/product-types/products below are placeholder example
+ * content (precision-tools starter catalog). If you run this against
+ * production, edit that content first — it will be created exactly as
+ * written, published and publicly visible.
  */
 
 import { NestFactory } from '@nestjs/core'
@@ -31,29 +39,28 @@ import { ProductTypesService } from 'src/products/providers/product-types.servic
 import { PostStatus } from 'src/posts/enums/postStatus.enum'
 import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 
-// Dev-only accounts — hardcoded because this script only ever runs against a
-// local dev database, never production.
-const DEV_USERS = [
+// One env-var pair per non-admin role, mirroring SEED_ADMIN_EMAIL/PASSWORD —
+// email falls back to an obvious default, password is required.
+const ROLE_ENV_PREFIXES = [
   {
-    firstName: 'Eve',
-    lastName: 'Editor',
-    email: 'editor@example.com',
+    prefix: 'SEED_EDITOR',
     role: UserRole.EDITOR,
+    firstName: 'Editor',
+    defaultEmail: 'editor@example.com',
   },
   {
-    firstName: 'Ada',
-    lastName: 'Author',
-    email: 'author@example.com',
+    prefix: 'SEED_AUTHOR',
     role: UserRole.AUTHOR,
+    firstName: 'Author',
+    defaultEmail: 'author@example.com',
   },
   {
-    firstName: 'Uma',
-    lastName: 'User',
-    email: 'user@example.com',
+    prefix: 'SEED_USER',
     role: UserRole.USER,
+    firstName: 'User',
+    defaultEmail: 'user@example.com',
   },
 ]
-const DEV_USER_PASSWORD = 'DevPassword123!'
 
 async function findOrCreateUser(
   userRepository: Repository<User>,
@@ -98,11 +105,6 @@ function toActiveUser(user: User): ActiveUserData {
 }
 
 async function seed() {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('Error: dev-data.seed.ts must never run against production')
-    process.exit(1)
-  }
-
   const app = await NestFactory.createApplicationContext(DevSeedModule, {
     logger: ['error', 'warn'],
   })
@@ -126,8 +128,31 @@ async function seed() {
 
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com'
   const adminPassword = process.env.SEED_ADMIN_PASSWORD
-  if (!adminPassword) {
-    console.error('Error: SEED_ADMIN_PASSWORD environment variable is required')
+
+  // Resolve every role's email/password up front so a missing password fails
+  // fast, before any user has been written.
+  const roleUserDefs = ROLE_ENV_PREFIXES.map(
+    ({ prefix, role, firstName, defaultEmail }) => ({
+      firstName,
+      lastName: null,
+      role,
+      email: process.env[`${prefix}_EMAIL`] ?? defaultEmail,
+      password: process.env[`${prefix}_PASSWORD`],
+      passwordEnvVar: `${prefix}_PASSWORD`,
+    }),
+  )
+
+  const missingPasswordVars = [
+    ...(adminPassword ? [] : ['SEED_ADMIN_PASSWORD']),
+    ...roleUserDefs
+      .filter((data) => !data.password)
+      .map((data) => data.passwordEnvVar),
+  ]
+
+  if (missingPasswordVars.length > 0) {
+    console.error(
+      `Error: the following environment variables are required: ${missingPasswordVars.join(', ')}`,
+    )
     await app.close()
     process.exit(1)
   }
@@ -137,14 +162,14 @@ async function seed() {
     lastName: null,
     email: adminEmail,
     role: UserRole.ADMIN,
-    password: adminPassword,
+    password: adminPassword as string,
   })
 
   const [editor, author, regularUser] = await Promise.all(
-    DEV_USERS.map((data) =>
+    roleUserDefs.map((data) =>
       findOrCreateUser(userRepository, {
         ...data,
-        password: DEV_USER_PASSWORD,
+        password: data.password as string,
       }),
     ),
   )
@@ -366,9 +391,6 @@ async function seed() {
   console.log('\nSeed summary:')
   console.log(
     `  Users: admin=${admin.email}, editor=${editor.email}, author=${author.email}, user=${regularUser.email}`,
-  )
-  console.log(
-    `  Dev account password (editor/author/user): ${DEV_USER_PASSWORD}`,
   )
 
   await app.close()

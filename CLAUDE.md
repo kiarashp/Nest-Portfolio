@@ -29,9 +29,9 @@ pnpm run test:debug          # node --inspect-brk for debugging a jest run
 
 pnpm run doc                 # compodoc, served on port 3001, output to ./documentation
 
-pnpm run seed:admin          # create or promote the first admin user (reads NODE_ENV=development)
-pnpm run seed:dev            # dev-only: seed an editor/author/user (plus the admin), tags, posts, product types, and products —
-                             # idempotent, safe to re-run; never run in production (see Database seeds section below)
+pnpm run seed:admin          # create or promote the first admin user — works against any NODE_ENV, including production
+pnpm run seed:dev            # seed an editor/author/user (plus the admin), tags, posts, product types, and products —
+                             # idempotent, safe to re-run; works against any NODE_ENV like seed:admin (see Database seeds section below)
 
 pnpm run generate:schema     # boot the NestJS app (no HTTP server), write openapi.json, exit — requires dev DB running
 pnpm run generate:types      # the one you normally run: chains generate:schema then openapi-typescript → openapi-types.ts
@@ -110,15 +110,19 @@ pnpm run seed:admin   # uses NODE_ENV=development → .env.development
 
 `SeedModule` (`src/database/seeds/seed.module.ts`) is a minimal module — only `ConfigModule` + `TypeOrmModule`. It skips Joi validation intentionally (the seed only needs DB vars). All entities must be listed explicitly in `entities: [...]` because `autoLoadEntities` only works when all feature modules are loaded.
 
-**Dev-data seed** (`src/database/seeds/dev-data.seed.ts`), dev-only — exits immediately if `NODE_ENV=production`:
-- Ensures the admin user exists (same `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD` env vars and upsert-or-promote logic as `admin.seed.ts`), plus one hardcoded editor/author/user account (`editor@example.com` / `author@example.com` / `user@example.com`, password `DevPassword123!`) — never env-driven, since this script never touches production
-- Seeds ~4 tags, ~4 posts (mixed `PostStatus`, tagged, authored by the seeded editor/author), 2 `ProductType`s (Thermocouples, Cables) with `filterableFields`, and ~6 `Product`s with matching `specs`
+**Data seed** (`src/database/seeds/dev-data.seed.ts`) — works against any environment, exactly like `admin.seed.ts` (point `NODE_ENV` at the target env, it reads that env's DB credentials; there is no production guard):
+- Ensures the admin user exists (same `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD` env vars and upsert-or-promote logic as `admin.seed.ts`), plus one editor/author/user account via `SEED_EDITOR_EMAIL`/`SEED_EDITOR_PASSWORD`, `SEED_AUTHOR_EMAIL`/`SEED_AUTHOR_PASSWORD`, `SEED_USER_EMAIL`/`SEED_USER_PASSWORD` — same pattern as the admin vars (email defaults to an obvious placeholder, password is required; the script fails fast listing every missing `*_PASSWORD` var before writing anything)
+- Seeds ~4 tags, ~4 posts (mixed `PostStatus`, tagged, authored by the seeded editor/author), 2 `ProductType`s (Thermocouples, Cables) with `filterableFields`, and ~6 `Product`s with matching `specs` — **this content is hardcoded placeholder example copy** (precision-tools starter catalog with `placehold.co` images). If you run this against production, edit the tag/post/product-type/product literals in the script first — they are created exactly as written, published and publicly visible.
 - Idempotent — every record is looked up by its unique email/slug first and skipped if already present
 - Users are created via direct repository writes + `bcryptjs` (mirroring `admin.seed.ts`), **not** `UsersService`/`CreateUserProvider` — that provider fires the `user.created` event (real email via `MailModule`) and leaves `isEmailVerified: false`, which blocks sign-in (`sign-in.provider.ts`). Seeded users get `isEmailVerified: true` set directly so they can sign in immediately.
 - Tags, posts, and products are created through their real `TagsService`/`PostsService`/`ProductsService`/`ProductTypesService` — these have no event side effects, so going through the service layer gives free DTO validation and audit-log entries.
 
 ```bash
-SEED_ADMIN_EMAIL=you@example.com SEED_ADMIN_PASSWORD=yourpassword pnpm run seed:dev   # uses NODE_ENV=development → .env.development
+SEED_ADMIN_EMAIL=you@example.com   SEED_ADMIN_PASSWORD=yourpassword   \
+SEED_EDITOR_EMAIL=ed@example.com   SEED_EDITOR_PASSWORD=yourpassword  \
+SEED_AUTHOR_EMAIL=au@example.com   SEED_AUTHOR_PASSWORD=yourpassword  \
+SEED_USER_EMAIL=user@example.com   SEED_USER_PASSWORD=yourpassword    \
+pnpm run seed:dev   # NODE_ENV selects the target env's .env.<NODE_ENV> file, same as admin.seed.ts
 ```
 
 `DevSeedModule` (`src/database/seeds/dev-seed.module.ts`) extends the minimal pattern: it imports `TagsModule`, `PostsModule`, and `ProductsModule` for their real service layer, plus `EventEmitterModule.forRoot()` — required because `PostsModule` pulls in `UsersModule`, and `CreateUserProvider` depends on `EventEmitter2`, which is normally only registered globally by `AppModule`. Its `entities: [...]` list also includes `AvatarOption` and `AuditLog` (pulled in transitively by `UsersModule` and `AuditLogModule`) alongside `Product`/`ProductType` — `seed.module.ts` itself is untouched and still used only by `admin.seed.ts`.
