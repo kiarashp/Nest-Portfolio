@@ -23,6 +23,8 @@ import { memoryStorage } from 'multer'
 import { SkipThrottle, Throttle } from '@nestjs/throttler'
 import { isDevelopmentEnvironment } from 'src/common/throttle/is-development.util'
 import { CreateUserDto } from './dtos/create-user.dtos'
+import { AdminCreateUserDto } from './dtos/admin-create-user.dto'
+import { SetEmailVerifiedDto } from './dtos/set-email-verified.dto'
 import { PatchUserDto } from './dtos/patch-user.dto'
 import { UsersService } from './providers/users.service'
 import {
@@ -106,6 +108,27 @@ export class UsersController {
   })
   public createManyUsers(@Body() createManyUsersDto: CreateManyUsersDto) {
     return this.usersService.createMany(createManyUsersDto)
+  }
+
+  /**
+   * Create a user with a chosen role and verified status — admin only.
+   * Unlike public registration, the admin picks the role directly. If
+   * isEmailVerified is left false, the new user still receives the normal
+   * verification email.
+   */
+  @Roles(UserRole.ADMIN)
+  @Post('admin')
+  @ApiOperation({
+    summary:
+      'Create a user with a chosen role and verified status (admin only)',
+  })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
+  @ApiDataResponse(AdminUser, { status: 201, description: 'User created' })
+  public createUserAsAdmin(
+    @Body() adminCreateUserDto: AdminCreateUserDto,
+    @ActiveUser('sub') activeUserId: number,
+  ) {
+    return this.usersService.adminCreateUser(adminCreateUserDto, activeUserId)
   }
 
   /**
@@ -265,6 +288,30 @@ export class UsersController {
     return this.usersService.changeUserRole(
       id,
       changeUserRoleDto.role,
+      activeUserId,
+    )
+  }
+
+  /**
+   * Set a user's email verification status — admin only
+   */
+  @Roles(UserRole.ADMIN)
+  @Patch(':id/verify-email')
+  @ApiOperation({
+    summary: "Set a user's email verification status (admin only)",
+  })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
+  @ApiDataResponse(AdminUser, {
+    description: 'Email verification status updated',
+  })
+  public setEmailVerified(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() setEmailVerifiedDto: SetEmailVerifiedDto,
+    @ActiveUser('sub') activeUserId: number,
+  ) {
+    return this.usersService.setEmailVerified(
+      id,
+      setEmailVerifiedDto.isEmailVerified,
       activeUserId,
     )
   }

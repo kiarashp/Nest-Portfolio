@@ -19,6 +19,9 @@ import { RemoveOneByIdProvider } from './remove-one-by-id.provider'
 import { SelectAvatarProvider } from './select-avatar.provider'
 import { AvatarOptionsProvider } from './avatar-options.provider'
 import { ChangeUserRoleProvider } from './change-user-role.provider'
+import { SetEmailVerifiedProvider } from './set-email-verified.provider'
+import { AdminCreateUserProvider } from './admin-create-user.provider'
+import { AdminCreateUserDto } from '../dtos/admin-create-user.dto'
 import { VerifyEmailProvider } from './verify-email.provider'
 import { ResendVerificationProvider } from './resend-verification.provider'
 import { UserRole } from 'src/auth/enums/user-role.enum'
@@ -77,6 +80,14 @@ export class UsersService {
      * inject change user role provider
      */
     private readonly changeUserRoleProvider: ChangeUserRoleProvider,
+    /**
+     * inject set email verified provider — used by the admin verify-email route
+     */
+    private readonly setEmailVerifiedProvider: SetEmailVerifiedProvider,
+    /**
+     * inject admin create user provider — used by the admin create route
+     */
+    private readonly adminCreateUserProvider: AdminCreateUserProvider,
     /**
      * inject verify email provider
      */
@@ -194,6 +205,31 @@ export class UsersService {
       role,
       activeUserId,
     )
+  }
+
+  /**
+   * Set a user's email verification status. Only callable by an admin. The
+   * acting admin's id is forwarded to the provider for audit logging.
+   */
+  public async setEmailVerified(
+    id: number,
+    isEmailVerified: boolean,
+    activeUserId: number,
+  ) {
+    return await this.setEmailVerifiedProvider.setEmailVerified(
+      id,
+      isEmailVerified,
+      activeUserId,
+    )
+  }
+
+  /**
+   * Create a new user on behalf of an admin, with an explicit role and
+   * verification status. The acting admin's id is forwarded to the provider
+   * for audit logging.
+   */
+  public async adminCreateUser(dto: AdminCreateUserDto, activeUserId: number) {
+    return await this.adminCreateUserProvider.adminCreateUser(dto, activeUserId)
   }
 
   public async verifyEmail(token: string) {

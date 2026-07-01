@@ -15,6 +15,8 @@ import { RemoveOneByIdProvider } from './providers/remove-one-by-id.provider'
 import { FindOneByIdProvider } from './providers/find-one-by-id.provider'
 import { SelectAvatarProvider } from './providers/select-avatar.provider'
 import { ChangeUserRoleProvider } from './providers/change-user-role.provider'
+import { SetEmailVerifiedProvider } from './providers/set-email-verified.provider'
+import { AdminCreateUserProvider } from './providers/admin-create-user.provider'
 import { VerifyEmailProvider } from './providers/verify-email.provider'
 import { ResendVerificationProvider } from './providers/resend-verification.provider'
 import { PatchUserProvider } from './providers/patch-user.provider'
@@ -46,6 +48,8 @@ import { AuditLogModule } from 'src/audit-log/audit-log.module'
     FindOneByIdProvider,
     SelectAvatarProvider,
     ChangeUserRoleProvider,
+    SetEmailVerifiedProvider,
+    AdminCreateUserProvider,
     VerifyEmailProvider,
     ResendVerificationProvider,
     PatchUserProvider,

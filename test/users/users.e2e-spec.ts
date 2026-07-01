@@ -17,6 +17,7 @@ describe('Users (e2e)', () => {
   let regularUserId: number
   let userToDeleteId: number
   let patchTargetId: number
+  let verifyTargetId: number
 
   const ADMIN_EMAIL = 'users-admin@e2e.test'
   const USER_EMAIL = 'users-user@e2e.test'
@@ -28,9 +29,19 @@ describe('Users (e2e)', () => {
   // User targeted by admin PATCH tests; second constant tracks the updated email.
   const PATCH_TARGET_EMAIL = 'users-patch@e2e.test'
   const PATCH_TARGET_UPDATED_EMAIL = 'users-patch-updated@e2e.test'
+  // User targeted by the admin verify-email toggle tests — seeded unverified.
+  const VERIFY_TARGET_EMAIL = 'users-verify-target@e2e.test'
+  // Emails used by the POST /users/admin tests.
+  const ADMIN_CREATED_VERIFIED_EMAIL = 'users-admin-created-verified@e2e.test'
+  const ADMIN_CREATED_UNVERIFIED_EMAIL =
+    'users-admin-created-unverified@e2e.test'
+
+  const sendVerificationMailMock = jest.fn().mockResolvedValue(undefined)
 
   beforeAll(async () => {
-    ;({ app, dataSource } = await createApp())
+    ;({ app, dataSource } = await createApp({
+      mailMock: { sendVerificationMail: sendVerificationMailMock },
+    }))
 
     await seedUser(dataSource, {
       email: ADMIN_EMAIL,
@@ -60,6 +71,14 @@ describe('Users (e2e)', () => {
     })
     patchTargetId = patchTarget.id
 
+    const verifyTarget = await seedUser(dataSource, {
+      email: VERIFY_TARGET_EMAIL,
+      password: PASSWORD,
+      firstName: 'VerifyTarget',
+      isEmailVerified: false,
+    })
+    verifyTargetId = verifyTarget.id
+
     adminToken = await getAuthToken(app, ADMIN_EMAIL, PASSWORD)
     userToken = await getAuthToken(app, USER_EMAIL, PASSWORD)
   })
@@ -74,6 +93,9 @@ describe('Users (e2e)', () => {
       REGISTER_EMAIL,
       PATCH_TARGET_EMAIL,
       PATCH_TARGET_UPDATED_EMAIL,
+      VERIFY_TARGET_EMAIL,
+      ADMIN_CREATED_VERIFIED_EMAIL,
+      ADMIN_CREATED_UNVERIFIED_EMAIL,
     ])
     await app.close()
   })
@@ -118,6 +140,77 @@ describe('Users (e2e)', () => {
       .post('/users')
       .send({ firstName: 'Bad', email: 'not-an-email', password: PASSWORD })
       .expect(400)
+  })
+
+  // ── POST /users/admin (admin only) ────────────────────────────────────────
+
+  it('POST /users/admin (ADMIN, isEmailVerified: true) → 201, pre-verified, no verification email sent', async () => {
+    sendVerificationMailMock.mockClear()
+
+    const res = await request(app.getHttpServer())
+      .post('/users/admin')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        firstName: 'AdminCreatedVerified',
+        email: ADMIN_CREATED_VERIFIED_EMAIL,
+        password: PASSWORD,
+        role: UserRole.EDITOR,
+        isEmailVerified: true,
+      })
+      .expect(201)
+
+    const user = res.body as ApiResponse<User>
+    expect(user.data.role).toBe(UserRole.EDITOR)
+    expect(user.data.isEmailVerified).toBe(true)
+    expect(sendVerificationMailMock).not.toHaveBeenCalled()
+
+    // A pre-verified admin-created user can sign in immediately.
+    await getAuthToken(app, ADMIN_CREATED_VERIFIED_EMAIL, PASSWORD)
+  })
+
+  it('POST /users/admin (ADMIN, isEmailVerified omitted) → 201, unverified, verification email sent', async () => {
+    sendVerificationMailMock.mockClear()
+
+    const res = await request(app.getHttpServer())
+      .post('/users/admin')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        firstName: 'AdminCreatedUnverified',
+        email: ADMIN_CREATED_UNVERIFIED_EMAIL,
+        password: PASSWORD,
+      })
+      .expect(201)
+
+    const user = res.body as ApiResponse<User>
+    expect(user.data.role).toBe(UserRole.USER)
+    expect(user.data.isEmailVerified).toBe(false)
+    expect(sendVerificationMailMock).toHaveBeenCalledWith(
+      expect.objectContaining({ email: ADMIN_CREATED_UNVERIFIED_EMAIL }),
+    )
+  })
+
+  it('POST /users/admin (duplicate email) → 400', async () => {
+    await request(app.getHttpServer())
+      .post('/users/admin')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        firstName: 'Dupe',
+        email: ADMIN_CREATED_VERIFIED_EMAIL,
+        password: PASSWORD,
+      })
+      .expect(400)
+  })
+
+  it('POST /users/admin (USER role) → 403', async () => {
+    await request(app.getHttpServer())
+      .post('/users/admin')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({
+        firstName: 'Hack',
+        email: 'users-admin-create-hack@e2e.test',
+        password: PASSWORD,
+      })
+      .expect(403)
   })
 
   // ── GET /users (admin only) ───────────────────────────────────────────────
@@ -269,6 +362,44 @@ describe('Users (e2e)', () => {
       .expect(200)
 
     expect((res.body as ApiResponse<User>).data.role).toBe(UserRole.EDITOR)
+  })
+
+  // ── PATCH /users/:id/verify-email (admin only) ────────────────────────────
+
+  it('PATCH /users/:id/verify-email (ADMIN, true) → 200 marks the user verified', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/users/${verifyTargetId}/verify-email`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ isEmailVerified: true })
+      .expect(200)
+
+    expect((res.body as ApiResponse<User>).data.isEmailVerified).toBe(true)
+  })
+
+  it('PATCH /users/:id/verify-email (ADMIN, false) → 200 un-verifies the user', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/users/${verifyTargetId}/verify-email`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ isEmailVerified: false })
+      .expect(200)
+
+    expect((res.body as ApiResponse<User>).data.isEmailVerified).toBe(false)
+  })
+
+  it('PATCH /users/:id/verify-email (USER role) → 403', async () => {
+    await request(app.getHttpServer())
+      .patch(`/users/${verifyTargetId}/verify-email`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ isEmailVerified: true })
+      .expect(403)
+  })
+
+  it('PATCH /users/:id/verify-email (non-existent id) → 404', async () => {
+    await request(app.getHttpServer())
+      .patch('/users/999999/verify-email')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ isEmailVerified: true })
+      .expect(404)
   })
 
   // ── DELETE /users/:id (admin only) ────────────────────────────────────────
