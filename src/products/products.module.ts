@@ -23,6 +23,7 @@ import { FindAllProductTypesProvider } from './providers/find-all-product-types.
 import { FindOneProductTypeProvider } from './providers/find-one-product-type.provider'
 import { UpdateProductTypeProvider } from './providers/update-product-type.provider'
 import { DeleteProductTypeProvider } from './providers/delete-product-type.provider'
+import { ValidateTypeChangeProvider } from './providers/validate-type-change.provider'
 
 @Module({
   controllers: [ProductsController, ProductTypesController],
@@ -42,6 +43,7 @@ import { DeleteProductTypeProvider } from './providers/delete-product-type.provi
     FindOneProductTypeProvider,
     UpdateProductTypeProvider,
     DeleteProductTypeProvider,
+    ValidateTypeChangeProvider,
   ],
   imports: [
     TypeOrmModule.forFeature([Product, ProductType, UploadFile]),

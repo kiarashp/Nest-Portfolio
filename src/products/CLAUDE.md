@@ -139,6 +139,28 @@ removed it — use the explicit grouped query instead.
 
 `DeleteProductTypeProvider` calls `productsRepository.count({ where: { productTypeId: id } })` before deleting. If any products reference the type, it throws `ConflictException` (409). The caller must delete or reassign those products first. This is a hard delete — there is no soft-delete for product types.
 
+## Product type field evolution (updating `filterableFields`)
+
+`PATCH /product-types/:id` can replace `filterableFields`, but the change is guarded so it can never strand a product's stored `specs`. Fields are matched **by `key`** (so reordering is free) and the rules are:
+
+| Operation | Verdict |
+|---|---|
+| Add a field | allowed |
+| Remove a field | allowed only if **no product** has a value for that `key` → else 409 |
+| Change a field's `key` | reads as remove-old + add-new; the removal check on the old key applies |
+| Change a field's `type` | **400** — immutable (a type change is the data-breaker) |
+| Change a field's `label`/`unit` | allowed (display-only) |
+| Add enum `options` | allowed |
+| Remove enum `options` | allowed only if **no product** holds one of the removed values → else 409 |
+
+Because `type` is immutable, a `number` field can never come to hold non-numeric data, so the `(specs ->> key)::numeric` cast in `FindAllProductsProvider` can never hit bad data — no read-side hardening is needed.
+
+Two pieces implement this:
+- `classify-type-change.util.ts` — a pure helper (no DI, like `validate-specs.util.ts`). `classifyTypeChange(old, new)` throws `BadRequestException` on an illegal type change and returns the removals (`fieldRemoved` / `optionsRemoved`) that still need a usage-check.
+- `ValidateTypeChangeProvider` (`validate-type-change.provider.ts`) — injects the `Product` repository, runs `classifyTypeChange`, then for each removal runs a jsonb count (`specs ->> key IS NOT NULL`, or `specs ->> key IN (:...opts)`) and throws `ConflictException` naming every conflict. `UpdateProductTypeProvider.update` calls `assertChangesSafe` before mutating the entity.
+
+The whole `filterableFields` array is replaced wholesale, so a client must always send the **complete** field list — a dropped field reads as a removal attempt. This is the same accepted no-transaction race as the delete-type count check (a product could be created between the count and the save).
+
 ## FindAllProductsProvider — QueryBuilder-based filtering
 
 Both list methods build a TypeORM `SelectQueryBuilder` via the shared private `buildQuery(dto, publishedOnly)` and hand it to `PaginationProvider.paginateQueryBuilder`. A QueryBuilder is required (not the simple `where` path) because spec filters need jsonb access (`specs ->> :key`) and numeric casts that `FindOptionsWhere` cannot express.

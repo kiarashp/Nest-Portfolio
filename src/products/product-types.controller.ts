@@ -87,12 +87,27 @@ export class ProductTypesController {
 
   /**
    * update a product type's fields
+   * Fields are add/remove only: a field's key and type are immutable, and a field or
+   * enum option can only be removed when no product still uses it. Always send the
+   * complete filterableFields list — the array is replaced wholesale.
    */
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Update a product type (admin only)' })
+  @ApiOperation({
+    summary:
+      'Update a product type (admin only). Fields are add/remove only; key and type are immutable; send the complete field list.',
+  })
   @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(ProductType)
-  @ApiResponse({ status: 409, description: 'Name or slug already in use' })
+  @ApiResponse({
+    status: 400,
+    description:
+      "Illegal field change (a field's key or type cannot be changed)",
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Name or slug already in use, or a field/option removal is blocked because products still use it',
+  })
   @Patch(':id')
   public update(
     @Param('id', ParseIntPipe) id: number,

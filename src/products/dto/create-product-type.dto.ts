@@ -79,6 +79,8 @@ export class CreateProductTypeDto {
   slug!: string
 
   @ApiPropertyOptional({
+    type: () => [FilterableFieldDto],
+    nullable: true,
     description: 'Filter facets shown in the product filter UI for this type',
     example: [
       {

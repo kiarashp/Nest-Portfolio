@@ -9,6 +9,7 @@ import { QueryFailedError, Repository } from 'typeorm'
 import { ProductType } from '../entities/product-type.entity'
 import { UpdateProductTypeDto } from '../dto/update-product-type.dto'
 import { FindOneProductTypeProvider } from './find-one-product-type.provider'
+import { ValidateTypeChangeProvider } from './validate-type-change.provider'
 import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
@@ -22,6 +23,8 @@ export class UpdateProductTypeProvider {
     private readonly productTypesRepository: Repository<ProductType>,
     /** inject find-one provider to load before mutating */
     private readonly findOneProductTypeProvider: FindOneProductTypeProvider,
+    /** inject guard that enforces field immutability and blocks unsafe removals */
+    private readonly validateTypeChangeProvider: ValidateTypeChangeProvider,
     /** inject audit log service to record type updates */
     private readonly auditLogService: AuditLogService,
   ) {}
@@ -38,6 +41,17 @@ export class UpdateProductTypeProvider {
   ): Promise<ProductType> {
     const productType =
       await this.findOneProductTypeProvider.findOneByIdOrFail(id)
+
+    // Enforce the field-evolution rules before touching the schema: a field's key
+    // and type are immutable, and a field or enum option can only be removed when no
+    // product still holds data for it. Throws 400 (illegal edit) or 409 (in-use removal).
+    if (dto.filterableFields !== undefined) {
+      await this.validateTypeChangeProvider.assertChangesSafe(
+        id,
+        productType.filterableFields,
+        dto.filterableFields,
+      )
+    }
 
     productType.name = dto.name ?? productType.name
     productType.slug = dto.slug ?? productType.slug
