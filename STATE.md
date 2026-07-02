@@ -10,6 +10,21 @@ Each item below is a self-contained feature to implement when the time comes. Be
 
 ---
 
+### Configurator module (ordering-code builder)
+
+An industrial "type code" configurator: the admin defines reusable segment definitions and
+assembles them into configurable products; customers compose an ordering code position by
+position (e.g. `FRH-2d-no-00-000-0450`) and the backend resolver validates selections,
+evaluates conditions (zero-fill/cascade), and renders the code + human summary. Fully
+separate from the existing `products` module — all tables use the `configurator_` prefix.
+
+The complete design and a 7-step implementation plan (already adapted to this codebase's
+conventions: int PKs, no `/admin` URL prefix, soft-delete only on the product entity,
+avatar-style image handling, audit logging, Jest) live in **`CONFIGURATOR.md`**. Implement
+its steps 1–7 in order, one step per session/commit, each ending fully green.
+
+---
+
 ### Scheduled post auto-publishing
 
 `Post.publishOn` is stored but nothing acts on it. A cron job (`@nestjs/schedule`) should query `status = SCHEDULED AND publishOn <= now()` and flip matching posts to `PUBLISHED`. Needs a migration if any index is added.
