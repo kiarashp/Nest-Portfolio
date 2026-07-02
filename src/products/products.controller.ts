@@ -30,6 +30,7 @@ import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { CreateProductDto } from './dto/create-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
 import { GetProductsDto } from './dto/get-products.dto'
+import { GetRelatedProductsDto } from './dto/get-related-products.dto'
 import { DeleteResultDto } from 'src/common/dto/delete-result.dto'
 import {
   ApiArrayDataResponse,
@@ -117,6 +118,29 @@ export class ProductsController {
   @Get(':id')
   public findOne(@Param('id', ParseIntPipe) id: number) {
     return this.productsService.findOne(id)
+  }
+
+  /**
+   * list up to `limit` other published products of the same type — public.
+   * Used by the frontend product detail page's "related products" section.
+   */
+  @Auth(AuthType.None)
+  @ApiOperation({
+    summary: 'List related products (same type, published, excluding self)',
+  })
+  @ApiArrayDataResponse(Product, {
+    description: 'Array of related products, newest first',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Product not found or not published',
+  })
+  @Get(':id/related')
+  public findRelated(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() dto: GetRelatedProductsDto,
+  ) {
+    return this.productsService.findRelated(id, dto.limit)
   }
 
   /**

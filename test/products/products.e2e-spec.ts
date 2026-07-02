@@ -55,6 +55,11 @@ describe('Products (e2e)', () => {
   let productTypeId: number
   let publishedProductId: number
 
+  // IDs used by the GET /products/:id/related tests.
+  let relatedSameTypeProductIds: number[]
+  let otherTypeProductId: number
+  let draftRelatedProductId: number
+
   // Track all created IDs so afterAll can clean up even if tests fail mid-run.
   // Products must be deleted before product types (FK constraint).
   const createdProductIds: number[] = []
@@ -83,6 +88,12 @@ describe('Products (e2e)', () => {
       'e2e-product-draft',
       'e2e-product-delete',
       'e2e-product-with-image',
+      'e2e-product-related-2',
+      'e2e-product-related-3',
+      'e2e-product-related-4',
+      'e2e-product-related-5',
+      'e2e-product-other-type',
+      'e2e-product-related-draft',
     ]) {
       const existing = await productRepo.findOne({
         where: { slug },
@@ -97,6 +108,7 @@ describe('Products (e2e)', () => {
       'e2e-type-main',
       'e2e-type-conflict',
       'e2e-type-to-delete',
+      'e2e-type-other',
     ]) {
       await productTypeRepo.delete({ slug })
     }
@@ -158,6 +170,74 @@ describe('Products (e2e)', () => {
       .expect(201)
     publishedProductId = (pRes.body as ApiResponse<Product>).data.id
     createdProductIds.push(publishedProductId)
+
+    // Seed extra same-type published products so the related-products limit
+    // cap has more than one candidate to actually truncate.
+    relatedSameTypeProductIds = []
+    for (const slug of [
+      'e2e-product-related-2',
+      'e2e-product-related-3',
+      'e2e-product-related-4',
+      'e2e-product-related-5',
+    ]) {
+      const res = await request(app.getHttpServer())
+        .post('/products')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: `E2E Related ${slug}`,
+          slug,
+          productTypeId,
+          shortDescription: 'Same-type product for related-products tests',
+          isPublished: true,
+        })
+        .expect(201)
+      const id: number = (res.body as ApiResponse<Product>).data.id
+      relatedSameTypeProductIds.push(id)
+      createdProductIds.push(id)
+    }
+
+    // Seed a second product type + published product to prove related-products
+    // excludes products of a different type.
+    const otherTypeRes = await request(app.getHttpServer())
+      .post('/product-types')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'e2e-type-other', slug: 'e2e-type-other' })
+      .expect(201)
+    const otherProductTypeId: number = (
+      otherTypeRes.body as ApiResponse<ProductType>
+    ).data.id
+    createdProductTypeIds.push(otherProductTypeId)
+
+    const otherTypeProductRes = await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'E2E Other Type Product',
+        slug: 'e2e-product-other-type',
+        productTypeId: otherProductTypeId,
+        shortDescription: 'Different-type product for related-products tests',
+        isPublished: true,
+      })
+      .expect(201)
+    otherTypeProductId = (otherTypeProductRes.body as ApiResponse<Product>).data
+      .id
+    createdProductIds.push(otherTypeProductId)
+
+    // Seed a draft (unpublished) product of the same type — used to prove
+    // related-products excludes drafts, and to test the 404-on-draft-anchor rule.
+    const draftRelatedRes = await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'E2E Draft Related Product',
+        slug: 'e2e-product-related-draft',
+        productTypeId,
+        shortDescription: 'Draft product for related-products tests',
+      })
+      .expect(201)
+    draftRelatedProductId = (draftRelatedRes.body as ApiResponse<Product>).data
+      .id
+    createdProductIds.push(draftRelatedProductId)
   })
 
   afterAll(async () => {
@@ -464,6 +544,60 @@ describe('Products (e2e)', () => {
 
   it('GET /products/99999 → 404', async () => {
     await request(app.getHttpServer()).get('/products/99999').expect(404)
+  })
+
+  // ── GET /products/:id/related ─────────────────────────────────────────────
+
+  it('GET /products/:id/related → 200, same-type published excluding self/cross-type/unpublished', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}/related`)
+      .expect(200)
+
+    const related = (res.body as ApiResponse<Product[]>).data
+    expect(Array.isArray(related)).toBe(true)
+    for (const p of related) {
+      expect(p.id).not.toBe(publishedProductId)
+      expect(p.productTypeId).toBe(productTypeId)
+      expect(p.isPublished).toBe(true)
+    }
+    expect(related.some((p) => relatedSameTypeProductIds.includes(p.id))).toBe(
+      true,
+    )
+    expect(related.some((p) => p.id === otherTypeProductId)).toBe(false)
+    expect(related.some((p) => p.id === draftRelatedProductId)).toBe(false)
+  })
+
+  it('GET /products/:id/related?limit=1 → caps the result to 1', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}/related?limit=1`)
+      .expect(200)
+
+    const related = (res.body as ApiResponse<Product[]>).data
+    expect(related.length).toBe(1)
+  })
+
+  it('GET /products/:id/related?limit=0 → 400', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}/related?limit=0`)
+      .expect(400)
+  })
+
+  it('GET /products/:id/related?limit=999 → 400', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}/related?limit=999`)
+      .expect(400)
+  })
+
+  it('GET /products/99999/related → 404', async () => {
+    await request(app.getHttpServer())
+      .get('/products/99999/related')
+      .expect(404)
+  })
+
+  it('GET /products/:id/related for a draft anchor → 404 (same rule as GET /products/:id)', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/${draftRelatedProductId}/related`)
+      .expect(404)
   })
 
   // ── GET /products/admin ───────────────────────────────────────────────────

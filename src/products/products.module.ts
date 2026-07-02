@@ -13,6 +13,7 @@ import { AuditLogModule } from 'src/audit-log/audit-log.module'
 import { CreateProductProvider } from './providers/create-product.provider'
 import { FindAllProductsProvider } from './providers/find-all-products.provider'
 import { FindOneProductProvider } from './providers/find-one-product.provider'
+import { FindRelatedProductsProvider } from './providers/find-related-products.provider'
 import { UpdateProductProvider } from './providers/update-product.provider'
 import { DeleteProductProvider } from './providers/delete-product.provider'
 import { UploadProductImageProvider } from './providers/upload-product-image.provider'
@@ -33,6 +34,7 @@ import { ValidateTypeChangeProvider } from './providers/validate-type-change.pro
     CreateProductProvider,
     FindAllProductsProvider,
     FindOneProductProvider,
+    FindRelatedProductsProvider,
     UpdateProductProvider,
     DeleteProductProvider,
     UploadProductImageProvider,

@@ -7,6 +7,7 @@ import { Product } from '../entities/product.entity'
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
 import { FindAllProductsProvider } from './find-all-products.provider'
 import { FindOneProductProvider } from './find-one-product.provider'
+import { FindRelatedProductsProvider } from './find-related-products.provider'
 import { CreateProductProvider } from './create-product.provider'
 import { UpdateProductProvider } from './update-product.provider'
 import { DeleteProductProvider } from './delete-product.provider'
@@ -26,6 +27,10 @@ export class ProductsService {
      * inject find-one product provider
      */
     private readonly findOneProductProvider: FindOneProductProvider,
+    /**
+     * inject find-related products provider
+     */
+    private readonly findRelatedProductsProvider: FindRelatedProductsProvider,
     /**
      * inject create product provider
      */
@@ -72,6 +77,10 @@ export class ProductsService {
 
   public findBySlug(slug: string): Promise<Product> {
     return this.findOneProductProvider.findOneBySlugOrFail(slug)
+  }
+
+  public findRelated(id: number, limit?: number): Promise<Product[]> {
+    return this.findRelatedProductsProvider.findRelated(id, limit)
   }
 
   public create(dto: CreateProductDto, activeUserId: number): Promise<Product> {

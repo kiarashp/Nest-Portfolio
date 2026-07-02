@@ -26,6 +26,7 @@ src/products/
     product-types.service.ts    — thin facade over product type providers
     find-all-products.provider.ts
     find-one-product.provider.ts
+    find-related-products.provider.ts   — GET /:id/related: same-type published siblings, excluding self
     create-product.provider.ts
     update-product.provider.ts
     delete-product.provider.ts
@@ -74,7 +75,7 @@ In `ProductsController`, three routes must be declared **before** `GET /:id`:
 
 1. `GET /slug/:slug` — if declared after `/:id`, NestJS tries to pass the literal `"slug"` through `ParseIntPipe` and throws 400.
 2. `GET /admin` — same reason: `"admin"` fails `ParseIntPipe`.
-3. `POST /:id/images`, `GET /:id/images`, `DELETE /:id/images/:fileId` — `ParseIntPipe` is on the `:id`/`:fileId` segments, so these are fine in any order relative to `/:id` (longer path and/or different HTTP method).
+3. `POST /:id/images`, `GET /:id/images`, `DELETE /:id/images/:fileId`, `GET /:id/related` — `ParseIntPipe` is on the `:id`/`:fileId` segments, so these are fine in any order relative to `/:id` (longer path and/or different HTTP method).
 
 ## FindOneProductProvider — four methods
 
@@ -88,6 +89,8 @@ In `ProductsController`, three routes must be declared **before** `GET /:id`:
 | `findOneBySlugOrFail(slug)` | `isPublished: true` | 404 if not found **or** draft |
 
 Write routes (`UpdateProductProvider`, `DeleteProductProvider`, `UploadProductImageProvider`) call `findOneByIdOrFail` — admins need to edit drafts. Public routes (`ProductsController.findOne`, `findBySlug`) call the published-only variants so drafts are invisible.
+
+`FindRelatedProductsProvider` (`GET /products/:id/related`) reuses `findOnePublishedByIdOrFail` to resolve and validate the anchor product — a missing or unpublished/draft id 404s exactly like `GET /products/:id`. It then runs a plain `productsRepository.find()` (not a `SelectQueryBuilder` — no jsonb/spec filtering is needed) on `productTypeId = anchor.productTypeId AND id != anchor.id AND isPublished = true`, ordered `createdAt DESC` with an `id` tiebreaker, capped by an optional `?limit=` query param (default 4, max 20). There is no fallback to other product types, so the result can be shorter than `limit` or empty. Read-only — no audit log entry is written.
 
 ## Nullable field updates
 
