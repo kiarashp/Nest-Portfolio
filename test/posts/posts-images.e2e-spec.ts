@@ -171,6 +171,70 @@ describe('Posts images (e2e)', () => {
     expect(post!.featuredImage).toBeNull()
   })
 
+  // ── PATCH /posts/:id (featuredImage clear) ──────────────────────────────
+
+  it('PATCH /posts/:id with featuredImage: null clears an existing featured image', async () => {
+    const upRes = await request(app.getHttpServer())
+      .post(`/posts/${postId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'to-clear.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file = (upRes.body as ApiResponse<UploadFile>).data
+
+    await request(app.getHttpServer())
+      .patch(`/posts/${postId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ featuredImage: file.path })
+      .expect(200)
+
+    await request(app.getHttpServer())
+      .patch(`/posts/${postId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ featuredImage: null })
+      .expect(200)
+
+    const post: Post | null = await postRepo.findOneBy({ id: postId })
+    expect(post!.featuredImage).toBeNull()
+  })
+
+  it('PATCH /posts/:id with featuredImage: "" → 400 (not a valid clear signal)', async () => {
+    await request(app.getHttpServer())
+      .patch(`/posts/${postId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ featuredImage: '' })
+      .expect(400)
+  })
+
+  it('PATCH /posts/:id with featuredImage omitted leaves the existing value untouched', async () => {
+    const upRes = await request(app.getHttpServer())
+      .post(`/posts/${postId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'untouched.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file = (upRes.body as ApiResponse<UploadFile>).data
+
+    await request(app.getHttpServer())
+      .patch(`/posts/${postId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ featuredImage: file.path })
+      .expect(200)
+
+    await request(app.getHttpServer())
+      .patch(`/posts/${postId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ title: 'Untouched featured image title' })
+      .expect(200)
+
+    const post: Post | null = await postRepo.findOneBy({ id: postId })
+    expect(post!.featuredImage).toBe(file.path)
+  })
+
   it('DELETE /posts/:id/images/:fileId for a non-existent file → 404', async () => {
     await request(app.getHttpServer())
       .delete(`/posts/${postId}/images/999999`)

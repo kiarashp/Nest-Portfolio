@@ -78,7 +78,12 @@ export class UpdatePostProvider {
     post.slug = patchPostDto.slug ?? post.slug
     post.status = patchPostDto.status ?? post.status
     post.content = patchPostDto.content ?? post.content
-    post.featuredImage = patchPostDto.featuredImage ?? post.featuredImage
+    // featuredImage is nullable and `null` is a valid "clear it" request, so
+    // `??` would wrongly discard an explicit null — only `undefined` (field
+    // omitted from the request body) should leave the existing value alone.
+    if (patchPostDto.featuredImage !== undefined) {
+      post.featuredImage = patchPostDto.featuredImage
+    }
     post.publishOn = patchPostDto.publishOn ?? post.publishOn
     if (tags) {
       post.tags = tags
