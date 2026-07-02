@@ -21,7 +21,7 @@ Guidance specific to this module. See the root `CLAUDE.md` for the high-level su
 Every write provider calls `auditLogService.log(...)` after a successful save — `grep -r "auditLogService.log" src/` for the current set.
 
 Two userId-source patterns:
-- `activeUser.sub` — Posts and MetaOptions, read directly from `@ActiveUser()` decorator in the provider.
+- `activeUser.sub` — Posts, read directly from `@ActiveUser()` decorator in the provider.
 - Threaded `activeUserId` parameter — Users, Tags, Products, AvatarOptions. The controller reads `@ActiveUser('sub') activeUserId: number`, passes it to the service method, which passes it to the provider.
 
 `CreateUserProvider` logs `null` as userId (self-registration; no authenticated actor).

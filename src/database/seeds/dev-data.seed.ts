@@ -252,7 +252,6 @@ async function seed() {
         status: dto.status,
         content: dto.content,
         tags: dto.tags,
-        metaOptions: { metaValue: '{"seed":true}' },
       },
       toActiveUser(dto.author),
     )

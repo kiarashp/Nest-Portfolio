@@ -5,7 +5,6 @@ import { PostsModule } from './posts/posts.module'
 import { AuthModule } from './auth/auth.module'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { TagsModule } from './tags/tags.module'
-import { MetaOptionsModule } from './meta-options/meta-options.module'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { PaginationModule } from './common/pagination/pagination.module'
 import appConfig from './config/app.config'
@@ -70,7 +69,6 @@ const ENV = process.env.NODE_ENV
       }),
     }),
     TagsModule,
-    MetaOptionsModule,
     PaginationModule,
     UploadsModule,
     MailModule,

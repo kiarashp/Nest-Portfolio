@@ -5,7 +5,6 @@ import { EventEmitterModule } from '@nestjs/event-emitter'
 import { User } from 'src/users/entities/user.entity'
 import { Post } from 'src/posts/entities/post.entity'
 import { Tag } from 'src/tags/entities/tag.entity'
-import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { AvatarOption } from 'src/users/entities/avatar-option.entity'
 import { AuditLog } from 'src/audit-log/entities/audit-log.entity'
@@ -57,7 +56,6 @@ import { ProductsModule } from 'src/products/products.module'
           User,
           Post,
           Tag,
-          MetaOption,
           UploadFile,
           AvatarOption,
           AuditLog,

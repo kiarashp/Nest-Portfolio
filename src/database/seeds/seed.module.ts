@@ -4,7 +4,6 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { User } from 'src/users/entities/user.entity'
 import { Post } from 'src/posts/entities/post.entity'
 import { Tag } from 'src/tags/entities/tag.entity'
-import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import databaseConfig from 'src/config/database.config'
 
@@ -48,7 +47,7 @@ import databaseConfig from 'src/config/database.config'
         // TypeORM resolves inverse-relation metadata at startup, so every
         // entity in the relation graph must be registered — even ones the seed
         // doesn't read or write.
-        entities: [User, Post, Tag, MetaOption, UploadFile],
+        entities: [User, Post, Tag, UploadFile],
         // Never let a script auto-migrate the schema — that is migrations' job.
         synchronize: false,
       }),

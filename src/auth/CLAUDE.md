@@ -49,15 +49,6 @@ createPost(...) {}
 
 `GET /posts/admin` (list all posts, all statuses, all authors) is accessible to AUTHOR + ADMIN — consistent with their unrestricted write access. EDITOR gets 403; they use `GET /posts/my` to see their own posts.
 
-**Meta-option write routes (EDITOR and AUTHOR restriction):**
-
-Unlike post routes, MetaOption write routes restrict both EDITOR and AUTHOR to their own posts' meta-options. Only ADMIN may update or delete any meta-option regardless of ownership. Implemented in:
-
-- `UpdateMetaOptionProvider.update()` — throws `ForbiddenException` if `activeUser.role !== ADMIN && post.author.id !== activeUser.sub`
-- `DeleteMetaOptionProvider.delete()` — same check
-
-This stricter model is intentional: MetaOption holds per-post SEO metadata and there is no cross-author reuse case analogous to an AUTHOR editing someone else's post content.
-
 ### `ActiveUserData`
 
 `src/auth/interfaces/active-user-data.interface.ts` — the shape of the JWT payload attached to every request. Includes `sub` (userId), `email`, and `role`. Always read via `@ActiveUser()` in controllers, never access `request[REQUEST_USER_KEY]` directly outside of guards.

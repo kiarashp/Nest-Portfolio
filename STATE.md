@@ -82,24 +82,20 @@ UI concern? Decide this before building the endpoint, since it affects the DTO.
 
 ---
 
-### Decide: should `GET /meta-options/:id` be ownership-gated?
+### Add a read route for `ContactSubmission`
 
-**Current behavior (intentional):** `GET /meta-options/:id` is role-gated
-(EDITOR/AUTHOR/ADMIN) but **not** ownership-gated — any of those roles can read any
-meta-option regardless of who owns the linked post. The write routes
-(`PATCH`/`DELETE`) *are* ownership-gated (non-ADMIN limited to their own posts'
-meta-options). This asymmetry is deliberate and is asserted by an explicit test:
-`test/meta-options/meta-options.e2e-spec.ts` → "GET /meta-options/:id (as non-owner
-AUTHOR) → 200 — read is not ownership-gated".
+**Why:** `ContactSubmission` rows are persisted permanently so the site owner can
+review submissions, but there is currently no way to read them back except direct
+DB access — `ContactController` only has `POST /contact`. The user has decided to
+keep the table write-only for now and add the read side later.
 
-This was flagged during the OpenAPI auth-docs audit. Meta-option data is per-post SEO
-metadata (low sensitivity), so leaving reads open is defensible, but if we want reads
-to match the write ownership model:
-- Thread `@ActiveUser()` into `MetaOptionsController.findOne` → `MetaOptionsService.findOne`
-  → a guarded lookup, reusing the same check as `UpdateMetaOptionProvider`
-  (`activeUser.role !== ADMIN && metaOption.post.author.id !== activeUser.sub` → 403).
-  `FindOneMetaOptionProvider.findOneById` already eager-loads `post.author`, so no new query.
-- Update the e2e test above (the non-owner case flips from 200 to 403) and the
-  `@ApiAuth` ownership note on the `GET` route in `meta-options.controller.ts`.
-- Decision needed first: is cross-author read of SEO metadata actually a problem? If not, leave as-is.
+**What to do:** Add an ADMIN-only `GET /contact` (paginated, following the same
+`PaginationQueryDto` / `paginateQuery` pattern as other list endpoints — see
+`FindAllAuditLogsProvider` for a similar admin-only paginated list) plus
+`GET /contact/:id` for a single submission. Back these with new
+`FindAllContactSubmissionsProvider` / `FindOneContactSubmissionProvider` classes in
+`src/contact/providers/`, registered in `ContactModule`. Document with
+`ApiPaginatedResponse(ContactSubmission)` / `ApiDataResponse(ContactSubmission)` and
+`@ApiAuth({ roles: [UserRole.ADMIN] })`, matching the pattern used by
+`GET /audit-logs`.
 

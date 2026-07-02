@@ -3,7 +3,6 @@ import {
   IsDate,
   IsEnum,
   IsInt,
-  IsJSON,
   IsOptional,
   IsString,
   IsUrl,
@@ -11,8 +10,6 @@ import {
   MinLength,
 } from 'class-validator'
 import { PostStatus } from '../enums/postStatus.enum'
-import { CreatePostMetaOptionsDto } from '../../meta-options/dto/create-post-meta-options.dto'
-import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class CreatePostDto {
@@ -53,14 +50,6 @@ export class CreatePostDto {
   @IsString()
   @IsOptional()
   content?: string
-  // schema
-  @ApiPropertyOptional({
-    description: 'Serialized JSON object',
-    example: '\r\n{\r\n  "village": "Konoha",\r\n  "clan": "Uzumaki"\r\n}',
-  })
-  @IsJSON()
-  @IsOptional()
-  schema?: string
   // featuredImage
   @ApiPropertyOptional({
     description: 'The URL of the featured image for the post',
@@ -87,12 +76,4 @@ export class CreatePostDto {
   @IsInt({ each: true })
   @IsOptional()
   tags?: number[]
-  // metaOptions
-  @ApiPropertyOptional({
-    type: CreatePostMetaOptionsDto,
-    description: 'The meta options for the post',
-  })
-  @IsOptional()
-  @Type(() => CreatePostMetaOptionsDto)
-  metaOptions?: CreatePostMetaOptionsDto | null
 }

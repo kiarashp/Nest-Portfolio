@@ -6,12 +6,10 @@ import {
   ManyToMany,
   ManyToOne,
   OneToMany,
-  OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { PostStatus } from '../enums/postStatus.enum'
-import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 import { User } from 'src/users/entities/user.entity'
 import { Tag } from 'src/tags/entities/tag.entity'
 import { UploadFile } from 'src/uploads/entities/upload-file.entity'
@@ -56,13 +54,6 @@ export class Post {
     nullable: true,
   })
   content?: string
-  //   schema
-  @ApiPropertyOptional({ type: String, nullable: true })
-  @Column({
-    type: 'text',
-    nullable: true,
-  })
-  schema?: string
   //   featuredImage — nullable so it can be explicitly cleared (e.g. when the
   //   image it points at is deleted via DELETE /posts/:id/images/:fileId)
   @ApiPropertyOptional({ type: String, nullable: true })
@@ -79,13 +70,6 @@ export class Post {
     nullable: true,
   })
   publishOn?: Date
-  //   metaOptions
-  @ApiPropertyOptional({ type: () => MetaOption, nullable: true })
-  @OneToOne(() => MetaOption, (metaOption) => metaOption.post, {
-    cascade: true,
-    eager: true,
-  })
-  metaOptions?: MetaOption | null
   // author — only the public author fields are serialized into post responses
   @ApiProperty({ type: () => PublicAuthor })
   @ManyToOne(() => User, (user) => user.post, { eager: true })

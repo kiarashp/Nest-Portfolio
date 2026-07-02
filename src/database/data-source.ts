@@ -3,7 +3,6 @@ import { DataSource } from 'typeorm'
 import { User } from 'src/users/entities/user.entity'
 import { Post } from 'src/posts/entities/post.entity'
 import { Tag } from 'src/tags/entities/tag.entity'
-import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { AvatarOption } from 'src/users/entities/avatar-option.entity'
 import { ContactSubmission } from 'src/contact/entities/contact-submission.entity'
@@ -24,7 +23,6 @@ export default new DataSource({
     User,
     Post,
     Tag,
-    MetaOption,
     UploadFile,
     AvatarOption,
     ContactSubmission,

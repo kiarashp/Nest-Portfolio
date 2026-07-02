@@ -4,7 +4,6 @@ import { PostsController } from './posts.controller'
 import { UsersModule } from 'src/users/users.module'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { Post } from './entities/post.entity'
-import { MetaOption } from 'src/meta-options/entities/meta-option.entity'
 import { TagsModule } from 'src/tags/tags.module'
 import { PaginationModule } from 'src/common/pagination/pagination.module'
 import { CreatePostProvider } from './providers/create-post.provider'
@@ -45,7 +44,7 @@ import { UploadFile } from 'src/uploads/entities/upload-file.entity'
     TagsModule,
     PaginationModule,
     UploadsModule,
-    TypeOrmModule.forFeature([Post, MetaOption, UploadFile]),
+    TypeOrmModule.forFeature([Post, UploadFile]),
     AuditLogModule,
   ],
 })
