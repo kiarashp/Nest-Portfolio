@@ -41,21 +41,6 @@ export class Tag {
     nullable: true,
   })
   description?: string | null
-  @ApiPropertyOptional({ type: String, nullable: true })
-  @Column({
-    type: 'text',
-    nullable: true,
-  })
-  // schema
-  schema?: string | null
-  @ApiPropertyOptional({ type: String, nullable: true })
-  @Column({
-    type: 'varchar',
-    length: 1024,
-    nullable: true,
-  })
-  // featured image
-  featuredImage?: string | null
   // posts — inverse relation, never loaded on a tag response; left undecorated
   @ManyToMany(() => Post, (post) => post.tags, { onDelete: 'CASCADE' })
   posts!: Post[]

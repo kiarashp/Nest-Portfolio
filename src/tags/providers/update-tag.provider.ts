@@ -38,8 +38,6 @@ export class UpdateTagProvider {
     tag.name = updateTagDto.name ?? tag.name
     tag.slug = updateTagDto.slug ?? tag.slug
     tag.description = updateTagDto.description ?? tag.description
-    tag.schema = updateTagDto.schema ?? tag.schema
-    tag.featuredImage = updateTagDto.featuredImage ?? tag.featuredImage
 
     // Persist and catch unique constraint violations from `name` and `slug`.
     try {

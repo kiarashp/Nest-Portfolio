@@ -177,10 +177,10 @@ async function seed() {
   // --- Tags ------------------------------------------------------------------
 
   const tagDefs = [
-    { name: 'News', slug: 'news', schema: '{}' },
-    { name: 'Engineering', slug: 'engineering', schema: '{}' },
-    { name: 'Announcements', slug: 'announcements', schema: '{}' },
-    { name: 'Product Updates', slug: 'product-updates', schema: '{}' },
+    { name: 'News', slug: 'news' },
+    { name: 'Engineering', slug: 'engineering' },
+    { name: 'Announcements', slug: 'announcements' },
+    { name: 'Product Updates', slug: 'product-updates' },
   ]
 
   const tags: Tag[] = []
