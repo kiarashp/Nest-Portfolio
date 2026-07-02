@@ -15,11 +15,13 @@ describe('GET /audit-logs (e2e)', () => {
   let dataSource: DataSource
   let adminToken: string
   let userToken: string
+  let adminUserId: number
   let auditLogRepo: Repository<AuditLog>
 
   const ADMIN_EMAIL = 'audit-admin@e2e.test'
   const USER_EMAIL = 'audit-user@e2e.test'
   const PASSWORD = 'Password1!'
+  const MISSING_USER_ID = 999999
 
   beforeAll(async () => {
     ;({ app, dataSource } = await createApp())
@@ -27,12 +29,13 @@ describe('GET /audit-logs (e2e)', () => {
     // Pre-cleanup: remove rows from a previously failed run.
     await cleanupUsers(dataSource, [ADMIN_EMAIL, USER_EMAIL])
 
-    await seedUser(dataSource, {
+    const adminUser = await seedUser(dataSource, {
       email: ADMIN_EMAIL,
       password: PASSWORD,
       firstName: 'AuditAdmin',
       role: UserRole.ADMIN,
     })
+    adminUserId = adminUser.id
     await seedUser(dataSource, {
       email: USER_EMAIL,
       password: PASSWORD,
@@ -47,9 +50,33 @@ describe('GET /audit-logs (e2e)', () => {
 
     // Seed a few rows directly so we have data to assert on.
     await auditLogRepo.save([
-      { userId: 1, action: AuditAction.CREATE, entity: 'Post', entityId: 100 },
-      { userId: 1, action: AuditAction.UPDATE, entity: 'Post', entityId: 100 },
+      {
+        userId: adminUserId,
+        action: AuditAction.CREATE,
+        entity: 'Post',
+        entityId: 100,
+      },
+      {
+        userId: adminUserId,
+        action: AuditAction.UPDATE,
+        entity: 'Post',
+        entityId: 100,
+      },
       { userId: 2, action: AuditAction.DELETE, entity: 'Tag', entityId: 5 },
+      // No actor (mirrors self-registration).
+      {
+        userId: null,
+        action: AuditAction.CREATE,
+        entity: 'User',
+        entityId: 200,
+      },
+      // Actor whose User row no longer exists (mirrors a hard-deleted user).
+      {
+        userId: MISSING_USER_ID,
+        action: AuditAction.DELETE,
+        entity: 'User',
+        entityId: 201,
+      },
     ])
   })
 
@@ -57,6 +84,8 @@ describe('GET /audit-logs (e2e)', () => {
     // Remove only the rows we inserted; don't wipe rows written by other suites.
     await auditLogRepo.delete({ entity: 'Post', entityId: 100 })
     await auditLogRepo.delete({ entity: 'Tag', entityId: 5 })
+    await auditLogRepo.delete({ entity: 'User', entityId: 200 })
+    await auditLogRepo.delete({ entity: 'User', entityId: 201 })
     await cleanupUsers(dataSource, [ADMIN_EMAIL, USER_EMAIL])
     await app.close()
   })
@@ -85,7 +114,7 @@ describe('GET /audit-logs (e2e)', () => {
     expect(body.data).toHaveProperty('meta')
     expect(body.data).toHaveProperty('links')
     expect(Array.isArray(body.data.data)).toBe(true)
-    expect(body.data.meta.totalItems).toBeGreaterThanOrEqual(3)
+    expect(body.data.meta.totalItems).toBeGreaterThanOrEqual(5)
   })
 
   it('filters by entity when ?entity=Post is provided', async () => {
@@ -122,5 +151,93 @@ describe('GET /audit-logs (e2e)', () => {
     const body = res.body as ApiResponse<Paginated<AuditLog>>
     expect(body.data.data.length).toBeLessThanOrEqual(1)
     expect(body.data.meta.itemsPerPage).toBe(1)
+  })
+
+  // ── Sorting ────────────────────────────────────────────────────────────────
+
+  it('sorts by action ascending when ?sortBy=action&order=asc is provided', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/audit-logs?sortBy=action&order=asc&limit=100')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const body = res.body as ApiResponse<Paginated<AuditLog>>
+    const actions = body.data.data.map((row) => row.action)
+    const sorted = [...actions].sort((a, b) => a.localeCompare(b))
+    expect(actions).toEqual(sorted)
+  })
+
+  it('defaults to createdAt desc when no sortBy/order is provided', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/audit-logs?limit=100')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const body = res.body as ApiResponse<Paginated<AuditLog>>
+    const timestamps = body.data.data.map((row) =>
+      new Date(row.createdAt).getTime(),
+    )
+    const sortedDesc = [...timestamps].sort((a, b) => b - a)
+    expect(timestamps).toEqual(sortedDesc)
+  })
+
+  it('returns 400 for an invalid sortBy', async () => {
+    await request(app.getHttpServer())
+      .get('/audit-logs?sortBy=bogus')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(400)
+  })
+
+  it('returns 400 for an invalid order', async () => {
+    await request(app.getHttpServer())
+      .get('/audit-logs?order=bogus')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(400)
+  })
+
+  // ── User snapshot ──────────────────────────────────────────────────────────
+
+  it('returns user: null for a row with no actor', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/audit-logs?entity=User&action=CREATE')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const body = res.body as ApiResponse<Paginated<AuditLog>>
+    const row = body.data.data.find((r) => r.entityId === 200)
+    expect(row?.user).toBeNull()
+  })
+
+  it('returns a live snapshot with deleted: false for an existing actor', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/audit-logs?entity=Post')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const body = res.body as ApiResponse<Paginated<AuditLog>>
+    const row = body.data.data.find((r) => r.entityId === 100)
+    expect(row?.user).toMatchObject({
+      id: adminUserId,
+      firstName: 'AuditAdmin',
+      email: ADMIN_EMAIL,
+      deleted: false,
+    })
+  })
+
+  it('returns deleted: true with null fields for a hard-deleted actor', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/audit-logs?entity=User&action=DELETE')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const body = res.body as ApiResponse<Paginated<AuditLog>>
+    const row = body.data.data.find((r) => r.entityId === 201)
+    expect(row?.user).toEqual({
+      id: MISSING_USER_ID,
+      firstName: null,
+      lastName: null,
+      email: null,
+      deleted: true,
+    })
   })
 })

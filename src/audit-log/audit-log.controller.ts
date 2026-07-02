@@ -20,7 +20,10 @@ export class AuditLogController {
 
   /**
    * Returns a paginated list of audit log entries. Admin only.
-   * Accepts optional ?entity= and ?action= query params to narrow results.
+   * Accepts optional ?entity= and ?action= query params to narrow results,
+   * and ?sortBy=/?order= to sort (default createdAt desc). Each row includes
+   * a `user` snapshot of its actor (null if none, `deleted: true` if the
+   * user has since been hard-deleted).
    */
   @Get()
   @ApiOperation({ summary: 'List audit log entries (admin only)' })

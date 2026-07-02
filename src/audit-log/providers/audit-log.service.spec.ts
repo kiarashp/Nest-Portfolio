@@ -3,7 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm'
 import { AuditLogService } from './audit-log.service'
 import { AuditLog } from '../entities/audit-log.entity'
 import { AuditAction } from '../enums/audit-action.enum'
-import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
+import { FindAllAuditLogsProvider } from './find-all-audit-logs.provider'
 
 describe('AuditLogService', () => {
   let service: AuditLogService
@@ -17,12 +17,13 @@ describe('AuditLogService', () => {
         AuditLogService,
         {
           provide: getRepositoryToken(AuditLog),
-          useValue: { save: saveMock, count: jest.fn(), find: jest.fn() },
+          useValue: { save: saveMock },
         },
-        // PaginationProvider is a singleton — a simple stub is enough here
+        // FindAllAuditLogsProvider does the real list query — a simple stub
+        // is enough here since findAll() is just a delegation.
         {
-          provide: PaginationProvider,
-          useValue: { paginateQuery: jest.fn() },
+          provide: FindAllAuditLogsProvider,
+          useValue: { findAll: jest.fn() },
         },
       ],
     }).compile()

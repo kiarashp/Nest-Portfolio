@@ -1,23 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { FindOptionsWhere, Repository } from 'typeorm'
+import { Repository } from 'typeorm'
 import { AuditLog } from '../entities/audit-log.entity'
 import { AuditAction } from '../enums/audit-action.enum'
 import type { Request } from 'express'
-import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
 import { GetAuditLogsDto } from '../dto/get-audit-logs.dto'
+import { FindAllAuditLogsProvider } from './find-all-audit-logs.provider'
 
 @Injectable()
 export class AuditLogService {
   private readonly logger = new Logger(AuditLogService.name)
 
   constructor(
-    /** inject AuditLog repository for persisting and querying audit records */
+    /** inject AuditLog repository for persisting audit records */
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
-    /** inject pagination provider to build paginated list responses */
-    private readonly paginationProvider: PaginationProvider,
+    /** inject find-all provider for the paginated listing */
+    private readonly findAllAuditLogsProvider: FindAllAuditLogsProvider,
   ) {}
 
   /**
@@ -42,20 +42,13 @@ export class AuditLogService {
 
   /**
    * Returns a paginated list of audit records. Optionally filtered by entity
-   * name and/or action string — both comparisons are exact.
+   * name and/or action string (exact match) and sorted by sortBy/order.
+   * Each row includes a `user` snapshot of its actor.
    */
-  public async findAll(
+  public findAll(
     dto: GetAuditLogsDto,
     request: Request,
   ): Promise<Paginated<AuditLog>> {
-    const where: FindOptionsWhere<AuditLog> = {}
-    if (dto.entity) where.entity = dto.entity
-    if (dto.action) where.action = dto.action
-    return this.paginationProvider.paginateQuery(
-      dto,
-      this.auditLogRepository,
-      where,
-      request,
-    )
+    return this.findAllAuditLogsProvider.findAll(dto, request)
   }
 }

@@ -5,6 +5,7 @@ import {
   Entity,
   PrimaryGeneratedColumn,
 } from 'typeorm'
+import { AuditLogUserSnapshot } from '../dto/audit-log-user-snapshot.dto'
 
 @Entity('audit_logs')
 export class AuditLog {
@@ -37,4 +38,11 @@ export class AuditLog {
   @ApiProperty()
   @CreateDateColumn()
   createdAt: Date
+
+  // Transient (not a DB column) — attached by FindAllAuditLogsProvider after
+  // the page is fetched. null when userId is null (no actor); a
+  // { deleted: true, ...null fields } snapshot when userId is set but the
+  // User row no longer exists (hard-deleted).
+  @ApiPropertyOptional({ type: () => AuditLogUserSnapshot, nullable: true })
+  user?: AuditLogUserSnapshot | null
 }
