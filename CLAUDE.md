@@ -94,6 +94,8 @@ Env file selection is driven by `NODE_ENV`: `.env` when unset, otherwise `.env.<
 
 `FRONTEND_URL` (default `http://localhost:5173`) controls the CORS allowed origin. Set it in `.env.development` for local Svelte dev and in the Coolify/Railway dashboard for production. It maps to `appConfig.frontendUrl`.
 
+`CONTACT_NOTIFICATION_EMAIL` (optional, falls back to `MAIL_FROM`) is the real inbox that receives `POST /contact` notifications — kept separate from `MAIL_FROM` since that's typically a no-reply sending address. Maps to `mail.contactNotificationEmail`, read by `SendContactNotificationProvider`. See `src/mail/CLAUDE.md`.
+
 Config is exposed to the app via `@nestjs/config` `registerAs` namespaces, not `process.env` directly outside of `src/config/*` and `src/auth/config/jwt.config.ts`. Inject `ConfigService` and read e.g. `configService.get('appConfig.appPort')` or `configService.get('database.host')`.
 
 ## Database seeds

@@ -29,6 +29,7 @@ export default Joi.object({
   MAIL_USER: Joi.string().required(),
   MAIL_PASSWORD: Joi.string().required(),
   MAIL_FROM: Joi.string().required(),
+  CONTACT_NOTIFICATION_EMAIL: Joi.string().optional(),
   APP_URL: Joi.string().uri().default('http://localhost:3000'),
   FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
 })

@@ -17,8 +17,11 @@ export class SendContactNotificationProvider {
     subject: string
     message: string
   }): Promise<void> {
-    // owner's email comes from MAIL_FROM — the owner receives their own contact notifications
-    const ownerEmail = this.configService.get<string>('mail.defaultFrom')
+    // owner's email comes from CONTACT_NOTIFICATION_EMAIL, falling back to MAIL_FROM
+    // when unset — lets MAIL_FROM stay a no-reply sender while notifications land in a real inbox
+    const ownerEmail = this.configService.get<string>(
+      'mail.contactNotificationEmail',
+    )
     await this.sendMailProvider.send({
       to: ownerEmail!,
       subject: `[Contact] ${submission.subject}`,

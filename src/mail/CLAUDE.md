@@ -12,7 +12,7 @@ Guidance specific to this module. See the root `CLAUDE.md` for the high-level su
 - `providers/send-welcome-mail.provider.ts` — welcome email.
 - `providers/send-verification-mail.provider.ts` — email address verification.
 - `providers/send-password-reset-mail.provider.ts` — password reset link.
-- `providers/send-contact-notification.provider.ts` — contact form notification to the site owner; reads recipient address from `mail.defaultFrom` (same as `MAIL_FROM` env var — no separate env var needed).
+- `providers/send-contact-notification.provider.ts` — contact form notification to the site owner; reads recipient address from `mail.contactNotificationEmail` (`CONTACT_NOTIFICATION_EMAIL` env var, falling back to `MAIL_FROM`/`mail.defaultFrom` if unset). Kept separate from `MAIL_FROM` because `MAIL_FROM` is typically a no-reply sending address, not a real inbox someone reads.
 - `mail.service.ts` — thin facade; exposes `sendMail`, `sendWelcomeMail`, `sendVerificationMail`, `sendPasswordResetMail`, `sendContactNotification`.
 - `templates/` — EJS files; one per email type (`welcome.ejs`, `verification.ejs`, `password-reset.ejs`, `contact.ejs`). Variables injected via the `context` field of `MailOptions`.
 
