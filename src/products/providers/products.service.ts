@@ -75,6 +75,10 @@ export class ProductsService {
     return this.findOneProductProvider.findOnePublishedByIdOrFail(id)
   }
 
+  public findOneForEdit(id: number): Promise<Product> {
+    return this.findOneProductProvider.findOneByIdOrFail(id)
+  }
+
   public findBySlug(slug: string): Promise<Product> {
     return this.findOneProductProvider.findOneBySlugOrFail(slug)
   }

@@ -71,11 +71,12 @@ CREATE INDEX idx_product_specs_gin ON product USING gin (specs);
 
 In `ProductTypesController`, `GET /product-types/slug/:slug` must be declared **before** `GET /:id` so `"slug"` is not parsed as an integer by `ParseIntPipe`. It maps to `FindOneProductTypeProvider.findOneBySlugOrFail` and returns the type (incl. `filterableFields`), letting a per-type page render its heading and filter UI by slug without first resolving the numeric id.
 
-In `ProductsController`, three routes must be declared **before** `GET /:id`:
+In `ProductsController`, these routes are declared **before** `GET /:id`:
 
 1. `GET /slug/:slug` — if declared after `/:id`, NestJS tries to pass the literal `"slug"` through `ParseIntPipe` and throws 400.
 2. `GET /admin` — same reason: `"admin"` fails `ParseIntPipe`.
-3. `POST /:id/images`, `GET /:id/images`, `DELETE /:id/images/:fileId`, `GET /:id/related` — `ParseIntPipe` is on the `:id`/`:fileId` segments, so these are fine in any order relative to `/:id` (longer path and/or different HTTP method).
+3. `GET /:id/admin` — declared before `GET /:id` (though it would also work after, since `ParseIntPipe` only applies to the `:id` segment and the extra `/admin` segment makes the path more specific — kept before `/:id` for readability, matching the `/admin` list route above it).
+4. `POST /:id/images`, `GET /:id/images`, `DELETE /:id/images/:fileId`, `GET /:id/related` — `ParseIntPipe` is on the `:id`/`:fileId` segments, so these are fine in any order relative to `/:id` (longer path and/or different HTTP method).
 
 ## FindOneProductProvider — four methods
 
@@ -88,7 +89,7 @@ In `ProductsController`, three routes must be declared **before** `GET /:id`:
 | `findOnePublishedByIdOrFail(id)` | `isPublished: true` | 404 if not found **or** draft |
 | `findOneBySlugOrFail(slug)` | `isPublished: true` | 404 if not found **or** draft |
 
-Write routes (`UpdateProductProvider`, `DeleteProductProvider`, `UploadProductImageProvider`) call `findOneByIdOrFail` — admins need to edit drafts. Public routes (`ProductsController.findOne`, `findBySlug`) call the published-only variants so drafts are invisible.
+Write routes (`UpdateProductProvider`, `DeleteProductProvider`, `UploadProductImageProvider`) call `findOneByIdOrFail` — admins need to edit drafts. Public routes (`ProductsController.findOne`, `findBySlug`) call the published-only variants so drafts are invisible. `GET /products/:id/admin` (`ProductsController.findOneForEdit` → `ProductsService.findOneForEdit`, ADMIN-only) also calls `findOneByIdOrFail` directly — it's the single-product counterpart to `GET /products/admin` used by the admin edit form, since `GET /products/:id` cannot return a draft. Unlike the posts equivalent (`GET /posts/:id/admin`), there's no ownership check to layer on — product writes are already ADMIN-only, with no EDITOR-owns-own-product concept.
 
 `FindRelatedProductsProvider` (`GET /products/:id/related`) reuses `findOnePublishedByIdOrFail` to resolve and validate the anchor product — a missing or unpublished/draft id 404s exactly like `GET /products/:id`. It then runs a plain `productsRepository.find()` (not a `SelectQueryBuilder` — no jsonb/spec filtering is needed) on `productTypeId = anchor.productTypeId AND id != anchor.id AND isPublished = true`, ordered `createdAt DESC` with an `id` tiebreaker, capped by an optional `?limit=` query param (default 4, max 20). There is no fallback to other product types, so the result can be shorter than `limit` or empty. Read-only — no audit log entry is written.
 

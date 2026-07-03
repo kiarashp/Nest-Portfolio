@@ -600,6 +600,49 @@ describe('Products (e2e)', () => {
       .expect(404)
   })
 
+  // ── GET /products/:id/admin ───────────────────────────────────────────────
+
+  it('GET /products/:id/admin (no token) → 401', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}/admin`)
+      .expect(401)
+  })
+
+  it('GET /products/:id/admin (USER role) → 403', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}/admin`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(403)
+  })
+
+  it('GET /products/:id/admin (ADMIN) → 200 for a published product', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}/admin`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const product = (res.body as ApiResponse<Product>).data
+    expect(product.id).toBe(publishedProductId)
+  })
+
+  it('GET /products/:id/admin (ADMIN) → 200 for a draft product', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/${draftRelatedProductId}/admin`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const product = (res.body as ApiResponse<Product>).data
+    expect(product.id).toBe(draftRelatedProductId)
+    expect(product.isPublished).toBe(false)
+  })
+
+  it('GET /products/99999/admin → 404', async () => {
+    await request(app.getHttpServer())
+      .get('/products/99999/admin')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404)
+  })
+
   // ── GET /products/admin ───────────────────────────────────────────────────
 
   it('GET /products/admin (no token) → 401', async () => {

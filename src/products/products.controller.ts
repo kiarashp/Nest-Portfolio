@@ -106,6 +106,23 @@ export class ProductsController {
   }
 
   /**
+   * get a single product by id regardless of publish status (admin only) — used
+   * by the admin edit form, which must be able to load drafts
+   * Declared before /:id so NestJS does not try to parse "admin" as an integer.
+   */
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Get a product by id including drafts (admin only)',
+  })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
+  @ApiDataResponse(Product)
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  @Get(':id/admin')
+  public findOneForEdit(@Param('id', ParseIntPipe) id: number) {
+    return this.productsService.findOneForEdit(id)
+  }
+
+  /**
    * get a single published product by id — public
    */
   @Auth(AuthType.None)
