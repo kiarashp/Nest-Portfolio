@@ -52,6 +52,8 @@ export class CreateProductDto {
 
   @ApiPropertyOptional({
     description: 'Full detail body shown on the product page',
+    type: String,
+    nullable: true,
   })
   @IsOptional()
   @IsString()
@@ -60,6 +62,8 @@ export class CreateProductDto {
   @ApiPropertyOptional({
     description: 'Vendor or internal SKU code',
     example: 'TC-K-1260-IC',
+    type: String,
+    nullable: true,
   })
   @IsOptional()
   @IsString()
@@ -67,16 +71,22 @@ export class CreateProductDto {
   sku?: string | null
 
   @ApiPropertyOptional({
-    description: 'Main Cloudinary image URL',
+    description: 'Main Cloudinary image URL. Send null to clear it.',
     example:
       'https://res.cloudinary.com/demo/image/upload/v1/products/tc-k.jpg',
+    type: String,
+    nullable: true,
   })
   @IsOptional()
   @IsUrl()
   @MaxLength(1024)
   imageUrl?: string | null
 
-  @ApiPropertyOptional({ description: 'Gallery of additional Cloudinary URLs' })
+  @ApiPropertyOptional({
+    description: 'Gallery of additional Cloudinary URLs',
+    type: [String],
+    nullable: true,
+  })
   @IsOptional()
   @IsArray()
   @IsUrl({}, { each: true })
