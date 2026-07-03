@@ -23,6 +23,12 @@ conventions: int PKs, no `/admin` URL prefix, soft-delete only on the product en
 avatar-style image handling, audit logging, Jest) live in **`CONFIGURATOR.md`**. Implement
 its steps 1–7 in order, one step per session/commit, each ending fully green.
 
+**Step 1 (module skeleton + entities + migration) is done** — `src/configurator/` has the
+four Phase-1 entities, the `SegmentDataType` enum, `ConfiguratorModule` (registered in
+`AppModule`), and migration `1783085011665-AddConfiguratorTables`. No controllers,
+providers, or routes yet. **Next: Step 2** (segment definition library CRUD + options, per
+`CONFIGURATOR.md` §7).
+
 ---
 
 ### Scheduled post auto-publishing

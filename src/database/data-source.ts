@@ -9,6 +9,10 @@ import { ContactSubmission } from 'src/contact/entities/contact-submission.entit
 import { AuditLog } from 'src/audit-log/entities/audit-log.entity'
 import { Product } from 'src/products/entities/product.entity'
 import { ProductType } from 'src/products/entities/product-type.entity'
+import { ConfigurableProduct } from 'src/configurator/entities/configurable-product.entity'
+import { SegmentDefinition } from 'src/configurator/entities/segment-definition.entity'
+import { SegmentOption } from 'src/configurator/entities/segment-option.entity'
+import { ProductSegmentAssignment } from 'src/configurator/entities/product-segment-assignment.entity'
 
 config({ path: `.env.${process.env.NODE_ENV ?? 'development'}` })
 
@@ -29,6 +33,10 @@ export default new DataSource({
     AuditLog,
     Product,
     ProductType,
+    ConfigurableProduct,
+    SegmentDefinition,
+    SegmentOption,
+    ProductSegmentAssignment,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,
