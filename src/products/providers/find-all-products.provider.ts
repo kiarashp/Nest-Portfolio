@@ -4,7 +4,11 @@ import { Repository, SelectQueryBuilder } from 'typeorm'
 import type { Request } from 'express'
 import { Product } from '../entities/product.entity'
 import { FilterableField, ProductType } from '../entities/product-type.entity'
-import { GetProductsDto, ProductSort } from '../dto/get-products.dto'
+import {
+  GetProductsDto,
+  ProductSortField,
+  ProductSortOrder,
+} from '../dto/get-products.dto'
 import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
 import { findFilterableField } from './validate-specs.util'
@@ -111,7 +115,7 @@ export class FindAllProductsProvider {
       this.applySpecFilters(qb, dto.specs, type.filterableFields)
     }
 
-    this.applySort(qb, dto.sort ?? 'newest')
+    this.applySort(qb, dto.sortBy ?? 'createdAt', dto.order ?? 'desc')
     return qb
   }
 
@@ -222,24 +226,25 @@ export class FindAllProductsProvider {
   /**
    * Applies the sort order. A secondary sort on id keeps pagination stable when
    * the primary key ties (e.g. two products created in the same instant).
+   * featured always sorts isFeatured DESC-first — order only controls the
+   * direction of the createdAt tiebreak (and of createdAt/name themselves for
+   * the other sortBy values).
    */
-  private applySort(qb: SelectQueryBuilder<Product>, sort: ProductSort): void {
-    switch (sort) {
-      case 'oldest':
-        qb.orderBy('product.createdAt', 'ASC').addOrderBy('product.id', 'ASC')
-        break
-      case 'name':
-        qb.orderBy('product.name', 'ASC').addOrderBy('product.id', 'ASC')
-        break
-      case 'featured':
-        qb.orderBy('product.isFeatured', 'DESC')
-          .addOrderBy('product.createdAt', 'DESC')
-          .addOrderBy('product.id', 'DESC')
-        break
-      case 'newest':
-      default:
-        qb.orderBy('product.createdAt', 'DESC').addOrderBy('product.id', 'DESC')
-        break
+  private applySort(
+    qb: SelectQueryBuilder<Product>,
+    sortBy: ProductSortField,
+    order: ProductSortOrder,
+  ): void {
+    const direction = order.toUpperCase() as 'ASC' | 'DESC'
+    if (sortBy === 'featured') {
+      qb.orderBy('product.isFeatured', 'DESC')
+        .addOrderBy('product.createdAt', direction)
+        .addOrderBy('product.id', direction)
+    } else {
+      qb.orderBy(`product.${sortBy}`, direction).addOrderBy(
+        'product.id',
+        direction,
+      )
     }
   }
 }

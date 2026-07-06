@@ -96,6 +96,8 @@ export class CreateProductDto {
     description:
       "Type-specific attribute values — keys must match the product type's filterableFields",
     example: { tempRange: 1260, accuracy: 0.75, sheathMaterial: 'Inconel 600' },
+    type: 'object',
+    additionalProperties: true,
   })
   @IsOptional()
   @IsObject()

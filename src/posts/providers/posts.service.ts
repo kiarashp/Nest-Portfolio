@@ -167,6 +167,19 @@ export class PostsService {
     return await this.findPostImagesProvider.findPostImages(postId, activeUser)
   }
 
+  /** Returns a single image uploaded for a post. */
+  public async findPostImage(
+    postId: number,
+    fileId: number,
+    activeUser: ActiveUserData,
+  ): Promise<UploadFile> {
+    return await this.findPostImagesProvider.findPostImage(
+      postId,
+      fileId,
+      activeUser,
+    )
+  }
+
   /** Deletes a single image from a post and clears featuredImage if it pointed there. */
   public async deletePostImage(
     postId: number,

@@ -13,9 +13,13 @@ import { Transform, Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.dto'
 
-/** Sort orders accepted by GET /products. */
-export const PRODUCT_SORTS = ['newest', 'oldest', 'name', 'featured'] as const
-export type ProductSort = (typeof PRODUCT_SORTS)[number]
+/** Sortable columns accepted by GET /products. */
+export const PRODUCT_SORT_FIELDS = ['createdAt', 'name', 'featured'] as const
+export type ProductSortField = (typeof PRODUCT_SORT_FIELDS)[number]
+
+/** Sort directions accepted by GET /products. */
+export const PRODUCT_SORT_ORDERS = ['asc', 'desc'] as const
+export type ProductSortOrder = (typeof PRODUCT_SORT_ORDERS)[number]
 
 export class GetProductsDto extends PaginationQueryDto {
   @ApiPropertyOptional({ description: 'Filter by product type ID', example: 1 })
@@ -47,13 +51,22 @@ export class GetProductsDto extends PaginationQueryDto {
 
   @ApiPropertyOptional({
     description:
-      'Sort order. newest (default) and oldest sort by creation date; name sorts A–Z; featured sorts featured products first, then newest.',
-    enum: PRODUCT_SORTS,
-    default: 'newest',
+      'Column to sort by (default createdAt). featured sorts isFeatured first, then always tiebreaks by createdAt — order controls the direction of both createdAt and the featured tiebreak.',
+    enum: PRODUCT_SORT_FIELDS,
+    default: 'createdAt',
   })
   @IsOptional()
-  @IsIn(PRODUCT_SORTS)
-  sort?: ProductSort
+  @IsIn(PRODUCT_SORT_FIELDS)
+  sortBy?: ProductSortField
+
+  @ApiPropertyOptional({
+    description: 'Sort direction (default desc)',
+    enum: PRODUCT_SORT_ORDERS,
+    default: 'desc',
+  })
+  @IsOptional()
+  @IsIn(PRODUCT_SORT_ORDERS)
+  order?: ProductSortOrder
 
   // isPublished — admin route only (GET /products/admin); the public route always hardcodes
   // isPublished = true and ignores this field. Query param arrives as the string 'true'/'false'.

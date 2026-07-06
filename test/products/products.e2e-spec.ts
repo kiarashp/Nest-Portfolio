@@ -544,9 +544,9 @@ describe('Products (e2e)', () => {
       .expect(400)
   })
 
-  it('GET /products?sort=name → 200 (sorted, published only)', async () => {
+  it('GET /products?sortBy=name&order=asc → 200 (sorted A-Z, published only)', async () => {
     const res = await request(app.getHttpServer())
-      .get('/products?sort=name')
+      .get('/products?sortBy=name&order=asc')
       .expect(200)
 
     const body = (res.body as ApiResponse<Paginated<Product>>).data
@@ -555,9 +555,26 @@ describe('Products (e2e)', () => {
     expect(names).toEqual(sorted)
   })
 
-  it('GET /products?sort=invalid → 400', async () => {
+  it('GET /products?sortBy=createdAt&order=asc → 200 (oldest first)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/products?sortBy=createdAt&order=asc')
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<Product>>).data
+    const dates = body.data.map((p) => new Date(p.createdAt).getTime())
+    const sorted = [...dates].sort((a, b) => a - b)
+    expect(dates).toEqual(sorted)
+  })
+
+  it('GET /products?sortBy=invalid → 400', async () => {
     await request(app.getHttpServer())
-      .get('/products?sort=cheapest')
+      .get('/products?sortBy=cheapest')
+      .expect(400)
+  })
+
+  it('GET /products?order=invalid → 400', async () => {
+    await request(app.getHttpServer())
+      .get('/products?order=sideways')
       .expect(400)
   })
 
@@ -577,6 +594,42 @@ describe('Products (e2e)', () => {
     await request(app.getHttpServer())
       .get('/products/slug/ghost-slug')
       .expect(404)
+  })
+
+  it('GET /products/slug/:slug (no includeRelated) → response has no related key', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/slug/${PUBLISHED_SLUG}`)
+      .expect(200)
+
+    const p = res.body as ApiResponse<Record<string, unknown>>
+    expect(p.data).not.toHaveProperty('related')
+  })
+
+  it('GET /products/slug/:slug?includeRelated=2 → embeds up to 2 related products', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/slug/${PUBLISHED_SLUG}?includeRelated=2`)
+      .expect(200)
+
+    const p = (res.body as ApiResponse<Product>).data
+    expect(Array.isArray(p.related)).toBe(true)
+    expect(p.related!.length).toBeLessThanOrEqual(2)
+    for (const r of p.related!) {
+      expect(r.id).not.toBe(p.id)
+      expect(r.productTypeId).toBe(productTypeId)
+      expect(r.isPublished).toBe(true)
+    }
+  })
+
+  it('GET /products/slug/:slug?includeRelated=0 → 400', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/slug/${PUBLISHED_SLUG}?includeRelated=0`)
+      .expect(400)
+  })
+
+  it('GET /products/slug/:slug?includeRelated=-1 → 400', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/slug/${PUBLISHED_SLUG}?includeRelated=-1`)
+      .expect(400)
   })
 
   // ── GET /products/:id ─────────────────────────────────────────────────────
@@ -805,10 +858,10 @@ describe('Products (e2e)', () => {
     expect(ids).not.toContain(draftRelatedProductId)
   })
 
-  it('GET /products?sort=featured → featured products first, then newest, scoped by productTypeId', async () => {
+  it('GET /products?sortBy=featured&order=desc → featured products first, then newest, scoped by productTypeId', async () => {
     const res = await request(app.getHttpServer())
       .get('/products')
-      .query({ productTypeId, sort: 'featured' })
+      .query({ productTypeId, sortBy: 'featured', order: 'desc' })
       .expect(200)
 
     const products = (res.body as ApiResponse<Paginated<Product>>).data.data
@@ -819,6 +872,40 @@ describe('Products (e2e)', () => {
     expect(featuredIndex).toBeGreaterThanOrEqual(0)
     expect(publishedIndex).toBeGreaterThanOrEqual(0)
     expect(featuredIndex).toBeLessThan(publishedIndex)
+  })
+
+  it('GET /products?sortBy=featured&order=asc → isFeatured still sorts first, but the createdAt tiebreak flips to ascending', async () => {
+    const resDesc = await request(app.getHttpServer())
+      .get('/products')
+      .query({ productTypeId, sortBy: 'featured', order: 'desc', limit: 100 })
+      .expect(200)
+    const resAsc = await request(app.getHttpServer())
+      .get('/products')
+      .query({ productTypeId, sortBy: 'featured', order: 'asc', limit: 100 })
+      .expect(200)
+
+    const productsDesc = (resDesc.body as ApiResponse<Paginated<Product>>).data
+      .data
+    const productsAsc = (resAsc.body as ApiResponse<Paginated<Product>>).data
+      .data
+
+    // isFeatured still sorts first regardless of order.
+    const featuredIndexAsc = productsAsc.findIndex(
+      (p) => p.id === featuredProductId,
+    )
+    const publishedIndexAsc = productsAsc.findIndex(
+      (p) => p.id === publishedProductId,
+    )
+    expect(featuredIndexAsc).toBeLessThan(publishedIndexAsc)
+
+    // Within the non-featured group, order flips the createdAt tiebreak.
+    const nonFeaturedDesc = productsDesc
+      .filter((p) => !p.isFeatured)
+      .map((p) => p.id)
+    const nonFeaturedAsc = productsAsc
+      .filter((p) => !p.isFeatured)
+      .map((p) => p.id)
+    expect(nonFeaturedAsc).toEqual([...nonFeaturedDesc].reverse())
   })
 
   it('isFeatured round-trips on create and patch, defaulting to false', async () => {
@@ -1001,6 +1088,41 @@ describe('Products (e2e)', () => {
       .get(`/products/${publishedProductId}/images`)
       .set('Authorization', `Bearer ${userToken}`)
       .expect(403)
+  })
+
+  // ── GET /products/:id/images/:fileId ──────────────────────────────────────
+
+  it('GET /products/:id/images/:fileId (ADMIN) → 200, returns the file', async () => {
+    const upRes = await request(app.getHttpServer())
+      .post(`/products/${publishedProductId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'single.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file = (upRes.body as ApiResponse<UploadFile>).data
+
+    const res = await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}/images/${file.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    expect((res.body as ApiResponse<UploadFile>).data.id).toBe(file.id)
+  })
+
+  it('GET /products/:id/images/:fileId (USER role) → 403', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}/images/999999`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(403)
+  })
+
+  it('GET /products/:id/images/:fileId for a non-existent file → 404', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/${publishedProductId}/images/999999`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404)
   })
 
   // ── DELETE /products/:id/images/:fileId ───────────────────────────────────

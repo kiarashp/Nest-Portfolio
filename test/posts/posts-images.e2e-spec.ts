@@ -128,6 +128,41 @@ describe('Posts images (e2e)', () => {
     expect(file.path).toContain('cloudinary')
   })
 
+  // ── GET /posts/:id/images/:fileId ───────────────────────────────────────
+
+  it('GET /posts/:id/images/:fileId (ADMIN) → 200, returns the file', async () => {
+    const upRes = await request(app.getHttpServer())
+      .post(`/posts/${postId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'single.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file = (upRes.body as ApiResponse<UploadFile>).data
+
+    const res = await request(app.getHttpServer())
+      .get(`/posts/${postId}/images/${file.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    expect((res.body as ApiResponse<UploadFile>).data.id).toBe(file.id)
+  })
+
+  it('GET /posts/:id/images/:fileId for a non-existent file → 404', async () => {
+    await request(app.getHttpServer())
+      .get(`/posts/${postId}/images/999999`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404)
+  })
+
+  it('GET /posts/:id/images/:fileId (EDITOR on a post they do not own) → 403', async () => {
+    await request(app.getHttpServer())
+      .get(`/posts/${postId}/images/999999`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .expect(403)
+  })
+
   // ── DELETE /posts/:id/images/:fileId ────────────────────────────────────
 
   it('DELETE /posts/:id/images/:fileId (ADMIN) → 200, removes the file and clears featuredImage', async () => {

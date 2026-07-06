@@ -189,4 +189,29 @@ describe('UpdatePostProvider', () => {
 
     expect(result.publishedAt).toBeUndefined()
   })
+
+  it('re-renders contentHtml when content is explicitly sent', async () => {
+    findOnePostProvider.findOneByIdOrFail.mockResolvedValue({ ...ownedPost })
+    postsRepo.save.mockImplementation((post: Post) => Promise.resolve(post))
+
+    const result = await provider.update(10, { content: '# Heading' }, editor)
+
+    expect(result.content).toBe('# Heading')
+    expect(result.contentHtml).toContain('<h1>')
+  })
+
+  it('leaves content and contentHtml untouched when content is omitted', async () => {
+    const existingPost = {
+      ...ownedPost,
+      content: 'Existing content',
+      contentHtml: '<p>Existing content</p>',
+    } as unknown as Post
+    findOnePostProvider.findOneByIdOrFail.mockResolvedValue(existingPost)
+    postsRepo.save.mockImplementation((post: Post) => Promise.resolve(post))
+
+    const result = await provider.update(10, { title: 'New Title' }, editor)
+
+    expect(result.content).toBe('Existing content')
+    expect(result.contentHtml).toBe('<p>Existing content</p>')
+  })
 })

@@ -17,6 +17,7 @@ import { User } from 'src/users/entities/user.entity'
 import { PostStatus } from '../enums/postStatus.enum'
 import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
+import { renderMarkdownToHtml } from './render-post-content.util'
 
 @Injectable()
 export class CreatePostProvider {
@@ -73,6 +74,9 @@ export class CreatePostProvider {
     // status: PUBLISHED doesn't skip the "publishedAt set exactly when
     // status is/became PUBLISHED" invariant that UpdatePostProvider enforces.
     const publishedAt = status === PostStatus.PUBLISHED ? new Date() : undefined
+    const contentHtml = createPostDto.content
+      ? renderMarkdownToHtml(createPostDto.content)
+      : undefined
 
     //create post
     const post = this.postsRepository.create({
@@ -81,6 +85,7 @@ export class CreatePostProvider {
       slug,
       status,
       publishedAt,
+      contentHtml,
       isFeatured: createPostDto.isFeatured ?? false,
       author: author,
       tags: tags,

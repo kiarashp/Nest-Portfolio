@@ -28,7 +28,7 @@ import { ChangePasswordDto } from './dtos/change-password.dto'
 import { ActiveUser } from './decorators/active-user.decorator'
 import type { ActiveUserData } from './interfaces/active-user-data.interface'
 import jwtConfig from './config/jwt.config'
-import { ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ApiDataResponse } from 'src/common/swagger/api-response.helpers'
 import { ApiAuth } from 'src/common/swagger/api-auth.helpers'
 import { AuthTokensDto } from './dtos/auth-tokens.dto'
@@ -63,6 +63,25 @@ export class AuthController {
   @SkipThrottle({ default: isDevelopmentEnvironment })
   @ApiOperation({ summary: 'Sign in with email and password' })
   @ApiDataResponse(AuthTokensDto, { description: 'Access and refresh tokens' })
+  @ApiResponse({
+    status: 401,
+    description:
+      'Invalid credentials, Google-only account, or unverified email',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 401 },
+        message: { type: 'string' },
+        error: { type: 'string', example: 'Unauthorized' },
+        errorCode: {
+          type: 'string',
+          enum: ['EMAIL_NOT_VERIFIED'],
+          description:
+            'Present only when the sign-in was rejected for an unverified email',
+        },
+      },
+    },
+  })
   public async signIn(
     @Body() signInDto: SignInDto,
     @Res({ passthrough: true }) res: Response,

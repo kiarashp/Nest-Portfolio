@@ -17,6 +17,7 @@ import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
+import { renderMarkdownToHtml } from './render-post-content.util'
 
 @Injectable()
 export class UpdatePostProvider {
@@ -88,7 +89,13 @@ export class UpdatePostProvider {
     ) {
       post.publishedAt = new Date()
     }
-    post.content = patchPostDto.content ?? post.content
+    // Re-render contentHtml only when content is explicitly sent, not on every
+    // save — !== undefined (rather than ??) distinguishes "field omitted" from
+    // a resend of the same value.
+    if (patchPostDto.content !== undefined) {
+      post.content = patchPostDto.content
+      post.contentHtml = renderMarkdownToHtml(patchPostDto.content)
+    }
     post.excerpt = patchPostDto.excerpt ?? post.excerpt
     post.isFeatured = patchPostDto.isFeatured ?? post.isFeatured
     // featuredImage is nullable and `null` is a valid "clear it" request, so

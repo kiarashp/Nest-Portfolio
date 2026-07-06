@@ -19,6 +19,7 @@ import type { Request } from 'express'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 import {
+  ApiBody,
   ApiConsumes,
   ApiOperation,
   ApiResponse,
@@ -30,6 +31,7 @@ import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { CreateProductDto } from './dto/create-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
 import { GetProductsDto } from './dto/get-products.dto'
+import { GetProductBySlugDto } from './dto/get-product-by-slug.dto'
 import { GetRelatedProductsDto } from './dto/get-related-products.dto'
 import { DeleteResultDto } from 'src/common/dto/delete-result.dto'
 import {
@@ -88,8 +90,11 @@ export class ProductsController {
     description: 'Product not found or not published',
   })
   @Get('slug/:slug')
-  public findBySlug(@Param('slug') slug: string) {
-    return this.productsService.findBySlug(slug)
+  public findBySlug(
+    @Param('slug') slug: string,
+    @Query() dto: GetProductBySlugDto,
+  ) {
+    return this.productsService.findBySlug(slug, dto.includeRelated)
   }
 
   /**
@@ -186,6 +191,12 @@ export class ProductsController {
   @ApiOperation({ summary: 'Upload a product image (admin only)' })
   @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
   @ApiDataResponse(UploadFile, {
     status: 201,
     description: 'Image uploaded; UploadFile record returned',
@@ -225,6 +236,22 @@ export class ProductsController {
   @Get(':id/images')
   public findImages(@Param('id', ParseIntPipe) productId: number) {
     return this.productsService.findImages(productId)
+  }
+
+  /**
+   * get a single uploaded image for a product (admin only)
+   */
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get a single product image (admin only)' })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
+  @ApiDataResponse(UploadFile, { description: 'The UploadFile record' })
+  @ApiResponse({ status: 404, description: 'Product or image not found' })
+  @Get(':id/images/:fileId')
+  public findImage(
+    @Param('id', ParseIntPipe) productId: number,
+    @Param('fileId', ParseIntPipe) fileId: number,
+  ) {
+    return this.productsService.findImage(productId, fileId)
   }
 
   /**

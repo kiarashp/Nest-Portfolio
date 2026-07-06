@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common'
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { SetEmailVerifiedProvider } from './set-email-verified.provider'
@@ -26,6 +30,13 @@ describe('SetEmailVerifiedProvider', () => {
     }).compile()
 
     provider = module.get(SetEmailVerifiedProvider)
+  })
+
+  it('throws ForbiddenException when the target id equals the active user id', async () => {
+    await expect(provider.setEmailVerified(5, false, 5)).rejects.toThrow(
+      ForbiddenException,
+    )
+    expect(userRepo.findOneBy).not.toHaveBeenCalled()
   })
 
   it('throws NotFoundException when the user does not exist', async () => {

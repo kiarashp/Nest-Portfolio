@@ -89,6 +89,24 @@ describe('Avatar selection (e2e)', () => {
     }
   })
 
+  // ── GET /users/avatar-options/:id ─────────────────────────────────────────
+
+  it('GET /users/avatar-options/:id (unauthenticated) → 200 with the option', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/users/avatar-options/${seededOption.id}`)
+      .expect(200)
+
+    expect((res.body as ApiResponse<AvatarOption>).data.id).toBe(
+      seededOption.id,
+    )
+  })
+
+  it('GET /users/avatar-options/99999 → 404', async () => {
+    await request(app.getHttpServer())
+      .get('/users/avatar-options/99999')
+      .expect(404)
+  })
+
   // ── POST /users/avatar-options ────────────────────────────────────────────
 
   it('POST /users/avatar-options (admin, valid file) → 201, option saved with mock URL', async () => {

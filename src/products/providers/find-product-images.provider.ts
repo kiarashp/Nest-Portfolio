@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { UploadFile } from 'src/uploads/entities/upload-file.entity'
@@ -24,5 +24,23 @@ export class FindProductImagesProvider {
     await this.findOneProductProvider.findOneByIdOrFail(productId)
 
     return await this.uploadFilesRepository.find({ where: { productId } })
+  }
+
+  /**
+   * Returns a single image uploaded for the given product. Throws
+   * NotFoundException if the product does not exist or if the file is not
+   * linked to that product.
+   */
+  public async findProductImage(
+    productId: number,
+    fileId: number,
+  ): Promise<UploadFile> {
+    await this.findOneProductProvider.findOneByIdOrFail(productId)
+
+    const file = await this.uploadFilesRepository.findOne({
+      where: { id: fileId, productId },
+    })
+    if (!file) throw new NotFoundException('Image not found')
+    return file
   }
 }

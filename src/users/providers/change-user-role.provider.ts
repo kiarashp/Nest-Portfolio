@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -34,6 +35,13 @@ export class ChangeUserRoleProvider {
     role: UserRole,
     activeUserId: number,
   ): Promise<User> {
+    // An admin can never change their own role — this could demote them
+    // below ADMIN, either locking them out of admin-only routes immediately
+    // or, if they are the last admin, stranding the system with no admin.
+    if (id === activeUserId) {
+      throw new ForbiddenException('You cannot change your own role')
+    }
+
     const user = await this.usersRepository.findOneBy({ id })
     if (!user) {
       throw new NotFoundException(`User with id ${id} not found`)

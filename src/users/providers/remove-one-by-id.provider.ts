@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -33,6 +34,13 @@ export class RemoveOneByIdProvider {
    * the audit log after a successful deletion.
    */
   public async removeUserById(id: number, activeUserId: number) {
+    // An admin can never delete their own account — this would either lock
+    // them out immediately or, if they are the last admin, strand the system
+    // with no admin at all.
+    if (id === activeUserId) {
+      throw new ForbiddenException('You cannot delete your own account')
+    }
+
     const user = await this.findOneByIdProvider.findOneById(id)
 
     try {

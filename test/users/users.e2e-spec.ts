@@ -14,6 +14,7 @@ describe('Users (e2e)', () => {
   let dataSource: DataSource
   let adminToken: string
   let userToken: string
+  let adminUserId: number
   let regularUserId: number
   let userToDeleteId: number
   let patchTargetId: number
@@ -43,12 +44,13 @@ describe('Users (e2e)', () => {
       mailMock: { sendVerificationMail: sendVerificationMailMock },
     }))
 
-    await seedUser(dataSource, {
+    const admin = await seedUser(dataSource, {
       email: ADMIN_EMAIL,
       password: PASSWORD,
       firstName: 'UsersAdmin',
       role: UserRole.ADMIN,
     })
+    adminUserId = admin.id
 
     const regularUser = await seedUser(dataSource, {
       email: USER_EMAIL,
@@ -364,6 +366,14 @@ describe('Users (e2e)', () => {
     expect((res.body as ApiResponse<User>).data.role).toBe(UserRole.EDITOR)
   })
 
+  it('PATCH /users/:id/role (ADMIN targets own account) → 403', async () => {
+    await request(app.getHttpServer())
+      .patch(`/users/${adminUserId}/role`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ role: UserRole.EDITOR })
+      .expect(403)
+  })
+
   // ── PATCH /users/:id/verify-email (admin only) ────────────────────────────
 
   it('PATCH /users/:id/verify-email (ADMIN, true) → 200 marks the user verified', async () => {
@@ -402,6 +412,14 @@ describe('Users (e2e)', () => {
       .expect(404)
   })
 
+  it('PATCH /users/:id/verify-email (ADMIN targets own account) → 403', async () => {
+    await request(app.getHttpServer())
+      .patch(`/users/${adminUserId}/verify-email`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ isEmailVerified: false })
+      .expect(403)
+  })
+
   // ── DELETE /users/:id (admin only) ────────────────────────────────────────
 
   it('DELETE /users/:id (ADMIN) → 200 and user is gone', async () => {
@@ -419,5 +437,12 @@ describe('Users (e2e)', () => {
       .getRepository(User)
       .findOneBy({ id: userToDeleteId })
     expect(user).toBeNull()
+  })
+
+  it('DELETE /users/:id (ADMIN targets own account) → 403', async () => {
+    await request(app.getHttpServer())
+      .delete(`/users/${adminUserId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(403)
   })
 })

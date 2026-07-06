@@ -15,10 +15,10 @@ Guidance specific to this module. See the root `CLAUDE.md` for the high-level su
 
 `UploadFile` has nullable `postId` and `productId` foreign keys. Every row created for a parent is tied to it so the asset can be cleaned up later:
 
-- **Posts** — created through `POST /posts/:id/images` (`UploadPostImageProvider` passes `{ postId }`). `RemovePostProvider` loads the post with its `uploadFiles` relation and `deleteFile()`s each before deleting the post row; `DeletePostImageProvider` (`DELETE /posts/:id/images/:fileId`) removes a single one and clears `featuredImage` if it pointed there. Editors may only delete images on posts they authored.
-- **Products** — created through `POST /products/:id/images` (`UploadProductImageProvider` passes `{ productId }`). `DeleteProductProvider.softDelete` queries `UploadFile` by `productId` and `deleteFile()`s each before soft-deleting; `DeleteProductImageProvider` (`DELETE /products/:id/images/:fileId`) removes a single one. See `src/products/CLAUDE.md`.
+- **Posts** — created through `POST /posts/:id/images` (`UploadPostImageProvider` passes `{ postId }`). `RemovePostProvider` loads the post with its `uploadFiles` relation and `deleteFile()`s each before deleting the post row; `DeletePostImageProvider` (`DELETE /posts/:id/images/:fileId`) removes a single one and clears `featuredImage` if it pointed there; `FindPostImagesProvider.findPostImage` (`GET /posts/:id/images/:fileId`) is the single-item read counterpart. Editors may only delete or read images on posts they authored (same ownership check on both routes).
+- **Products** — created through `POST /products/:id/images` (`UploadProductImageProvider` passes `{ productId }`). `DeleteProductProvider.softDelete` queries `UploadFile` by `productId` and `deleteFile()`s each before soft-deleting; `DeleteProductImageProvider` (`DELETE /products/:id/images/:fileId`) removes a single one; `FindProductImagesProvider.findProductImage` (`GET /products/:id/images/:fileId`) is the single-item read counterpart (ADMIN-only, no ownership concept — mirrors `DELETE`). See `src/products/CLAUDE.md`.
 
-Avatars bypass `UploadFile` entirely — `AvatarOptionsProvider` injects `StorageProvider` directly and writes to `AvatarOption`, a separate table with no `postId`/`productId`.
+Avatars bypass `UploadFile` entirely — `AvatarOptionsProvider` injects `StorageProvider` directly and writes to `AvatarOption`, a separate table with no `postId`/`productId`. `AvatarOptionsProvider.findOne` (`GET /users/avatar-options/:id`, public) is the single-item read counterpart to the list/create/delete routes.
 
 ## OpenAPI typing of `UploadFile`
 

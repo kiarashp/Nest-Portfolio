@@ -115,4 +115,14 @@ export class Product {
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   @DeleteDateColumn()
   deletedAt?: Date | null
+
+  // related — transient (not a DB column); populated only by
+  // GET /products/slug/:slug when ?includeRelated is sent. Undefined (and
+  // therefore omitted from the JSON response) on every other read.
+  @ApiPropertyOptional({
+    type: () => [Product],
+    description:
+      'Related products, populated only when ?includeRelated was requested',
+  })
+  related?: Product[]
 }

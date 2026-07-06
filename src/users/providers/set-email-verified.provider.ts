@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -35,6 +36,14 @@ export class SetEmailVerifiedProvider {
     isEmailVerified: boolean,
     activeUserId: number,
   ): Promise<User> {
+    // An admin can never change their own email verification status — setting
+    // it to false would lock them out of sign-in immediately.
+    if (id === activeUserId) {
+      throw new ForbiddenException(
+        'You cannot change your own email verification status',
+      )
+    }
+
     const user = await this.usersRepository.findOneBy({ id })
     if (!user) {
       throw new NotFoundException(`User with id ${id} not found`)

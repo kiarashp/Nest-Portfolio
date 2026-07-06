@@ -16,7 +16,8 @@ src/products/
     update-product-type.dto.ts  — PartialType(CreateProductTypeDto)
     create-product.dto.ts
     update-product.dto.ts
-    get-products.dto.ts         — extends PaginationQueryDto; adds productTypeId, typeSlug, q, sort, isPublished, isFeatured, specs
+    get-products.dto.ts         — extends PaginationQueryDto; adds productTypeId, typeSlug, q, sortBy, order, isPublished, isFeatured, specs
+    get-product-by-slug.dto.ts  — includeRelated for GET /products/slug/:slug
   providers/
     find-all-product-types.provider.ts
     find-one-product-type.provider.ts   — by id or by slug
@@ -76,7 +77,7 @@ In `ProductsController`, these routes are declared **before** `GET /:id`:
 1. `GET /slug/:slug` — if declared after `/:id`, NestJS tries to pass the literal `"slug"` through `ParseIntPipe` and throws 400.
 2. `GET /admin` — same reason: `"admin"` fails `ParseIntPipe`.
 3. `GET /:id/admin` — declared before `GET /:id` (though it would also work after, since `ParseIntPipe` only applies to the `:id` segment and the extra `/admin` segment makes the path more specific — kept before `/:id` for readability, matching the `/admin` list route above it).
-4. `POST /:id/images`, `GET /:id/images`, `DELETE /:id/images/:fileId`, `GET /:id/related` — `ParseIntPipe` is on the `:id`/`:fileId` segments, so these are fine in any order relative to `/:id` (longer path and/or different HTTP method).
+4. `POST /:id/images`, `GET /:id/images`, `GET /:id/images/:fileId`, `DELETE /:id/images/:fileId`, `GET /:id/related` — `ParseIntPipe` is on the `:id`/`:fileId` segments, so these are fine in any order relative to `/:id` (longer path and/or different HTTP method).
 
 ## FindOneProductProvider — four methods
 
@@ -92,6 +93,8 @@ In `ProductsController`, these routes are declared **before** `GET /:id`:
 Write routes (`UpdateProductProvider`, `DeleteProductProvider`, `UploadProductImageProvider`) call `findOneByIdOrFail` — admins need to edit drafts. Public routes (`ProductsController.findOne`, `findBySlug`) call the published-only variants so drafts are invisible. `GET /products/:id/admin` (`ProductsController.findOneForEdit` → `ProductsService.findOneForEdit`, ADMIN-only) also calls `findOneByIdOrFail` directly — it's the single-product counterpart to `GET /products/admin` used by the admin edit form, since `GET /products/:id` cannot return a draft. Unlike the posts equivalent (`GET /posts/:id/admin`), there's no ownership check to layer on — product writes are already ADMIN-only, with no EDITOR-owns-own-product concept.
 
 `FindRelatedProductsProvider` (`GET /products/:id/related`) reuses `findOnePublishedByIdOrFail` to resolve and validate the anchor product — a missing or unpublished/draft id 404s exactly like `GET /products/:id`. It then runs a plain `productsRepository.find()` (not a `SelectQueryBuilder` — no jsonb/spec filtering is needed) on `productTypeId = anchor.productTypeId AND id != anchor.id AND isPublished = true`, ordered `createdAt DESC` with an `id` tiebreaker, capped by an optional `?limit=` query param (default 4, max 20). There is no fallback to other product types, so the result can be shorter than `limit` or empty. Read-only — no audit log entry is written.
+
+**`GET /products/slug/:slug?includeRelated=N`:** avoids a two-request waterfall (slug→id, then id→related) for a slug-only product detail page. `GetProductBySlugDto.includeRelated` (optional int, 1-20, same validation shape as `GetRelatedProductsDto.limit`) is read by `ProductsController.findBySlug` and passed to `ProductsService.findBySlug(slug, includeRelated?)`, which composes the two existing providers directly in the service facade (no new provider class — this is simple orchestration, not new business logic): it calls `FindOneProductProvider.findOneBySlugOrFail`, and when `includeRelated !== undefined` also calls `FindRelatedProductsProvider.findRelated(product.id, includeRelated)` and assigns the result to `product.related` before returning. `Product.related` is a transient (non-column) field, the same pattern as `ProductType.productCount` — it stays `undefined` (and is therefore omitted from the JSON response) unless `includeRelated` is sent, so every existing caller of the slug route is unaffected.
 
 ## Nullable field updates
 
@@ -175,7 +178,7 @@ Both list methods build a TypeORM `SelectQueryBuilder` via the shared private `b
 Filters supported by both:
 - **Type** — `productTypeId` (FK column match) **or** `typeSlug` (matches the joined `productType.slug`). `productTypeId` wins if both are sent.
 - **Keyword** `q` — `name ILIKE OR shortDescription ILIKE`.
-- **Sort** — `newest` (default, `createdAt DESC`), `oldest` (`createdAt ASC`), `name` (`name ASC`), `featured` (`isFeatured DESC` then `createdAt DESC`); each adds an `id` tiebreaker so pagination is stable.
+- **Sort** — `sortBy` (`createdAt` default / `name` / `featured`) + `order` (`asc`/`desc`, default `desc`); `sortBy=featured` always sorts `isFeatured DESC` first, `order` only controls the direction of the `createdAt` tiebreak (and of `createdAt`/`name` themselves for the other `sortBy` values). Each adds an `id` tiebreaker (same direction as `order`) so pagination is stable. This replaced an earlier fused `sort: 'newest'|'oldest'|'name'|'featured'` enum — a breaking API change with no dual-support shim, done to match the `sortBy`+`order` shape already used by `GetPostsDto`/`GetUsersDto`/`GetAuditLogsDto`.
 - **Specs** — see below.
 
 **`isPublished` filter (admin route only):** `buildQuery` mirrors `FindAllPostsProvider`'s `status` handling — when `publishedOnly` is `true` (the public route) the `isPublished = true` clause is hardcoded and `dto.isPublished` is ignored entirely, even if a caller sends it; when `publishedOnly` is `false` (`GET /products/admin`) the clause is applied only if `dto.isPublished !== undefined`, so omitting the param still returns both drafts and published rows. The DTO field uses the same `@Type(() => String)` + `@Transform` boolean-coercion guard as `GetContactSubmissionsDto.handled` (see the root `CLAUDE.md`), since the global `ValidationPipe` would otherwise coerce a raw `'false'` query string to `true` before any custom transform runs.
@@ -214,11 +217,18 @@ Both controllers document their response bodies with the shared helpers in
 response field. This makes the generated `openapi-types.ts` expose real response shapes (the
 `{ apiVersion, data }` envelope, paginated for the list routes) instead of `content?: never`.
 `FilterableFieldDto` is also decorated so the frontend gets a typed filter-metadata shape.
+`CreateProductDto.specs` (and `UpdateProductDto`, which inherits it via `PartialType`) carries
+`type: 'object', additionalProperties: true` on its `@ApiPropertyOptional` — without this,
+`openapi-typescript` emits `Record<string, never>` (an object that can hold nothing) instead of
+`Record<string, unknown>`, making the field unusable on a typed client. Mirrors the same
+`additionalProperties: true` already used by `GetProductsDto.specs` (the query-filter DTO).
 Nullable fields pass an explicit `type` (e.g. `@ApiPropertyOptional({ type: String, nullable: true })`)
 because a `string | null` union otherwise emits `Object` metadata and renders as an empty object.
 The **posts** module is also fully response-typed using these same helpers — see the root
 `CLAUDE.md` Serialization section for the rationale, the `PublicAuthor` embedded-author pattern,
 and how to extend this to other modules.
+
+`POST /products/:id/images` carries `@ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })` alongside its `@ApiConsumes('multipart/form-data')` — without `@ApiBody`, a multipart endpoint's request body is undocumented and generates `requestBody?: never` in `openapi-types.ts`. `POST /posts/:id/images` and `POST /users/avatar-options` use the identical `@ApiBody` shape for the same reason.
 
 Both controllers' write/admin routes (everything except the public reads) are ADMIN-only and
 carry `@ApiAuth({ roles: [UserRole.ADMIN] })` from `src/common/swagger/api-auth.helpers.ts`,

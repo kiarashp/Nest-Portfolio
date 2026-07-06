@@ -46,9 +46,12 @@ export class SignInProvider {
       this.logger.warn(
         `Sign-in rejected: unverified email — email=${signInDto.email}`,
       )
-      throw new UnauthorizedException(
-        'Please verify your email address before signing in',
-      )
+      // errorCode lets the frontend distinguish this case from wrong
+      // credentials without string-matching the message text.
+      throw new UnauthorizedException({
+        message: 'Please verify your email address before signing in',
+        errorCode: 'EMAIL_NOT_VERIFIED',
+      })
     }
     //compare password to the hashed password
     let isEqual: boolean = false

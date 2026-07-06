@@ -39,6 +39,16 @@ export class AvatarOptionsProvider {
   }
 
   /**
+   * Returns a single avatar option by id. Throws NotFoundException if no
+   * option with that id exists.
+   */
+  public async findOne(id: number): Promise<AvatarOption> {
+    const option = await this.avatarOptionRepo.findOne({ where: { id } })
+    if (!option) throw new NotFoundException('Avatar option not found')
+    return option
+  }
+
+  /**
    * Uploads the file to Cloudinary, then saves the url and publicId to the DB.
    * The acting admin's id is recorded in the audit log after a successful save.
    */

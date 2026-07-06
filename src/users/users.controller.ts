@@ -28,6 +28,7 @@ import { SetEmailVerifiedDto } from './dtos/set-email-verified.dto'
 import { PatchUserDto } from './dtos/patch-user.dto'
 import { UsersService } from './providers/users.service'
 import {
+  ApiBody,
   ApiConsumes,
   ApiOperation,
   ApiResponse,
@@ -163,6 +164,12 @@ export class UsersController {
   @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiOperation({ summary: 'Add a new avatar option (admin only)' })
   @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
   @ApiDataResponse(AvatarOption, {
     status: 201,
     description: 'Avatar option created',
@@ -181,6 +188,18 @@ export class UsersController {
     @ActiveUser('sub') activeUserId: number,
   ) {
     return this.usersService.createAvatarOption(file, activeUserId)
+  }
+
+  /**
+   * Get a single avatar option by id — public, no auth required.
+   */
+  @Get('avatar-options/:id')
+  @Auth(AuthType.None)
+  @ApiOperation({ summary: 'Get a single avatar option by id' })
+  @ApiDataResponse(AvatarOption, { description: 'The avatar option' })
+  @ApiResponse({ status: 404, description: 'Avatar option not found' })
+  public getAvatarOption(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.getAvatarOption(id)
   }
 
   /**
@@ -277,6 +296,7 @@ export class UsersController {
   @ApiOperation({ summary: "Change a user's role (admin only)" })
   @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(AdminUser, { description: 'Role updated' })
+  @ApiResponse({ status: 403, description: 'Cannot target your own account' })
   public changeUserRole(
     @Param('id', ParseIntPipe) id: number,
     @Body() changeUserRoleDto: ChangeUserRoleDto,
@@ -301,6 +321,7 @@ export class UsersController {
   @ApiDataResponse(AdminUser, {
     description: 'Email verification status updated',
   })
+  @ApiResponse({ status: 403, description: 'Cannot target your own account' })
   public setEmailVerified(
     @Param('id', ParseIntPipe) id: number,
     @Body() setEmailVerifiedDto: SetEmailVerifiedDto,
@@ -337,6 +358,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Delete a user (admin only)' })
   @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(MessageResponseDto, { description: 'User deleted' })
+  @ApiResponse({ status: 403, description: 'Cannot target your own account' })
   public deleteUser(
     @Param('id', ParseIntPipe) id: number,
     @ActiveUser('sub') activeUserId: number,

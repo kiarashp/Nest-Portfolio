@@ -62,6 +62,16 @@ export class Post {
     nullable: true,
   })
   content?: string
+  //   contentHtml — sanitized HTML rendered from `content` at write time so
+  //   clients don't need their own markdown parser/sanitizer. Never
+  //   client-settable: absent from CreatePostDto/PatchPostDto, so
+  //   forbidNonWhitelisted rejects any attempt to set it directly.
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  contentHtml?: string | null
   //   excerpt — short plain-text summary; used as the SEO meta description /
   //   OG description, capped at the conventional 160-character length
   @ApiPropertyOptional({ type: String, nullable: true })

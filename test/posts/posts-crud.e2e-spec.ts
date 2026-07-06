@@ -412,6 +412,55 @@ describe('Posts CRUD (e2e)', () => {
       .expect(400)
   })
 
+  // ── contentHtml ────────────────────────────────────────────────────────────
+
+  it('POST /posts with content → 201 with sanitized contentHtml', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/posts')
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({
+        title: 'E2E Content Html Post',
+        slug: 'e2e-content-html-post',
+        content: '# Heading\n\nSome <script>alert(1)</script> text.',
+      })
+      .expect(201)
+
+    const post = (res.body as ApiResponse<Post>).data
+    expect(post.contentHtml).toContain('<h1>Heading</h1>')
+    expect(post.contentHtml).not.toContain('<script>')
+    extraPostIds.push(post.id)
+  })
+
+  it('PATCH /posts/:id with a new content value re-renders contentHtml', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/posts/${authorPublishedPostId}`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({ content: '## Updated Heading' })
+      .expect(200)
+
+    expect((res.body as ApiResponse<Post>).data.contentHtml).toContain(
+      '<h2>Updated Heading</h2>',
+    )
+  })
+
+  it('PATCH /posts/:id or POST /posts with contentHtml in the body → 400 (server-derived only)', async () => {
+    await request(app.getHttpServer())
+      .patch(`/posts/${authorPublishedPostId}`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({ contentHtml: '<p>hijacked</p>' })
+      .expect(400)
+
+    await request(app.getHttpServer())
+      .post('/posts')
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({
+        title: 'E2E ContentHtml Forbidden',
+        slug: 'e2e-content-html-forbidden',
+        contentHtml: '<p>hijacked</p>',
+      })
+      .expect(400)
+  })
+
   it('isFeatured round-trips on create and patch, defaulting to false', async () => {
     const created = await request(app.getHttpServer())
       .post('/posts')

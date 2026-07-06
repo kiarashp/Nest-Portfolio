@@ -22,6 +22,7 @@ import { PostsService } from './providers/posts.service'
 import { CreatePostDto } from './dto/create-post.dto'
 import { PatchPostDto } from './dto/update-post.dto'
 import {
+  ApiBody,
   ApiConsumes,
   ApiOperation,
   ApiResponse,
@@ -251,6 +252,12 @@ export class PostsController {
    */
   @ApiOperation({ summary: 'Upload an image for a post' })
   @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
   @ApiAuth({ roles: POST_WRITE_ROLES, ownership: POST_OWNERSHIP })
   @ApiDataResponse(UploadFile, {
     status: 201,
@@ -275,6 +282,23 @@ export class PostsController {
     @ActiveUser() activeUser: ActiveUserData,
   ) {
     return this.postsService.uploadPostImage(file, postId, activeUser)
+  }
+
+  /**
+   * get a single image uploaded for a post
+   */
+  @ApiOperation({ summary: 'Get a single image uploaded for a post' })
+  @ApiAuth({ roles: POST_WRITE_ROLES, ownership: POST_OWNERSHIP })
+  @ApiDataResponse(UploadFile, { description: 'The UploadFile record' })
+  @ApiResponse({ status: 404, description: 'Post or image not found' })
+  @Roles(UserRole.EDITOR, UserRole.AUTHOR, UserRole.ADMIN)
+  @Get(':id/images/:fileId')
+  findPostImage(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('fileId', ParseIntPipe) fileId: number,
+    @ActiveUser() activeUser: ActiveUserData,
+  ) {
+    return this.postsService.findPostImage(id, fileId, activeUser)
   }
 
   /**

@@ -79,8 +79,18 @@ export class ProductsService {
     return this.findOneProductProvider.findOneByIdOrFail(id)
   }
 
-  public findBySlug(slug: string): Promise<Product> {
-    return this.findOneProductProvider.findOneBySlugOrFail(slug)
+  public async findBySlug(
+    slug: string,
+    includeRelated?: number,
+  ): Promise<Product> {
+    const product = await this.findOneProductProvider.findOneBySlugOrFail(slug)
+    if (includeRelated !== undefined) {
+      product.related = await this.findRelatedProductsProvider.findRelated(
+        product.id,
+        includeRelated,
+      )
+    }
+    return product
   }
 
   public findRelated(id: number, limit?: number): Promise<Product[]> {
@@ -116,6 +126,10 @@ export class ProductsService {
 
   public findImages(productId: number): Promise<UploadFile[]> {
     return this.findProductImagesProvider.findProductImages(productId)
+  }
+
+  public findImage(productId: number, fileId: number): Promise<UploadFile> {
+    return this.findProductImagesProvider.findProductImage(productId, fileId)
   }
 
   public deleteImage(

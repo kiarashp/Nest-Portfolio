@@ -51,14 +51,16 @@ describe('POST /auth/sign-in (e2e)', () => {
 
   // ── Sad paths ────────────────────────────────────────────────────────────
 
-  it('returns 401 when the password is wrong', async () => {
-    await request(app.getHttpServer())
+  it('returns 401 with no errorCode when the password is wrong', async () => {
+    const res = await request(app.getHttpServer())
       .post('/auth/sign-in')
       .send({ email: TEST_EMAIL, password: 'WrongPassword!' })
       .expect(401)
+
+    expect((res.body as { errorCode?: string }).errorCode).toBeUndefined()
   })
 
-  it('returns 401 when the user has not verified their email', async () => {
+  it('returns 401 with errorCode EMAIL_NOT_VERIFIED when the user has not verified their email', async () => {
     // Seed an unverified user to exercise that branch of SignInProvider.
     await seedUser(dataSource, {
       email: 'unverified@example.com',
@@ -67,10 +69,14 @@ describe('POST /auth/sign-in (e2e)', () => {
       isEmailVerified: false,
     })
 
-    await request(app.getHttpServer())
+    const res = await request(app.getHttpServer())
       .post('/auth/sign-in')
       .send({ email: 'unverified@example.com', password: TEST_PASSWORD })
       .expect(401)
+
+    expect((res.body as { errorCode?: string }).errorCode).toBe(
+      'EMAIL_NOT_VERIFIED',
+    )
   })
 
   it('returns 400 when a required field is missing', async () => {

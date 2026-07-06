@@ -292,6 +292,13 @@ export class UsersService {
   }
 
   /**
+   * Returns a single avatar option by id.
+   */
+  public async getAvatarOption(id: number) {
+    return this.avatarOptionsProvider.findOne(id)
+  }
+
+  /**
    * Uploads a new avatar image to Cloudinary and saves the option to the DB.
    * The acting admin's id is forwarded to the provider for audit logging.
    */

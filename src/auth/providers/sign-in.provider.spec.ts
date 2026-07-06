@@ -66,19 +66,30 @@ describe('SignInProvider', () => {
     )
   })
 
-  it('throws UnauthorizedException when email has not been verified', async () => {
+  it('throws UnauthorizedException with an EMAIL_NOT_VERIFIED errorCode when email has not been verified', async () => {
     // Registration sends a verification link; sign-in must be blocked until
-    // the user clicks that link to prove they own the email address.
+    // the user clicks that link to prove they own the email address. The
+    // errorCode lets the frontend distinguish this case without string-
+    // matching the message text.
     usersService.findOneByEmail.mockResolvedValue({
       ...verifiedUser,
       isEmailVerified: false,
     })
 
-    await expect(provider.signIn(signInDto)).rejects.toThrow(
-      new UnauthorizedException(
+    try {
+      await provider.signIn(signInDto)
+      fail('expected signIn to throw')
+    } catch (error) {
+      expect(error).toBeInstanceOf(UnauthorizedException)
+      const response = (error as UnauthorizedException).getResponse() as {
+        message: string
+        errorCode: string
+      }
+      expect(response.message).toBe(
         'Please verify your email address before signing in',
-      ),
-    )
+      )
+      expect(response.errorCode).toBe('EMAIL_NOT_VERIFIED')
+    }
   })
 
   it('throws RequestTimeoutException when comparePassword throws', async () => {
@@ -99,9 +110,20 @@ describe('SignInProvider', () => {
     usersService.findOneByEmail.mockResolvedValue(verifiedUser)
     hashingProvider.comparePassword.mockResolvedValue(false)
 
-    await expect(
-      provider.signIn({ ...signInDto, password: 'wrong' }),
-    ).rejects.toThrow(new UnauthorizedException('Invalid credentials'))
+    try {
+      await provider.signIn({ ...signInDto, password: 'wrong' })
+      fail('expected signIn to throw')
+    } catch (error) {
+      expect(error).toBeInstanceOf(UnauthorizedException)
+      const response = (error as UnauthorizedException).getResponse() as
+        | string
+        | { errorCode?: string }
+      // Wrong-password 401s never carry an errorCode — only the unverified-
+      // email branch does.
+      expect(
+        typeof response === 'string' ? undefined : response.errorCode,
+      ).toBeUndefined()
+    }
   })
 
   it('returns tokens when credentials are valid', async () => {
