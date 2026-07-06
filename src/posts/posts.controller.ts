@@ -28,6 +28,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger'
 import { GetPostsDto } from './dto/get-posts.dto'
+import { GetRelatedPostsDto } from './dto/get-related-posts.dto'
 import { PostTagsDto } from './dto/post-tags.dto'
 import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
 import type { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
@@ -153,6 +154,25 @@ export class PostsController {
     @ActiveUser() activeUser: ActiveUserData,
   ) {
     return this.postsService.findOneForEdit(id, activeUser)
+  }
+
+  /**
+   * list related posts (shared tags, published, excluding self) — public
+   */
+  @ApiOperation({
+    summary: 'List related posts (shared tags, published, excluding self)',
+  })
+  @ApiArrayDataResponse(PostEntity, {
+    description: 'Array of related posts, newest first',
+  })
+  @ApiResponse({ status: 404, description: 'Post not found' })
+  @Auth(AuthType.None)
+  @Get(':id/related')
+  findRelated(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() dto: GetRelatedPostsDto,
+  ) {
+    return this.postsService.findRelated(id, dto.limit)
   }
 
   /**

@@ -28,7 +28,7 @@ Two userId-source patterns:
 
 ## Signature threading
 
-Several providers originally received only the target entity's `id`. When audit logging was added, `activeUserId: number` was added as a final parameter and threaded through the service facade and controller. Affected chains: `RemoveOneByIdProvider`, `ChangeUserRoleProvider`, `PatchUserProvider`, `AvatarOptionsProvider.create/remove`, and `TagsService.create/delete/softDelete`.
+Several providers originally received only the target entity's `id`. When audit logging was added, `activeUserId: number` was added as a final parameter and threaded through the service facade and controller. Affected chains: `RemoveOneByIdProvider`, `ChangeUserRoleProvider`, `PatchUserProvider`, `AvatarOptionsProvider.create/remove`, `TagsService.create/delete/softDelete`, and `ContactService.update` → `UpdateContactSubmissionProvider` (the `PATCH /contact/:id` handled-flag toggle).
 
 ## Adding audit logging to a new provider
 

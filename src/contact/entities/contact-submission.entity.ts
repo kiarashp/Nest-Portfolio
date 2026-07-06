@@ -4,6 +4,7 @@ import {
   CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm'
 
 @Entity()
@@ -32,4 +33,12 @@ export class ContactSubmission {
   @ApiProperty()
   @CreateDateColumn()
   createdAt!: Date
+  // last-modified timestamp — updated when an admin toggles `handled`
+  @ApiProperty()
+  @UpdateDateColumn()
+  updatedAt!: Date
+  // whether an admin has reviewed this submission
+  @ApiProperty({ example: false })
+  @Column({ type: 'boolean', default: false })
+  handled!: boolean
 }

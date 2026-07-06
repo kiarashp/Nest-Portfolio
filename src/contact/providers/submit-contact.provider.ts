@@ -7,8 +7,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter'
 import { AppEvents } from 'src/common/events/app-events'
 
 @Injectable()
-export class ContactProvider {
-  private readonly logger = new Logger(ContactProvider.name)
+export class SubmitContactProvider {
+  private readonly logger = new Logger(SubmitContactProvider.name)
 
   constructor(
     // repository for persisting contact form submissions

@@ -5,6 +5,7 @@ import { In, Repository } from 'typeorm'
 import { Tag } from '../entities/tag.entity'
 import { InjectRepository } from '@nestjs/typeorm'
 import { UpdateTagProvider } from './update-tag.provider'
+import { FindOneTagProvider } from './find-one-tag.provider'
 import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 
@@ -22,9 +23,20 @@ export class TagsService {
      * inject update tag provider
      */
     private readonly updateTagProvider: UpdateTagProvider,
+    /**
+     * inject find-one tag provider
+     */
+    private readonly findOneTagProvider: FindOneTagProvider,
     /** inject audit log service to record tag writes */
     private readonly auditLogService: AuditLogService,
   ) {}
+
+  /**
+   * Finds a single tag by ID or throws NotFoundException.
+   */
+  public async findOne(id: number): Promise<Tag> {
+    return this.findOneTagProvider.findOneByIdOrFail(id)
+  }
 
   /**
    * Updates an existing tag by ID with the provided partial fields.

@@ -241,6 +241,17 @@ expect(ids).toContain(seededPostId)
 
 See `test/posts/posts-filter.e2e-spec.ts`'s `startDate`/`endDate` tests, which scope by `authorId` for exactly this reason.
 
+## Whole-table aggregate endpoints (no scoping filter available)
+
+Some endpoints return a single aggregate object computed over an entire table with no per-suite scoping parameter to narrow it — e.g. `GET /admin/stats` (`test/admin-stats.e2e-spec.ts`), which counts every row in `post`, `product`, `user`, etc. Unlike list endpoints, there is no `authorId`/`tagIds`-style filter to add, so the two techniques above (scoped queries, race-free lower bounds) don't apply.
+
+For these, assert only:
+- **Shape and type** — every field is present and is a number (or the expected nested shape).
+- **Internal consistency** — invariants that hold regardless of what other suites have inserted, e.g. `products.total === products.published + products.draft`.
+- **A loose lower bound** for counts this suite itself seeded, e.g. `stats.users >= 2` after seeding two users — never an exact count, since other suites are concurrently inserting rows into the same shared tables.
+
+Do not assert an exact total against a whole-table aggregate — there is no way to make that race-free under the shared parallel e2e database.
+
 ## Paginated response shape
 
 Routes that return paginated lists (`GET /posts`, `GET /users`) wrap their payload in a `Paginated<T>` object:

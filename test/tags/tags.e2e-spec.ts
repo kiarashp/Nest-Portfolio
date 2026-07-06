@@ -85,6 +85,21 @@ describe('Tags (e2e)', () => {
     expect(Array.isArray((res.body as ApiResponse<Tag[]>).data)).toBe(true)
   })
 
+  // ── GET /tags/:id ─────────────────────────────────────────────────────────
+
+  it('GET /tags/:id (public, no token) → 200 with the tag', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/tags/${patchTagId}`)
+      .expect(200)
+
+    const tag = (res.body as ApiResponse<Tag>).data
+    expect(tag.id).toBe(patchTagId)
+  })
+
+  it('GET /tags/99999 (non-existent) → 404', async () => {
+    await request(app.getHttpServer()).get('/tags/99999').expect(404)
+  })
+
   // ── POST /tags ────────────────────────────────────────────────────────────
 
   it('POST /tags (AUTHOR) → 201 with the created tag', async () => {

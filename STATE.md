@@ -100,23 +100,3 @@ fixed row of boxes (e.g. exactly 10 characters), should the backend enforce a
 fixed length/charset on `sku` (via DTO validation, e.g. `@Length(10, 10)` /
 a regex), or should the format stay backend-agnostic and be purely a frontend
 UI concern? Decide this before building the endpoint, since it affects the DTO.
-
----
-
-### Add a read route for `ContactSubmission`
-
-**Why:** `ContactSubmission` rows are persisted permanently so the site owner can
-review submissions, but there is currently no way to read them back except direct
-DB access — `ContactController` only has `POST /contact`. The user has decided to
-keep the table write-only for now and add the read side later.
-
-**What to do:** Add an ADMIN-only `GET /contact` (paginated, following the same
-`PaginationQueryDto` / `paginateQuery` pattern as other list endpoints — see
-`FindAllAuditLogsProvider` for a similar admin-only paginated list) plus
-`GET /contact/:id` for a single submission. Back these with new
-`FindAllContactSubmissionsProvider` / `FindOneContactSubmissionProvider` classes in
-`src/contact/providers/`, registered in `ContactModule`. Document with
-`ApiPaginatedResponse(ContactSubmission)` / `ApiDataResponse(ContactSubmission)` and
-`@ApiAuth({ roles: [UserRole.ADMIN] })`, matching the pattern used by
-`GET /audit-logs`.
-

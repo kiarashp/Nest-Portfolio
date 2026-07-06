@@ -16,7 +16,7 @@ import { AuthType } from 'src/auth/enums/auth-type.enum'
 import { Roles } from 'src/auth/decorators/roles.decorator'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
-import { ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import {
   ApiArrayDataResponse,
   ApiDataResponse,
@@ -41,6 +41,18 @@ export class TagsController {
   @ApiArrayDataResponse(Tag)
   public async findAllTags() {
     return await this.tagsService.findAll()
+  }
+
+  /**
+   * get a single tag by id — public, same access as the tag list
+   */
+  @Auth(AuthType.None)
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a single tag by ID' })
+  @ApiDataResponse(Tag)
+  @ApiResponse({ status: 404, description: 'Tag not found' })
+  public async findOneTag(@Param('id', ParseIntPipe) id: number) {
+    return await this.tagsService.findOne(id)
   }
 
   /**

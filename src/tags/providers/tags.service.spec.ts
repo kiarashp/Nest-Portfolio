@@ -3,14 +3,17 @@ import { getRepositoryToken } from '@nestjs/typeorm'
 import { Tag } from '../entities/tag.entity'
 import { TagsService } from './tags.service'
 import { UpdateTagProvider } from './update-tag.provider'
+import { FindOneTagProvider } from './find-one-tag.provider'
 import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 
 describe('TagsService', () => {
   let service: TagsService
   let repoFind: jest.Mock
+  let findOneTagProvider: { findOneByIdOrFail: jest.Mock }
 
   beforeEach(async () => {
     repoFind = jest.fn().mockResolvedValue([])
+    findOneTagProvider = { findOneByIdOrFail: jest.fn() }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -27,6 +30,7 @@ describe('TagsService', () => {
         },
         // UpdateTagProvider is not exercised here — stub it out.
         { provide: UpdateTagProvider, useValue: { update: jest.fn() } },
+        { provide: FindOneTagProvider, useValue: findOneTagProvider },
         {
           provide: AuditLogService,
           useValue: { log: jest.fn().mockResolvedValue(undefined) },
@@ -35,6 +39,16 @@ describe('TagsService', () => {
     }).compile()
 
     service = module.get(TagsService)
+  })
+
+  // ── findOne ───────────────────────────────────────────────────────────────
+
+  it('findOne → delegates to FindOneTagProvider.findOneByIdOrFail', async () => {
+    const tag = { id: 1, name: 'ts' } as Tag
+    findOneTagProvider.findOneByIdOrFail.mockResolvedValue(tag)
+    const result = await service.findOne(1)
+    expect(findOneTagProvider.findOneByIdOrFail).toHaveBeenCalledWith(1)
+    expect(result).toBe(tag)
   })
 
   // ── findAll ───────────────────────────────────────────────────────────────

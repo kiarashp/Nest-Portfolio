@@ -18,6 +18,7 @@ import { FindMyPostsProvider } from './providers/find-my-posts.provider'
 import { ManagePostTagsProvider } from './providers/manage-post-tags.provider'
 import { FindPostImagesProvider } from './providers/find-post-images.provider'
 import { DeletePostImageProvider } from './providers/delete-post-image.provider'
+import { FindRelatedPostsProvider } from './providers/find-related-posts.provider'
 import { UploadsModule } from 'src/uploads/uploads.module'
 import { AuditLogModule } from 'src/audit-log/audit-log.module'
 import { UploadFile } from 'src/uploads/entities/upload-file.entity'
@@ -38,6 +39,7 @@ import { UploadFile } from 'src/uploads/entities/upload-file.entity'
     ManagePostTagsProvider,
     FindPostImagesProvider,
     DeletePostImageProvider,
+    FindRelatedPostsProvider,
   ],
   imports: [
     UsersModule,

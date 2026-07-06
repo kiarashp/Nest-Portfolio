@@ -19,6 +19,7 @@ import { FindMyPostsProvider } from './find-my-posts.provider'
 import { ManagePostTagsProvider } from './manage-post-tags.provider'
 import { FindPostImagesProvider } from './find-post-images.provider'
 import { DeletePostImageProvider } from './delete-post-image.provider'
+import { FindRelatedPostsProvider } from './find-related-posts.provider'
 import { PostTagsDto } from '../dto/post-tags.dto'
 
 @Injectable()
@@ -72,6 +73,10 @@ export class PostsService {
      * inject delete post image provider
      */
     private readonly deletePostImageProvider: DeletePostImageProvider,
+    /**
+     * inject find related posts provider
+     */
+    private readonly findRelatedPostsProvider: FindRelatedPostsProvider,
   ) {}
 
   public async create(
@@ -123,6 +128,11 @@ export class PostsService {
 
   public async findBySlug(slug: string): Promise<Post> {
     return await this.findPostBySlugProvider.findBySlug(slug)
+  }
+
+  /** Returns other published posts sharing a tag with the anchor post. */
+  public async findRelated(id: number, limit?: number): Promise<Post[]> {
+    return await this.findRelatedPostsProvider.findRelated(id, limit)
   }
 
   public async update(

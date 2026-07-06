@@ -28,6 +28,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter'
 import { AuditLogModule } from './audit-log/audit-log.module'
 import { ProductsModule } from './products/products.module'
 import { ConfiguratorModule } from './configurator/configurator.module'
+import { AdminModule } from './admin/admin.module'
 import { isDevelopmentEnvironment } from './common/throttle/is-development.util'
 
 const ENV = process.env.NODE_ENV
@@ -77,6 +78,7 @@ const ENV = process.env.NODE_ENV
     AuditLogModule,
     ProductsModule,
     ConfiguratorModule,
+    AdminModule,
     ConfigModule.forFeature(jwtConfig),
     JwtModule.registerAsync(jwtConfig.asProvider()),
   ],
