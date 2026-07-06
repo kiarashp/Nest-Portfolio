@@ -34,7 +34,7 @@ import { ForgotPasswordProvider } from './forgot-password.provider'
 import { ResetPasswordProvider } from './reset-password.provider'
 import { FindAllUsersProvider } from './find-all-users.provider'
 import type { Request } from 'express'
-import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.dto'
+import { GetUsersDto } from '../dtos/get-users.dto'
 
 @Injectable()
 export class UsersService {
@@ -134,8 +134,8 @@ export class UsersService {
   /**
    * Returns a paginated list of all users.
    */
-  public findAll(paginationQuery: PaginationQueryDto, request: Request) {
-    return this.findAllUsersProvider.findAll(paginationQuery, request)
+  public findAll(dto: GetUsersDto, request: Request) {
+    return this.findAllUsersProvider.findAll(dto, request)
   }
   /**
    * Find user by id

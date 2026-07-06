@@ -79,6 +79,8 @@ export class FindAllProductsProvider {
 
     if (publishedOnly) {
       qb.andWhere('product.isPublished = :pub', { pub: true })
+    } else if (dto.isPublished !== undefined) {
+      qb.andWhere('product.isPublished = :pub', { pub: dto.isPublished })
     }
 
     // Type filter — productTypeId takes precedence over typeSlug if both are sent.

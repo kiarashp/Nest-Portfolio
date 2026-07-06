@@ -16,7 +16,7 @@ src/products/
     update-product-type.dto.ts  — PartialType(CreateProductTypeDto)
     create-product.dto.ts
     update-product.dto.ts
-    get-products.dto.ts         — extends PaginationQueryDto; adds productTypeId, typeSlug, q, sort, specs
+    get-products.dto.ts         — extends PaginationQueryDto; adds productTypeId, typeSlug, q, sort, isPublished, specs
   providers/
     find-all-product-types.provider.ts
     find-one-product-type.provider.ts   — by id or by slug
@@ -177,6 +177,8 @@ Filters supported by both:
 - **Keyword** `q` — `name ILIKE OR shortDescription ILIKE`.
 - **Sort** — `newest` (default, `createdAt DESC`), `oldest` (`createdAt ASC`), `name` (`name ASC`); each adds an `id` tiebreaker so pagination is stable.
 - **Specs** — see below.
+
+**`isPublished` filter (admin route only):** `buildQuery` mirrors `FindAllPostsProvider`'s `status` handling — when `publishedOnly` is `true` (the public route) the `isPublished = true` clause is hardcoded and `dto.isPublished` is ignored entirely, even if a caller sends it; when `publishedOnly` is `false` (`GET /products/admin`) the clause is applied only if `dto.isPublished !== undefined`, so omitting the param still returns both drafts and published rows. The DTO field uses the same `@Type(() => String)` + `@Transform` boolean-coercion guard as `GetContactSubmissionsDto.handled` (see the root `CLAUDE.md`), since the global `ValidationPipe` would otherwise coerce a raw `'false'` query string to `true` before any custom transform runs.
 
 ### Spec filtering
 

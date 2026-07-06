@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsObject,
@@ -8,7 +9,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator'
-import { Type } from 'class-transformer'
+import { Transform, Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.dto'
 
@@ -53,6 +54,24 @@ export class GetProductsDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(PRODUCT_SORTS)
   sort?: ProductSort
+
+  // isPublished — admin route only (GET /products/admin); the public route always hardcodes
+  // isPublished = true and ignores this field. Query param arrives as the string 'true'/'false'.
+  // @Type(String) stops the global ValidationPipe's enableImplicitConversion from coercing it to
+  // a boolean via Boolean(value) first (which would make 'false' truthy); the explicit @Transform
+  // then converts the raw string to a real boolean before validation.
+  @ApiPropertyOptional({
+    description:
+      'Filter by publish status — admin route only (GET /products/admin); ignored on the public GET /products route',
+    example: true,
+  })
+  @Type(() => String)
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  @IsOptional()
+  isPublished?: boolean
 
   @ApiPropertyOptional({
     description:

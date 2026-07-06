@@ -30,7 +30,6 @@ import { UsersService } from './providers/users.service'
 import {
   ApiConsumes,
   ApiOperation,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger'
@@ -54,7 +53,7 @@ import { ChangeUserRoleDto } from './dtos/change-user-role.dto'
 import { PatchUserProfileDto } from './dtos/patch-user-profile.dto'
 import { SelectAvatarDto } from './dtos/select-avatar.dto'
 import type { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
-import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.dto'
+import { GetUsersDto } from './dtos/get-users.dto'
 
 @Controller('users')
 @ApiTags('Users')
@@ -68,18 +67,16 @@ export class UsersController {
    */
   @Roles(UserRole.ADMIN)
   @Get()
-  @ApiOperation({ summary: 'Get all users with pagination and limit' })
+  @ApiOperation({
+    summary:
+      'Get all users — supports search, role/verification filters, sort, and pagination',
+  })
   @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiPaginatedResponse(AdminUser, {
     description: 'Users fetched successfully',
   })
-  @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
-  @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
-  public getAllUsers(
-    @Query() paginationQuery: PaginationQueryDto,
-    @Req() request: Request,
-  ) {
-    return this.usersService.findAll(paginationQuery, request)
+  public getAllUsers(@Query() dto: GetUsersDto, @Req() request: Request) {
+    return this.usersService.findAll(dto, request)
   }
 
   /**

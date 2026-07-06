@@ -19,11 +19,22 @@ describe('GET /users — pagination (e2e)', () => {
   const USER_EMAIL = 'users-list-user@e2e.test'
   const PASSWORD = 'Password1!'
 
+  // Distinctly-named users for the search/filter/sort section below — the
+  // firstName prefix is unique enough that a `q` search scopes results to
+  // only these rows, even though `user` is a table shared by parallel suites.
+  const SEARCH_EMAIL_A = 'users-list-search-a@e2e.test'
+  const SEARCH_EMAIL_B = 'users-list-search-b@e2e.test'
+
   beforeAll(async () => {
     ;({ app, dataSource } = await createApp())
 
     // Pre-cleanup: remove rows from a previously failed run.
-    await cleanupUsers(dataSource, [ADMIN_EMAIL, USER_EMAIL])
+    await cleanupUsers(dataSource, [
+      ADMIN_EMAIL,
+      USER_EMAIL,
+      SEARCH_EMAIL_A,
+      SEARCH_EMAIL_B,
+    ])
 
     await seedUser(dataSource, {
       email: ADMIN_EMAIL,
@@ -37,13 +48,32 @@ describe('GET /users — pagination (e2e)', () => {
       firstName: 'ListUser',
       role: UserRole.USER,
     })
+    await seedUser(dataSource, {
+      email: SEARCH_EMAIL_A,
+      password: PASSWORD,
+      firstName: 'Zephyrine-A',
+      role: UserRole.EDITOR,
+      isEmailVerified: false,
+    })
+    await seedUser(dataSource, {
+      email: SEARCH_EMAIL_B,
+      password: PASSWORD,
+      firstName: 'Zephyrine-B',
+      role: UserRole.USER,
+      isEmailVerified: true,
+    })
 
     adminToken = await getAuthToken(app, ADMIN_EMAIL, PASSWORD)
     userToken = await getAuthToken(app, USER_EMAIL, PASSWORD)
   })
 
   afterAll(async () => {
-    await cleanupUsers(dataSource, [ADMIN_EMAIL, USER_EMAIL])
+    await cleanupUsers(dataSource, [
+      ADMIN_EMAIL,
+      USER_EMAIL,
+      SEARCH_EMAIL_A,
+      SEARCH_EMAIL_B,
+    ])
     await app.close()
   })
 
@@ -127,5 +157,79 @@ describe('GET /users — pagination (e2e)', () => {
     const body = (res.body as ApiResponse<Paginated<User>>).data
     expect(body.data.length).toBe(1) // the page limit is respected
     expect(body.meta.totalItems).toBeGreaterThanOrEqual(2) // count is not capped at the limit
+  })
+
+  // ── GET /users — search, filters, and sort ────────────────────────────────
+
+  it('q searches across firstName, lastName, and email, case-insensitively', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/users')
+      .query({ q: 'zephyrine' })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<User>>).data
+    const emails = body.data.map((u) => u.email)
+    expect(emails).toEqual(
+      expect.arrayContaining([SEARCH_EMAIL_A, SEARCH_EMAIL_B]),
+    )
+  })
+
+  it('role filters to an exact match, scoped by q', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/users')
+      .query({ q: 'Zephyrine', role: UserRole.EDITOR })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<User>>).data
+    const emails = body.data.map((u) => u.email)
+    expect(emails).toContain(SEARCH_EMAIL_A)
+    expect(emails).not.toContain(SEARCH_EMAIL_B)
+  })
+
+  it('isEmailVerified filters by verification status, scoped by q', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/users')
+      .query({ q: 'Zephyrine', isEmailVerified: false })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const body = (res.body as ApiResponse<Paginated<User>>).data
+    const emails = body.data.map((u) => u.email)
+    expect(emails).toContain(SEARCH_EMAIL_A)
+    expect(emails).not.toContain(SEARCH_EMAIL_B)
+  })
+
+  it('sortBy/order sorts the scoped result set', async () => {
+    const asc = await request(app.getHttpServer())
+      .get('/users')
+      .query({ q: 'Zephyrine', sortBy: 'email', order: 'asc' })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const desc = await request(app.getHttpServer())
+      .get('/users')
+      .query({ q: 'Zephyrine', sortBy: 'email', order: 'desc' })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const ascEmails = (asc.body as ApiResponse<Paginated<User>>).data.data
+      .map((u) => u.email)
+      .filter((e) => e === SEARCH_EMAIL_A || e === SEARCH_EMAIL_B)
+    const descEmails = (desc.body as ApiResponse<Paginated<User>>).data.data
+      .map((u) => u.email)
+      .filter((e) => e === SEARCH_EMAIL_A || e === SEARCH_EMAIL_B)
+
+    expect(ascEmails).toEqual([SEARCH_EMAIL_A, SEARCH_EMAIL_B])
+    expect(descEmails).toEqual([SEARCH_EMAIL_B, SEARCH_EMAIL_A])
+  })
+
+  it('rejects an invalid sortBy value with 400', async () => {
+    await request(app.getHttpServer())
+      .get('/users')
+      .query({ sortBy: 'password' })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(400)
   })
 })

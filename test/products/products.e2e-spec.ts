@@ -683,6 +683,48 @@ describe('Products (e2e)', () => {
     expect(body.data.some((p) => p.id === draftId)).toBe(true)
   })
 
+  it('GET /products/admin?isPublished=false → 200, only unpublished products of the scoped type', async () => {
+    // Scope by productTypeId so parallel suites' products can't affect the assertion.
+    const res = await request(app.getHttpServer())
+      .get('/products/admin')
+      .query({ productTypeId, isPublished: false })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const ids = (res.body as ApiResponse<Paginated<Product>>).data.data.map(
+      (p) => p.id,
+    )
+    expect(ids).toContain(draftRelatedProductId)
+    expect(ids).not.toContain(publishedProductId)
+  })
+
+  it('GET /products/admin?isPublished=true → 200, only published products of the scoped type', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/products/admin')
+      .query({ productTypeId, isPublished: true })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const ids = (res.body as ApiResponse<Paginated<Product>>).data.data.map(
+      (p) => p.id,
+    )
+    expect(ids).toContain(publishedProductId)
+    expect(ids).not.toContain(draftRelatedProductId)
+  })
+
+  it('GET /products (public) ignores isPublished — still only returns published products', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/products')
+      .query({ productTypeId, isPublished: false })
+      .expect(200)
+
+    const ids = (res.body as ApiResponse<Paginated<Product>>).data.data.map(
+      (p) => p.id,
+    )
+    expect(ids).toContain(publishedProductId)
+    expect(ids).not.toContain(draftRelatedProductId)
+  })
+
   // ── POST /products ────────────────────────────────────────────────────────
 
   it('POST /products (no token) → 401', async () => {
