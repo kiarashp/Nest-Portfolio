@@ -14,7 +14,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger'
 import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.dto'
 
 /** Sort orders accepted by GET /products. */
-export const PRODUCT_SORTS = ['newest', 'oldest', 'name'] as const
+export const PRODUCT_SORTS = ['newest', 'oldest', 'name', 'featured'] as const
 export type ProductSort = (typeof PRODUCT_SORTS)[number]
 
 export class GetProductsDto extends PaginationQueryDto {
@@ -47,7 +47,7 @@ export class GetProductsDto extends PaginationQueryDto {
 
   @ApiPropertyOptional({
     description:
-      'Sort order. newest (default) and oldest sort by creation date; name sorts A–Z.',
+      'Sort order. newest (default) and oldest sort by creation date; name sorts A–Z; featured sorts featured products first, then newest.',
     enum: PRODUCT_SORTS,
     default: 'newest',
   })
@@ -72,6 +72,21 @@ export class GetProductsDto extends PaginationQueryDto {
   @IsBoolean()
   @IsOptional()
   isPublished?: boolean
+
+  // isFeatured — available on both the public GET /products and GET /products/admin
+  // routes, unlike isPublished which is admin-only and hardcoded on the public route.
+  @ApiPropertyOptional({
+    description:
+      'Filter by featured flag — available on both public and admin routes',
+    example: true,
+  })
+  @Type(() => String)
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  @IsOptional()
+  isFeatured?: boolean
 
   @ApiPropertyOptional({
     description:

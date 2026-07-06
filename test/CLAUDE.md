@@ -241,6 +241,30 @@ expect(ids).toContain(seededPostId)
 
 See `test/posts/posts-filter.e2e-spec.ts`'s `startDate`/`endDate` tests, which scope by `authorId` for exactly this reason.
 
+## New fixtures must not land under an owner another test asserts exact equality against
+
+Scoping by `authorId` (above) only works if the scoped set stays exactly what an earlier test expects. If a suite has an existing test asserting `expect(ids).toEqual([idA, idB, idC])` for a given author, a *later-added* fixture created under that same author — even one seeded for an unrelated filter — silently joins that result set and breaks the exact-equality test, since `toEqual` on an array is order- and length-sensitive.
+
+**Pick a different existing owner (or a new one) for the new fixture** rather than reusing the one under exact-equality assertion:
+
+```ts
+// ✗ breaks the pre-existing `sortBy=title` exact-array test for AUTHOR_EMAIL,
+// which asserts exactly [postTagAId, postTagABId, postTagBId]
+const postFeaturedRes = await request(app.getHttpServer())
+  .post('/posts')
+  .set('Authorization', `Bearer ${authorToken}`)
+  .send({ title: 'Filter Post Featured', isFeatured: true, status: 'published' })
+
+// ✓ uses the editor's account instead — already excluded from the author-scoped
+// exact-array assertions, so the new fixture can't leak into them
+const postFeaturedRes = await request(app.getHttpServer())
+  .post('/posts')
+  .set('Authorization', `Bearer ${editorToken}`)
+  .send({ title: 'Filter Post Featured', isFeatured: true, status: 'published' })
+```
+
+See `test/posts/posts-filter.e2e-spec.ts`'s `isFeatured` tests, added under `editorToken` for this reason — the `sortBy=title`/`sortBy=createdAt` tests immediately above assert an exact three-element array scoped to `authorId`.
+
 ## Whole-table aggregate endpoints (no scoping filter available)
 
 Some endpoints return a single aggregate object computed over an entire table with no per-suite scoping parameter to narrow it — e.g. `GET /admin/stats` (`test/admin-stats.e2e-spec.ts`), which counts every row in `post`, `product`, `user`, etc. Unlike list endpoints, there is no `authorId`/`tagIds`-style filter to add, so the two techniques above (scoped queries, race-free lower bounds) don't apply.

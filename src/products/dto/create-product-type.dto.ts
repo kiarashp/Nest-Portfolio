@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUrl,
   MaxLength,
   MinLength,
   ValidateNested,
@@ -77,6 +78,19 @@ export class CreateProductTypeDto {
   @MinLength(2)
   @MaxLength(256)
   slug!: string
+
+  @ApiPropertyOptional({
+    description:
+      'Image URL for the landing-page type card. Send null to clear it.',
+    example:
+      'https://res.cloudinary.com/demo/image/upload/v1/types/thermocouple.jpg',
+    type: String,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(1024)
+  imageUrl?: string | null
 
   @ApiPropertyOptional({
     type: () => [FilterableFieldDto],

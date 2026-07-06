@@ -37,6 +37,11 @@ export class ProductType {
   @Column({ type: 'varchar', length: 256, nullable: false, unique: true })
   slug!: string
 
+  // imageUrl — image used on the landing-page type card
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ type: 'varchar', length: 1024, nullable: true })
+  imageUrl?: string | null
+
   // filterableFields — drives the filter UI; each entry describes one filterable facet
   @ApiPropertyOptional({
     type: () => [FilterableFieldDto],

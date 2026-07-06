@@ -10,6 +10,7 @@ import { Repository } from 'typeorm'
 import { Post } from '../entities/post.entity'
 import { Tag } from 'src/tags/entities/tag.entity'
 import { PatchPostDto } from '../dto/update-post.dto'
+import { PostStatus } from '../enums/postStatus.enum'
 import { TagsService } from 'src/tags/providers/tags.service'
 import { FindOnePostProvider } from './find-one-post.provider'
 import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
@@ -76,8 +77,20 @@ export class UpdatePostProvider {
     // Step 4: apply the updates.
     post.title = patchPostDto.title ?? post.title
     post.slug = patchPostDto.slug ?? post.slug
+    // Capture the pre-update status so a transition into PUBLISHED can be
+    // detected after assignment — publishedAt is stamped exactly once per
+    // transition into PUBLISHED (re-stamps if unpublished and republished later).
+    const previousStatus = post.status
     post.status = patchPostDto.status ?? post.status
+    if (
+      post.status === PostStatus.PUBLISHED &&
+      previousStatus !== PostStatus.PUBLISHED
+    ) {
+      post.publishedAt = new Date()
+    }
     post.content = patchPostDto.content ?? post.content
+    post.excerpt = patchPostDto.excerpt ?? post.excerpt
+    post.isFeatured = patchPostDto.isFeatured ?? post.isFeatured
     // featuredImage is nullable and `null` is a valid "clear it" request, so
     // `??` would wrongly discard an explicit null — only `undefined` (field
     // omitted from the request body) should leave the existing value alone.

@@ -47,6 +47,14 @@ export class Post {
     default: PostStatus.DRAFT,
   })
   status!: PostStatus
+  //   isFeatured — surfaces the post in a featured/highlighted section
+  @ApiProperty({ example: false })
+  @Column({
+    type: 'boolean',
+    default: false,
+    nullable: false,
+  })
+  isFeatured!: boolean
   //   content — opaque plain-text body; format is whatever the editor writes
   @ApiPropertyOptional({ type: String, nullable: true })
   @Column({
@@ -54,6 +62,15 @@ export class Post {
     nullable: true,
   })
   content?: string
+  //   excerpt — short plain-text summary; used as the SEO meta description /
+  //   OG description, capped at the conventional 160-character length
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({
+    type: 'varchar',
+    length: 160,
+    nullable: true,
+  })
+  excerpt?: string
   //   featuredImage — nullable so it can be explicitly cleared (e.g. when the
   //   image it points at is deleted via DELETE /posts/:id/images/:fileId)
   @ApiPropertyOptional({ type: String, nullable: true })
@@ -70,6 +87,15 @@ export class Post {
     nullable: true,
   })
   publishOn?: Date
+  //   publishedAt — stamped automatically the moment status becomes PUBLISHED;
+  //   never settable via any DTO. Nullable because draft/scheduled/review
+  //   posts have none.
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+  })
+  publishedAt?: Date
   // author — only the public author fields are serialized into post responses
   @ApiProperty({ type: () => PublicAuthor })
   @ManyToOne(() => User, (user) => user.post, { eager: true })

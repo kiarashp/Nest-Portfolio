@@ -56,6 +56,7 @@ export class UpdateProductProvider {
     if (dto.images !== undefined) product.images = dto.images
     if (dto.specs !== undefined) product.specs = dto.specs
     if (dto.isPublished !== undefined) product.isPublished = dto.isPublished
+    if (dto.isFeatured !== undefined) product.isFeatured = dto.isFeatured
     if (dto.productTypeId !== undefined)
       product.productTypeId = dto.productTypeId
 

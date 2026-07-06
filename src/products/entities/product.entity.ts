@@ -82,6 +82,11 @@ export class Product {
   @Column({ type: 'boolean', default: false, nullable: false })
   isPublished!: boolean
 
+  // isFeatured — false by default; set to true to surface the product in a featured section
+  @ApiProperty({ example: false })
+  @Column({ type: 'boolean', default: false, nullable: false })
+  isFeatured!: boolean
+
   // productType — the category this product belongs to (eager so callers always get type data)
   @ApiProperty({ type: () => ProductType })
   @ManyToOne(() => ProductType, (pt) => pt.products, {

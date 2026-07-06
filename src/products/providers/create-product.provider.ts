@@ -57,6 +57,7 @@ export class CreateProductProvider {
     const product = this.productsRepository.create({
       ...dto,
       isPublished: dto.isPublished ?? false,
+      isFeatured: dto.isFeatured ?? false,
     })
 
     try {

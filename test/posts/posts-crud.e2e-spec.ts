@@ -60,6 +60,11 @@ describe('Posts CRUD (e2e)', () => {
       'e2e-post-to-delete',
       'e2e-inline-create-post',
       'e2e-no-title', // left over if a previous run hit the old "missing title" test
+      'e2e-published-on-create',
+      'e2e-draft-no-published-at',
+      'e2e-excerpt-post',
+      'e2e-excerpt-too-long',
+      'e2e-featured-post',
     ]) {
       await postRepo.delete({ slug })
     }
@@ -305,6 +310,127 @@ describe('Posts CRUD (e2e)', () => {
       .patch(`/posts/${authorPublishedPostId}`)
       .send({ title: 'Anonymous edit' })
       .expect(401)
+  })
+
+  // ── excerpt / isFeatured / publishedAt ────────────────────────────────────
+
+  it('POST /posts with status published → 201 with publishedAt set', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/posts')
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({
+        title: 'E2E Published On Create',
+        slug: 'e2e-published-on-create',
+        status: 'published',
+      })
+      .expect(201)
+
+    const post = (res.body as ApiResponse<Post>).data
+    expect(post.publishedAt).not.toBeNull()
+    extraPostIds.push(post.id)
+  })
+
+  it('POST /posts with status draft (default) → 201 with publishedAt null', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/posts')
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({
+        title: 'E2E Draft No PublishedAt',
+        slug: 'e2e-draft-no-published-at',
+      })
+      .expect(201)
+
+    const post = (res.body as ApiResponse<Post>).data
+    expect(post.publishedAt).toBeFalsy()
+    extraPostIds.push(post.id)
+  })
+
+  it('PATCH transitioning draft → published sets publishedAt', async () => {
+    expect(draftPostId).toBeDefined()
+
+    const res = await request(app.getHttpServer())
+      .patch(`/posts/${draftPostId}`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({ status: 'published' })
+      .expect(200)
+
+    const post = (res.body as ApiResponse<Post>).data
+    expect(post.publishedAt).not.toBeNull()
+  })
+
+  it('PATCH on an already-published post with an unrelated field leaves publishedAt unchanged', async () => {
+    const first = await request(app.getHttpServer())
+      .patch(`/posts/${authorPublishedPostId}`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({ title: 'Touch 1' })
+      .expect(200)
+    const publishedAtBefore = (first.body as ApiResponse<Post>).data.publishedAt
+
+    const second = await request(app.getHttpServer())
+      .patch(`/posts/${authorPublishedPostId}`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({ title: 'Touch 2' })
+      .expect(200)
+    const publishedAtAfter = (second.body as ApiResponse<Post>).data.publishedAt
+
+    expect(publishedAtAfter).toBe(publishedAtBefore)
+  })
+
+  it('PATCH /posts/:id with publishedAt in the body → 400 (server-derived only)', async () => {
+    await request(app.getHttpServer())
+      .patch(`/posts/${authorPublishedPostId}`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({ publishedAt: '2024-01-01T00:00:00.000Z' })
+      .expect(400)
+  })
+
+  it('POST /posts with a valid excerpt (≤160 chars) round-trips', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/posts')
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({
+        title: 'E2E Excerpt Post',
+        slug: 'e2e-excerpt-post',
+        excerpt: 'A short summary of this post.',
+      })
+      .expect(201)
+
+    const post = (res.body as ApiResponse<Post>).data
+    expect(post.excerpt).toBe('A short summary of this post.')
+    extraPostIds.push(post.id)
+  })
+
+  it('POST /posts with an excerpt over 160 chars → 400', async () => {
+    await request(app.getHttpServer())
+      .post('/posts')
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({
+        title: 'E2E Excerpt Too Long',
+        slug: 'e2e-excerpt-too-long',
+        excerpt: 'x'.repeat(161),
+      })
+      .expect(400)
+  })
+
+  it('isFeatured round-trips on create and patch, defaulting to false', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/posts')
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({
+        title: 'E2E Featured Post',
+        slug: 'e2e-featured-post',
+      })
+      .expect(201)
+    const createdPost = (created.body as ApiResponse<Post>).data
+    expect(createdPost.isFeatured).toBe(false)
+    extraPostIds.push(createdPost.id)
+
+    const patched = await request(app.getHttpServer())
+      .patch(`/posts/${createdPost.id}`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({ isFeatured: true })
+      .expect(200)
+    expect((patched.body as ApiResponse<Post>).data.isFeatured).toBe(true)
   })
 
   // ── DELETE /posts/:id ─────────────────────────────────────────────────────

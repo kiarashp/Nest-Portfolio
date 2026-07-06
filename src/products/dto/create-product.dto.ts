@@ -108,4 +108,13 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   isPublished?: boolean
+
+  @ApiPropertyOptional({
+    description:
+      'Surface the product in a featured section (defaults to false)',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean
 }

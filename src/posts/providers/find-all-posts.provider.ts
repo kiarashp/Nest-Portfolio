@@ -51,6 +51,12 @@ export class FindAllPostsProvider {
       qb.andWhere('author.id = :authorId', { authorId: getPostsDto.authorId })
     }
 
+    if (getPostsDto.isFeatured !== undefined) {
+      qb.andWhere('post.isFeatured = :isFeatured', {
+        isFeatured: getPostsDto.isFeatured,
+      })
+    }
+
     // Date range filter on createdAt — supports open-ended ranges (one side only).
     if (getPostsDto.startDate && getPostsDto.endDate) {
       qb.andWhere('post.createdAt BETWEEN :startDate AND :endDate', {

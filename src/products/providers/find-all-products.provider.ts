@@ -83,6 +83,12 @@ export class FindAllProductsProvider {
       qb.andWhere('product.isPublished = :pub', { pub: dto.isPublished })
     }
 
+    if (dto.isFeatured !== undefined) {
+      qb.andWhere('product.isFeatured = :isFeatured', {
+        isFeatured: dto.isFeatured,
+      })
+    }
+
     // Type filter — productTypeId takes precedence over typeSlug if both are sent.
     if (dto.productTypeId) {
       qb.andWhere('product.productTypeId = :ptId', { ptId: dto.productTypeId })
@@ -224,6 +230,11 @@ export class FindAllProductsProvider {
         break
       case 'name':
         qb.orderBy('product.name', 'ASC').addOrderBy('product.id', 'ASC')
+        break
+      case 'featured':
+        qb.orderBy('product.isFeatured', 'DESC')
+          .addOrderBy('product.createdAt', 'DESC')
+          .addOrderBy('product.id', 'DESC')
         break
       case 'newest':
       default:

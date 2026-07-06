@@ -13,6 +13,7 @@ import { FindOnePostProvider } from './find-one-post.provider'
 import { ActiveUserData } from 'src/auth/interfaces/active-user-data.interface'
 import { UserRole } from 'src/auth/enums/user-role.enum'
 import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
+import { PostStatus } from '../enums/postStatus.enum'
 
 // UpdatePostProvider handles the PATCH /posts/:id endpoint.
 // Key business rule: EDITORs may only update posts they authored.
@@ -136,5 +137,56 @@ describe('UpdatePostProvider', () => {
     ).resolves.toBeDefined()
 
     expect(postsRepo.save).toHaveBeenCalled()
+  })
+
+  it('stamps publishedAt when status transitions from DRAFT to PUBLISHED', async () => {
+    const draftPost = {
+      ...ownedPost,
+      status: PostStatus.DRAFT,
+      publishedAt: undefined,
+    } as unknown as Post
+    findOnePostProvider.findOneByIdOrFail.mockResolvedValue(draftPost)
+    postsRepo.save.mockImplementation((post: Post) => Promise.resolve(post))
+
+    const result = await provider.update(
+      10,
+      { status: PostStatus.PUBLISHED },
+      author,
+    )
+
+    expect(result.publishedAt).toBeInstanceOf(Date)
+  })
+
+  it('does not re-stamp publishedAt when status stays PUBLISHED across an unrelated edit', async () => {
+    const existingDate = new Date('2024-01-01T00:00:00.000Z')
+    const publishedPost = {
+      ...ownedPost,
+      status: PostStatus.PUBLISHED,
+      publishedAt: existingDate,
+    } as unknown as Post
+    findOnePostProvider.findOneByIdOrFail.mockResolvedValue(publishedPost)
+    postsRepo.save.mockImplementation((post: Post) => Promise.resolve(post))
+
+    const result = await provider.update(10, { title: 'New Title' }, author)
+
+    expect(result.publishedAt).toBe(existingDate)
+  })
+
+  it('does not stamp publishedAt for a transition between two non-PUBLISHED statuses', async () => {
+    const draftPost = {
+      ...ownedPost,
+      status: PostStatus.DRAFT,
+      publishedAt: undefined,
+    } as unknown as Post
+    findOnePostProvider.findOneByIdOrFail.mockResolvedValue(draftPost)
+    postsRepo.save.mockImplementation((post: Post) => Promise.resolve(post))
+
+    const result = await provider.update(
+      10,
+      { status: PostStatus.REVIEW },
+      author,
+    )
+
+    expect(result.publishedAt).toBeUndefined()
   })
 })

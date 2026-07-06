@@ -55,6 +55,7 @@ export class UpdateProductTypeProvider {
 
     productType.name = dto.name ?? productType.name
     productType.slug = dto.slug ?? productType.slug
+    if (dto.imageUrl !== undefined) productType.imageUrl = dto.imageUrl
     if (dto.filterableFields !== undefined) {
       productType.filterableFields = dto.filterableFields
     }

@@ -33,7 +33,7 @@ providers, or routes yet. **Next: Step 2** (segment definition library CRUD + op
 
 ### Scheduled post auto-publishing
 
-`Post.publishOn` is stored but nothing acts on it. A cron job (`@nestjs/schedule`) should query `status = SCHEDULED AND publishOn <= now()` and flip matching posts to `PUBLISHED`. Needs a migration if any index is added.
+`Post.publishOn` is stored but nothing acts on it. A cron job (`@nestjs/schedule`) should query `status = SCHEDULED AND publishOn <= now()` and flip matching posts to `PUBLISHED`. Needs a migration if any index is added. `Post.publishedAt` now exists (stamped by `UpdatePostProvider`/`CreatePostProvider` whenever `status` transitions into `PUBLISHED` manually) — the cron job must stamp it the same way (`post.publishedAt = new Date()`) when it flips a scheduled post, not just update `status`.
 
 ---
 

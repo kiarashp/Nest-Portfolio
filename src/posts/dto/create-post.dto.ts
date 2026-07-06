@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsDate,
   IsEnum,
   IsInt,
@@ -50,6 +51,23 @@ export class CreatePostDto {
   @IsString()
   @IsOptional()
   content?: string
+  // excerpt — short plain-text summary, used as the meta description
+  @ApiPropertyOptional({
+    description: 'Short plain-text summary, used as the meta description',
+    example: 'A quick overview of what this post covers.',
+  })
+  @IsString()
+  @MaxLength(160)
+  @IsOptional()
+  excerpt?: string
+  // isFeatured — omit to default to false
+  @ApiPropertyOptional({
+    description: 'Surface this post in a featured section',
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isFeatured?: boolean
   // featuredImage
   @ApiPropertyOptional({
     description: 'The URL of the featured image for the post',

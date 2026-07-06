@@ -69,6 +69,10 @@ export class CreatePostProvider {
     const title = createPostDto.title ?? 'Untitled'
     const slug = createPostDto.slug ?? `draft-${randomUUID()}`
     const status = createPostDto.status ?? PostStatus.DRAFT
+    // publishedAt is stamped here too so a post created directly with
+    // status: PUBLISHED doesn't skip the "publishedAt set exactly when
+    // status is/became PUBLISHED" invariant that UpdatePostProvider enforces.
+    const publishedAt = status === PostStatus.PUBLISHED ? new Date() : undefined
 
     //create post
     const post = this.postsRepository.create({
@@ -76,6 +80,8 @@ export class CreatePostProvider {
       title,
       slug,
       status,
+      publishedAt,
+      isFeatured: createPostDto.isFeatured ?? false,
       author: author,
       tags: tags,
     })

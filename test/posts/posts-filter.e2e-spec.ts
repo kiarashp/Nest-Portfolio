@@ -39,6 +39,7 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
   let postTagBId: number
   let postNoTagsId: number
   let postDraftId: number
+  let postFeaturedId: number
 
   const AUTHOR_EMAIL = 'filter-author@e2e.test'
   const EDITOR_EMAIL = 'filter-editor@e2e.test'
@@ -57,6 +58,7 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
       'filter-post-tag-b',
       'filter-post-no-tags',
       'filter-post-draft',
+      'filter-post-featured',
     ]) {
       await postRepo.delete({ slug })
     }
@@ -151,6 +153,20 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
         tags: [tagAId],
       })
     postDraftId = (postDraftRes.body as ApiResponse<Post>).data.id
+
+    // Featured post — created by the editor (not the author) so it does not
+    // land in the author-scoped result sets the sortBy/order tests above
+    // assert exact equality against.
+    const postFeaturedRes = await request(app.getHttpServer())
+      .post('/posts')
+      .set('Authorization', `Bearer ${editorToken}`)
+      .send({
+        title: 'Filter Post Featured',
+        slug: 'filter-post-featured',
+        status: 'published',
+        isFeatured: true,
+      })
+    postFeaturedId = (postFeaturedRes.body as ApiResponse<Post>).data.id
   })
 
   afterAll(async () => {
@@ -163,6 +179,7 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
       postTagBId,
       postNoTagsId,
       postDraftId,
+      postFeaturedId,
     ].filter(Boolean)
     if (ids.length) {
       await postRepo.delete(ids)
@@ -475,5 +492,47 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
       .get('/posts')
       .query({ order: 'invalid' })
       .expect(400)
+  })
+
+  // ── GET /posts?isFeatured ─────────────────────────────────────────────────
+  // Scoped by the editor's authorId (who owns both postNoTagsId and
+  // postFeaturedId) so the result set is exactly this suite's own posts.
+
+  it('GET /posts?authorId&isFeatured=true → returns only the featured post', async () => {
+    const userRepo = dataSource.getRepository(User)
+    const editor: User | null = await userRepo.findOneBy({
+      email: EDITOR_EMAIL,
+    })
+    const authorId = editor!.id
+
+    const res = await request(app.getHttpServer())
+      .get('/posts')
+      .query({ authorId, isFeatured: true })
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+
+    expect(ids).toContain(postFeaturedId)
+    expect(ids).not.toContain(postNoTagsId)
+  })
+
+  it('GET /posts?authorId&isFeatured=false → excludes the featured post', async () => {
+    const userRepo = dataSource.getRepository(User)
+    const editor: User | null = await userRepo.findOneBy({
+      email: EDITOR_EMAIL,
+    })
+    const authorId = editor!.id
+
+    const res = await request(app.getHttpServer())
+      .get('/posts')
+      .query({ authorId, isFeatured: false })
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+
+    expect(ids).not.toContain(postFeaturedId)
+    expect(ids).toContain(postNoTagsId)
   })
 })

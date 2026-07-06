@@ -16,7 +16,7 @@ src/products/
     update-product-type.dto.ts  — PartialType(CreateProductTypeDto)
     create-product.dto.ts
     update-product.dto.ts
-    get-products.dto.ts         — extends PaginationQueryDto; adds productTypeId, typeSlug, q, sort, isPublished, specs
+    get-products.dto.ts         — extends PaginationQueryDto; adds productTypeId, typeSlug, q, sort, isPublished, isFeatured, specs
   providers/
     find-all-product-types.provider.ts
     find-one-product-type.provider.ts   — by id or by slug
@@ -44,7 +44,7 @@ src/products/
 
 ### ProductType (`src/products/entities/product-type.entity.ts`)
 
-Columns: `id`, `name` (unique varchar 256), `slug` (unique varchar 256), `filterableFields` (jsonb, nullable), `createdAt`, `updatedAt`.
+Columns: `id`, `name` (unique varchar 256), `slug` (unique varchar 256), `imageUrl` (nullable varchar 1024 — image for the landing-page type card, client-settable on create/patch, send `null` to clear), `filterableFields` (jsonb, nullable), `createdAt`, `updatedAt`.
 
 `filterableFields` stores a `FilterableField[]` array that drives the filter UI. Each entry has `key`, `label`, `type` (`'number' | 'enum' | 'string'`), optional `unit`, optional `options` (enum choices). The `FilterableField` interface is exported from this file — import it when you need to type-annotate the array.
 
@@ -54,7 +54,7 @@ The `products` inverse relation (`@OneToMany`) is non-eager and is never auto-lo
 
 ### Product (`src/products/entities/product.entity.ts`)
 
-Columns: `id`, `name`, `slug` (unique), `sku` (unique, nullable), `shortDescription`, `description` (nullable text), `imageUrl` (nullable), `images` (jsonb, nullable), `specs` (jsonb, nullable), `isPublished` (boolean, default false), `productTypeId` (FK), `createdAt`, `updatedAt`, `deletedAt` (soft-delete).
+Columns: `id`, `name`, `slug` (unique), `sku` (unique, nullable), `shortDescription`, `description` (nullable text), `imageUrl` (nullable), `images` (jsonb, nullable), `specs` (jsonb, nullable), `isPublished` (boolean, default false), `isFeatured` (boolean, default false — mirrors `isPublished`'s shape, surfaces the product in a featured section), `productTypeId` (FK), `createdAt`, `updatedAt`, `deletedAt` (soft-delete).
 
 One index:
 - `@Index(['productTypeId'])` at class level — B-tree index on the FK column for fast type-based filtering.
@@ -175,10 +175,12 @@ Both list methods build a TypeORM `SelectQueryBuilder` via the shared private `b
 Filters supported by both:
 - **Type** — `productTypeId` (FK column match) **or** `typeSlug` (matches the joined `productType.slug`). `productTypeId` wins if both are sent.
 - **Keyword** `q` — `name ILIKE OR shortDescription ILIKE`.
-- **Sort** — `newest` (default, `createdAt DESC`), `oldest` (`createdAt ASC`), `name` (`name ASC`); each adds an `id` tiebreaker so pagination is stable.
+- **Sort** — `newest` (default, `createdAt DESC`), `oldest` (`createdAt ASC`), `name` (`name ASC`), `featured` (`isFeatured DESC` then `createdAt DESC`); each adds an `id` tiebreaker so pagination is stable.
 - **Specs** — see below.
 
 **`isPublished` filter (admin route only):** `buildQuery` mirrors `FindAllPostsProvider`'s `status` handling — when `publishedOnly` is `true` (the public route) the `isPublished = true` clause is hardcoded and `dto.isPublished` is ignored entirely, even if a caller sends it; when `publishedOnly` is `false` (`GET /products/admin`) the clause is applied only if `dto.isPublished !== undefined`, so omitting the param still returns both drafts and published rows. The DTO field uses the same `@Type(() => String)` + `@Transform` boolean-coercion guard as `GetContactSubmissionsDto.handled` (see the root `CLAUDE.md`), since the global `ValidationPipe` would otherwise coerce a raw `'false'` query string to `true` before any custom transform runs.
+
+**`isFeatured` filter (both routes):** unlike `isPublished`, `dto.isFeatured` is applied unconditionally in `buildQuery` — it is not gated behind `publishedOnly`, so it filters both the public `GET /products` and `GET /products/admin`. Uses the same boolean-coercion guard.
 
 ### Spec filtering
 

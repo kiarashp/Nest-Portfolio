@@ -1,7 +1,8 @@
 import { ApiPropertyOptional, IntersectionType } from '@nestjs/swagger'
-import { Transform } from 'class-transformer'
+import { Transform, Type } from 'class-transformer'
 import {
   IsArray,
+  IsBoolean,
   IsDate,
   IsEnum,
   IsIn,
@@ -85,6 +86,21 @@ class GetPostsBaseDto {
   @IsInt()
   @IsPositive()
   authorId?: number
+  // filter by featured flag — works on all three routes (GET /posts, /posts/my,
+  // /posts/admin). Query param arrives as the string 'true'/'false'; @Type(String)
+  // stops the global ValidationPipe's enableImplicitConversion from coercing it
+  // to true first (see root CLAUDE.md's boolean query-param gotcha).
+  @ApiPropertyOptional({
+    description: 'Filter by featured flag — works on all three routes',
+    example: true,
+  })
+  @Type(() => String)
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  @IsOptional()
+  isFeatured?: boolean
   // keyword search across post title and content — case-insensitive partial match
   @ApiPropertyOptional({
     description: 'Keyword search across title and content',

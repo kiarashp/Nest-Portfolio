@@ -87,6 +87,7 @@ describe('GET /posts/admin (e2e)', () => {
         title: `${ADMIN_TERM} Admin Published Post`,
         slug: 'admin-view-published',
         status: 'published',
+        isFeatured: true,
       })
     adminPublishedPostId = (adminPubRes.body as ApiResponse<Post>).data.id
 
@@ -296,5 +297,21 @@ describe('GET /posts/admin (e2e)', () => {
       .query({ sortBy: 'invalidField' })
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(400)
+  })
+
+  // ── GET /posts/admin?isFeatured ───────────────────────────────────────────
+
+  it('GET /posts/admin?isFeatured=true → filters admin listings across all statuses', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/posts/admin')
+      .query({ q: ADMIN_TERM, isFeatured: true })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+    expect(ids).toContain(adminPublishedPostId)
+    expect(ids).not.toContain(authorDraftPostId)
+    expect(ids).not.toContain(authorPublishedPostId)
   })
 })

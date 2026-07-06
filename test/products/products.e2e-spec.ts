@@ -60,6 +60,9 @@ describe('Products (e2e)', () => {
   let otherTypeProductId: number
   let draftRelatedProductId: number
 
+  // ID used by the isFeatured filter/sort tests.
+  let featuredProductId: number
+
   // Track all created IDs so afterAll can clean up even if tests fail mid-run.
   // Products must be deleted before product types (FK constraint).
   const createdProductIds: number[] = []
@@ -94,6 +97,7 @@ describe('Products (e2e)', () => {
       'e2e-product-related-5',
       'e2e-product-other-type',
       'e2e-product-related-draft',
+      'e2e-product-featured',
     ]) {
       const existing = await productRepo.findOne({
         where: { slug },
@@ -238,6 +242,23 @@ describe('Products (e2e)', () => {
     draftRelatedProductId = (draftRelatedRes.body as ApiResponse<Product>).data
       .id
     createdProductIds.push(draftRelatedProductId)
+
+    // Seed a featured, published product of the same type — used by the
+    // isFeatured filter/sort tests, scoped by productTypeId.
+    const featuredRes = await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'E2E Featured Product',
+        slug: 'e2e-product-featured',
+        productTypeId,
+        shortDescription: 'Featured product for isFeatured tests',
+        isPublished: true,
+        isFeatured: true,
+      })
+      .expect(201)
+    featuredProductId = (featuredRes.body as ApiResponse<Product>).data.id
+    createdProductIds.push(featuredProductId)
   })
 
   afterAll(async () => {
@@ -347,6 +368,33 @@ describe('Products (e2e)', () => {
     const pt = (res.body as ApiResponse<ProductType>).data
     expect(pt.name).toBe('e2e-type-main-updated')
     expect(pt.slug).toBe('e2e-type-main')
+  })
+
+  it('PATCH /product-types/:id imageUrl → 200, round-trips and can be cleared with null', async () => {
+    const url =
+      'https://res.cloudinary.com/demo/image/upload/v1/types/thermocouple.jpg'
+
+    const withImage = await request(app.getHttpServer())
+      .patch(`/product-types/${productTypeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ imageUrl: url })
+      .expect(200)
+    expect((withImage.body as ApiResponse<ProductType>).data.imageUrl).toBe(url)
+
+    const cleared = await request(app.getHttpServer())
+      .patch(`/product-types/${productTypeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ imageUrl: null })
+      .expect(200)
+    expect((cleared.body as ApiResponse<ProductType>).data.imageUrl).toBeNull()
+  })
+
+  it('PATCH /product-types/:id imageUrl with a non-URL value → 400', async () => {
+    await request(app.getHttpServer())
+      .patch(`/product-types/${productTypeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ imageUrl: 'not-a-url' })
+      .expect(400)
   })
 
   // ── DELETE /product-types/:id ─────────────────────────────────────────────
@@ -723,6 +771,70 @@ describe('Products (e2e)', () => {
     )
     expect(ids).toContain(publishedProductId)
     expect(ids).not.toContain(draftRelatedProductId)
+  })
+
+  // ── GET /products?isFeatured ──────────────────────────────────────────────
+  // Unlike isPublished, isFeatured is not gated behind the public/admin split —
+  // it works on both routes. Scoped by productTypeId.
+
+  it('GET /products (public)?isFeatured=true → filters, unlike isPublished which is ignored there', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/products')
+      .query({ productTypeId, isFeatured: true })
+      .expect(200)
+
+    const ids = (res.body as ApiResponse<Paginated<Product>>).data.data.map(
+      (p) => p.id,
+    )
+    expect(ids).toContain(featuredProductId)
+    expect(ids).not.toContain(publishedProductId)
+  })
+
+  it('GET /products/admin?isFeatured=true → 200, only featured products of the scoped type', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/products/admin')
+      .query({ productTypeId, isFeatured: true })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const ids = (res.body as ApiResponse<Paginated<Product>>).data.data.map(
+      (p) => p.id,
+    )
+    expect(ids).toContain(featuredProductId)
+    expect(ids).not.toContain(publishedProductId)
+    expect(ids).not.toContain(draftRelatedProductId)
+  })
+
+  it('GET /products?sort=featured → featured products first, then newest, scoped by productTypeId', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/products')
+      .query({ productTypeId, sort: 'featured' })
+      .expect(200)
+
+    const products = (res.body as ApiResponse<Paginated<Product>>).data.data
+    const featuredIndex = products.findIndex((p) => p.id === featuredProductId)
+    const publishedIndex = products.findIndex(
+      (p) => p.id === publishedProductId,
+    )
+    expect(featuredIndex).toBeGreaterThanOrEqual(0)
+    expect(publishedIndex).toBeGreaterThanOrEqual(0)
+    expect(featuredIndex).toBeLessThan(publishedIndex)
+  })
+
+  it('isFeatured round-trips on create and patch, defaulting to false', async () => {
+    const patched = await request(app.getHttpServer())
+      .patch(`/products/${publishedProductId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ isFeatured: true })
+      .expect(200)
+    expect((patched.body as ApiResponse<Product>).data.isFeatured).toBe(true)
+
+    // Revert so later tests relying on publishedProductId's default state are unaffected.
+    await request(app.getHttpServer())
+      .patch(`/products/${publishedProductId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ isFeatured: false })
+      .expect(200)
   })
 
   // ── POST /products ────────────────────────────────────────────────────────
