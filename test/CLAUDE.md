@@ -220,6 +220,27 @@ expect(body.meta.totalItems).toBeGreaterThanOrEqual(body.data.length)
 expect(body.data.length).toBeGreaterThanOrEqual(seededCount)
 ```
 
+## Unscoped inclusion assertions on a sorted, shared list endpoint
+
+An endpoint with a real default sort (e.g. `GET /posts` defaults to `createdAt desc`) returns the page-1 slice as the **newest** rows across the whole table, not just the rows this suite seeded. Since e2e suites run in parallel and keep inserting rows into shared tables (`post`, `user`, etc.) throughout the run, a test that queries the endpoint with no filter and asserts `expect(ids).toContain(seededId)` can flake or fail outright once enough other suites' newer rows push the seeded one off page 1 — this is a real ordering effect, not a race condition to shrug off.
+
+**Scope the query** with a filter unique to the suite (`authorId`, `tagIds`, a distinctive `q` term, etc.) so the result set only ever contains this suite's own rows, then assert on that scoped set:
+
+```ts
+// ✗ fragile — page 1 is the newest rows across every suite's posts
+const res = await request(app.getHttpServer()).get('/posts').query({ startDate }).expect(200)
+expect(ids).toContain(seededPostId)
+
+// ✓ safe — scoped to only this suite's seeded posts
+const res = await request(app.getHttpServer())
+  .get('/posts')
+  .query({ authorId, startDate })
+  .expect(200)
+expect(ids).toContain(seededPostId)
+```
+
+See `test/posts/posts-filter.e2e-spec.ts`'s `startDate`/`endDate` tests, which scope by `authorId` for exactly this reason.
+
 ## Paginated response shape
 
 Routes that return paginated lists (`GET /posts`, `GET /users`) wrap their payload in a `Paginated<T>` object:

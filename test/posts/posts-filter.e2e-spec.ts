@@ -269,6 +269,15 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
 
   it('GET /posts?startDate=<past>&endDate=<future> → seeded posts appear in range', async () => {
     // A range that brackets today should include the posts seeded in beforeAll.
+    // Scoped by authorId: GET /posts now defaults to createdAt desc (newest
+    // first), so an unscoped query could push these posts past page 1 once
+    // other e2e suites running in parallel create newer published posts.
+    const userRepo = dataSource.getRepository(User)
+    const author: User | null = await userRepo.findOneBy({
+      email: AUTHOR_EMAIL,
+    })
+    const authorId = author!.id
+
     const startDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split('T')[0]
@@ -278,7 +287,7 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
 
     const res = await request(app.getHttpServer())
       .get('/posts')
-      .query({ startDate, endDate })
+      .query({ authorId, startDate, endDate })
       .expect(200)
 
     const paginated = (res.body as ApiResponse<Paginated<Post>>).data
@@ -291,13 +300,20 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
   })
 
   it('GET /posts?startDate=<past> (no endDate) → open-ended range includes seeded posts', async () => {
+    // Scoped by authorId for the same reason as the test above.
+    const userRepo = dataSource.getRepository(User)
+    const author: User | null = await userRepo.findOneBy({
+      email: AUTHOR_EMAIL,
+    })
+    const authorId = author!.id
+
     const startDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split('T')[0]
 
     const res = await request(app.getHttpServer())
       .get('/posts')
-      .query({ startDate })
+      .query({ authorId, startDate })
       .expect(200)
 
     const paginated = (res.body as ApiResponse<Paginated<Post>>).data
@@ -372,6 +388,92 @@ describe('GET /posts (filter by tag/author) (e2e)', () => {
     await request(app.getHttpServer())
       .get('/posts')
       .query({ tagIds: 'notAnInt' })
+      .expect(400)
+  })
+
+  // ── GET /posts?sortBy / order ────────────────────────────────────────────
+  // Scoped with authorId so the result set is exactly the 3 tag posts seeded
+  // above, regardless of what other e2e suites concurrently write to `post`.
+
+  it('GET /posts?authorId&sortBy=title&order=asc → alphabetical by title', async () => {
+    const userRepo = dataSource.getRepository(User)
+    const author: User | null = await userRepo.findOneBy({
+      email: AUTHOR_EMAIL,
+    })
+    const authorId = author!.id
+
+    const res = await request(app.getHttpServer())
+      .get('/posts')
+      .query({ authorId, sortBy: 'title', order: 'asc' })
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+    expect(ids).toEqual([postTagAId, postTagABId, postTagBId])
+  })
+
+  it('GET /posts?authorId&sortBy=title&order=desc → reverse alphabetical', async () => {
+    const userRepo = dataSource.getRepository(User)
+    const author: User | null = await userRepo.findOneBy({
+      email: AUTHOR_EMAIL,
+    })
+    const authorId = author!.id
+
+    const res = await request(app.getHttpServer())
+      .get('/posts')
+      .query({ authorId, sortBy: 'title', order: 'desc' })
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+    expect(ids).toEqual([postTagBId, postTagABId, postTagAId])
+  })
+
+  it('GET /posts?authorId&sortBy=createdAt&order=asc → creation order (oldest first)', async () => {
+    const userRepo = dataSource.getRepository(User)
+    const author: User | null = await userRepo.findOneBy({
+      email: AUTHOR_EMAIL,
+    })
+    const authorId = author!.id
+
+    const res = await request(app.getHttpServer())
+      .get('/posts')
+      .query({ authorId, sortBy: 'createdAt', order: 'asc' })
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+    expect(ids).toEqual([postTagAId, postTagABId, postTagBId])
+  })
+
+  it('GET /posts?authorId (no sortBy/order) → defaults to createdAt desc (newest first)', async () => {
+    const userRepo = dataSource.getRepository(User)
+    const author: User | null = await userRepo.findOneBy({
+      email: AUTHOR_EMAIL,
+    })
+    const authorId = author!.id
+
+    const res = await request(app.getHttpServer())
+      .get('/posts')
+      .query({ authorId })
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+    expect(ids).toEqual([postTagBId, postTagABId, postTagAId])
+  })
+
+  it('GET /posts?sortBy=invalidField → 400 validation error', async () => {
+    await request(app.getHttpServer())
+      .get('/posts')
+      .query({ sortBy: 'invalidField' })
+      .expect(400)
+  })
+
+  it('GET /posts?order=invalid → 400 validation error', async () => {
+    await request(app.getHttpServer())
+      .get('/posts')
+      .query({ order: 'invalid' })
       .expect(400)
   })
 })

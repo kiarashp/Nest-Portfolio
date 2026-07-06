@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { FindOptionsWhere, ILike, Repository } from 'typeorm'
+import { Repository } from 'typeorm'
 import { Post } from '../entities/post.entity'
 import { GetPostsDto } from '../dto/get-posts.dto'
 import type { Request } from 'express'
 import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
+import { applyPostSort } from './apply-post-sort.util'
 
 @Injectable()
 export class FindMyPostsProvider {
@@ -33,31 +34,37 @@ export class FindMyPostsProvider {
     getPostsDto: GetPostsDto,
     request: Request,
   ): Promise<Paginated<Post>> {
-    const base: FindOptionsWhere<Post> = { author: { id: userId } }
+    // leftJoinAndSelect keeps the (eager) author/tags in the response — eager
+    // relations are not auto-loaded when using a QueryBuilder.
+    const qb = this.postsRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('post.tags', 'tags')
+      .andWhere('author.id = :userId', { userId })
+
     if (getPostsDto.status) {
-      base.status = getPostsDto.status
+      qb.andWhere('post.status = :status', { status: getPostsDto.status })
     }
 
-    // Keyword search: two branches (title OR content) when q is provided.
-    const searchBranches: FindOptionsWhere<Post>[] = getPostsDto.q
-      ? [
-          { title: ILike(`%${getPostsDto.q}%`) },
-          { content: ILike(`%${getPostsDto.q}%`) },
-        ]
-      : [{}]
+    // Keyword search — OR across title and content, case-insensitive.
+    if (getPostsDto.q) {
+      qb.andWhere('(post.title ILIKE :q OR post.content ILIKE :q)', {
+        q: `%${getPostsDto.q}%`,
+      })
+    }
 
-    const where: FindOptionsWhere<Post>[] = searchBranches.map((sf) => ({
-      ...base,
-      ...sf,
-    }))
+    applyPostSort(
+      qb,
+      getPostsDto.sortBy ?? 'createdAt',
+      getPostsDto.order ?? 'desc',
+    )
 
     this.logger.debug(
       `Finding posts for userId=${userId} — page=${getPostsDto.page ?? 1}, limit=${getPostsDto.limit ?? 10}`,
     )
-    return await this.paginationProvider.paginateQuery(
-      { page: getPostsDto.page, limit: getPostsDto.limit },
-      this.postsRepository,
-      where,
+    return await this.paginationProvider.paginateQueryBuilder(
+      getPostsDto,
+      qb,
       request,
     )
   }

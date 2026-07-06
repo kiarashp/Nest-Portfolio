@@ -234,4 +234,30 @@ describe('GET /posts/my (e2e)', () => {
     const paginated = (res.body as ApiResponse<Paginated<Post>>).data
     expect(paginated.data).toHaveLength(0)
   })
+
+  // ── GET /posts/my?sortBy / order ─────────────────────────────────────────
+
+  it('GET /posts/my?sortBy=title&order=asc → alphabetical by title', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/posts/my')
+      .query({ sortBy: 'title', order: 'asc' })
+      .set('Authorization', `Bearer ${authorToken}`)
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+    expect(ids).toEqual([
+      authorDraftPostId,
+      authorPublishedPostId,
+      authorSearchPostId,
+    ])
+  })
+
+  it('GET /posts/my?sortBy=invalidField → 400 validation error', async () => {
+    await request(app.getHttpServer())
+      .get('/posts/my')
+      .query({ sortBy: 'invalidField' })
+      .set('Authorization', `Bearer ${authorToken}`)
+      .expect(400)
+  })
 })

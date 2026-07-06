@@ -271,4 +271,30 @@ describe('GET /posts/admin (e2e)', () => {
       .get(`/posts/${authorDraftPostId}`)
       .expect(404)
   })
+
+  // ── GET /posts/admin?sortBy / order ──────────────────────────────────────
+
+  it('GET /posts/admin?sortBy=title&order=asc → alphabetical by title, drafts included', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/posts/admin')
+      .query({ q: ADMIN_TERM, sortBy: 'title', order: 'asc' })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    const paginated = (res.body as ApiResponse<Paginated<Post>>).data
+    const ids = paginated.data.map((p) => p.id)
+    expect(ids).toEqual([
+      adminPublishedPostId,
+      authorDraftPostId,
+      authorPublishedPostId,
+    ])
+  })
+
+  it('GET /posts/admin?sortBy=invalidField → 400 validation error', async () => {
+    await request(app.getHttpServer())
+      .get('/posts/admin')
+      .query({ sortBy: 'invalidField' })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(400)
+  })
 })

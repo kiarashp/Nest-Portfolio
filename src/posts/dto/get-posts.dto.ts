@@ -4,6 +4,7 @@ import {
   IsArray,
   IsDate,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsPositive,
@@ -13,6 +14,14 @@ import {
 } from 'class-validator'
 import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.dto'
 import { PostStatus } from '../enums/postStatus.enum'
+
+/** Columns GET /posts, /posts/my, and /posts/admin can sort by. */
+export const POST_SORT_FIELDS = ['createdAt', 'title'] as const
+export type PostSortField = (typeof POST_SORT_FIELDS)[number]
+
+/** Sort directions accepted alongside sortBy. */
+export const POST_SORT_ORDERS = ['asc', 'desc'] as const
+export type PostSortOrder = (typeof POST_SORT_ORDERS)[number]
 
 class GetPostsBaseDto {
   // start date — query param arrives as a string, transform converts it to a Date before validation
@@ -85,6 +94,24 @@ class GetPostsBaseDto {
   @MinLength(1)
   @MaxLength(100)
   q?: string
+  // column to sort by — defaults to createdAt in the provider
+  @ApiPropertyOptional({
+    description: 'Column to sort by',
+    enum: POST_SORT_FIELDS,
+    default: 'createdAt',
+  })
+  @IsOptional()
+  @IsIn(POST_SORT_FIELDS)
+  sortBy?: PostSortField
+  // sort direction — defaults to desc in the provider
+  @ApiPropertyOptional({
+    description: 'Sort direction',
+    enum: POST_SORT_ORDERS,
+    default: 'desc',
+  })
+  @IsOptional()
+  @IsIn(POST_SORT_ORDERS)
+  order?: PostSortOrder
 }
 
 export class GetPostsDto extends IntersectionType(
