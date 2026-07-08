@@ -34,6 +34,9 @@ src/products/
     upload-product-image.provider.ts   — uploads via UploadsService, returns UploadFile
     find-product-images.provider.ts    — lists a product's UploadFile rows (admin picker)
     delete-product-image.provider.ts   — deletes one image + clears imageUrl/images
+    upload-product-type-image.provider.ts — uploads via UploadsService AND sets imageUrl (combined, single-slot)
+    find-product-type-image.provider.ts   — returns the one tracked UploadFile for a type
+    delete-product-type-image.provider.ts — deletes the tracked image + clears imageUrl
     validate-specs.util.ts      — shared spec validation helpers (no DI)
     products.service.ts         — thin facade over product providers
   product-types.controller.ts
@@ -121,6 +124,17 @@ what lets Cloudinary assets be cleaned up when a product is deleted.
 
 `imageUrl`/`images` remain plain URL fields on the create/update DTOs. Cleanup iterates `UploadFile` rows by `productId`, so it is correct regardless of what those fields point at; an arbitrary external URL with no `UploadFile` row simply won't be cleaned (only uploaded assets are tracked).
 
+## Product type image tracking
+
+`ProductType.imageUrl` is also backed by an `UploadFile` row (via `UploadFile.productTypeId`), so its Cloudinary asset gets purged when the type is deleted or the image is replaced — the same tracking model as products/posts. Unlike products/posts, a type has only **one** image slot (no `images` gallery), so the flow is a **single combined endpoint** rather than the decoupled upload-then-PATCH pattern:
+
+- `POST /product-types/:id/image` (`UploadProductTypeImageProvider`) uploads the file **and** sets `imageUrl` in the same call. If a previous image was already tracked, it is purged from Cloudinary + the `upload_file` table first, so replacing the image never leaves an orphan behind. Returns the updated `ProductType` (not a bare `UploadFile`), since the caller needs the new `imageUrl` immediately with no follow-up request.
+- `GET /product-types/:id/image` (`FindProductTypeImageProvider`) returns the tracked `UploadFile` for the admin edit form; 404 if none exists.
+- `DELETE /product-types/:id/image` (`DeleteProductTypeImageProvider`) purges the tracked file and clears `imageUrl` — but only if `imageUrl` still points at that file (guards against a direct `PATCH /product-types/:id` having pointed it elsewhere since upload). Returns the updated `ProductType`.
+- `DeleteProductTypeProvider.delete` (a **hard** delete, no soft-delete fallback) loads every `UploadFile` by `productTypeId` and `uploadsService.deleteFile()`s each **before** the actual `delete()` call — otherwise the FK on `upload_file.productTypeId` would block the delete. This runs after the existing products-still-reference-this-type conflict check.
+
+All three image routes are ADMIN-only with no ownership concept, same as product images.
+
 ## Error mapping in write providers
 
 | PostgreSQL error | Mapped to | Where |
@@ -144,7 +158,7 @@ removed it — use the explicit grouped query instead.
 
 ## Product type deletion safety
 
-`DeleteProductTypeProvider` calls `productsRepository.count({ where: { productTypeId: id } })` before deleting. If any products reference the type, it throws `ConflictException` (409). The caller must delete or reassign those products first. This is a hard delete — there is no soft-delete for product types.
+`DeleteProductTypeProvider` calls `productsRepository.count({ where: { productTypeId: id } })` before deleting. If any products reference the type, it throws `ConflictException` (409). The caller must delete or reassign those products first. This is a hard delete — there is no soft-delete for product types. After that check passes, it also purges any tracked `UploadFile` for the type before the actual delete — see "Product type image tracking" above.
 
 ## Product type field evolution (updating `filterableFields`)
 
@@ -207,7 +221,7 @@ Unknown keys, non-object `specs`, non-numeric number values, or out-of-range enu
 
 ## Audit logging
 
-Every write provider calls `auditLogService.log(activeUserId, action, entity, entityId)` after each successful DB operation — the five product-type/product CRUD providers, plus the three image providers (`UploadProductImageProvider` and `DeleteProductImageProvider` both log `UPDATE Product`; `DeleteProductProvider` logs `SOFT_DELETE Product`). `activeUserId` flows from the controller `@ActiveUser('sub')` decorator through the service facade into the provider.
+Every write provider calls `auditLogService.log(activeUserId, action, entity, entityId)` after each successful DB operation — the five product-type/product CRUD providers, plus the product image providers (`UploadProductImageProvider` and `DeleteProductImageProvider` both log `UPDATE Product`; `DeleteProductProvider` logs `SOFT_DELETE Product`) and the product type image providers (`UploadProductTypeImageProvider` and `DeleteProductTypeImageProvider` both log `UPDATE ProductType`). `activeUserId` flows from the controller `@ActiveUser('sub')` decorator through the service facade into the provider.
 
 ## OpenAPI response typing
 
@@ -228,7 +242,7 @@ The **posts** module is also fully response-typed using these same helpers — s
 `CLAUDE.md` Serialization section for the rationale, the `PublicAuthor` embedded-author pattern,
 and how to extend this to other modules.
 
-`POST /products/:id/images` carries `@ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })` alongside its `@ApiConsumes('multipart/form-data')` — without `@ApiBody`, a multipart endpoint's request body is undocumented and generates `requestBody?: never` in `openapi-types.ts`. `POST /posts/:id/images` and `POST /users/avatar-options` use the identical `@ApiBody` shape for the same reason.
+`POST /products/:id/images` carries `@ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })` alongside its `@ApiConsumes('multipart/form-data')` — without `@ApiBody`, a multipart endpoint's request body is undocumented and generates `requestBody?: never` in `openapi-types.ts`. `POST /posts/:id/images`, `POST /users/avatar-options`, and `POST /product-types/:id/image` use the identical `@ApiBody` shape for the same reason.
 
 Both controllers' write/admin routes (everything except the public reads) are ADMIN-only and
 carry `@ApiAuth({ roles: [UserRole.ADMIN] })` from `src/common/swagger/api-auth.helpers.ts`,

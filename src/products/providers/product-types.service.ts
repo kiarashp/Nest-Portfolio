@@ -2,11 +2,15 @@ import { Injectable } from '@nestjs/common'
 import { CreateProductTypeDto } from '../dto/create-product-type.dto'
 import { UpdateProductTypeDto } from '../dto/update-product-type.dto'
 import { ProductType } from '../entities/product-type.entity'
+import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { FindAllProductTypesProvider } from './find-all-product-types.provider'
 import { FindOneProductTypeProvider } from './find-one-product-type.provider'
 import { CreateProductTypeProvider } from './create-product-type.provider'
 import { UpdateProductTypeProvider } from './update-product-type.provider'
 import { DeleteProductTypeProvider } from './delete-product-type.provider'
+import { UploadProductTypeImageProvider } from './upload-product-type-image.provider'
+import { FindProductTypeImageProvider } from './find-product-type-image.provider'
+import { DeleteProductTypeImageProvider } from './delete-product-type-image.provider'
 
 @Injectable()
 export class ProductTypesService {
@@ -31,6 +35,18 @@ export class ProductTypesService {
      * inject delete product type provider
      */
     private readonly deleteProductTypeProvider: DeleteProductTypeProvider,
+    /**
+     * inject upload product type image provider
+     */
+    private readonly uploadProductTypeImageProvider: UploadProductTypeImageProvider,
+    /**
+     * inject find product type image provider
+     */
+    private readonly findProductTypeImageProvider: FindProductTypeImageProvider,
+    /**
+     * inject delete product type image provider
+     */
+    private readonly deleteProductTypeImageProvider: DeleteProductTypeImageProvider,
   ) {}
 
   public findAll(): Promise<ProductType[]> {
@@ -65,5 +81,31 @@ export class ProductTypesService {
     activeUserId: number,
   ): Promise<{ deleted: boolean; id: number }> {
     return this.deleteProductTypeProvider.delete(id, activeUserId)
+  }
+
+  public uploadImage(
+    file: Express.Multer.File,
+    productTypeId: number,
+    activeUserId: number,
+  ): Promise<ProductType> {
+    return this.uploadProductTypeImageProvider.upload(
+      file,
+      productTypeId,
+      activeUserId,
+    )
+  }
+
+  public findImage(productTypeId: number): Promise<UploadFile> {
+    return this.findProductTypeImageProvider.findProductTypeImage(productTypeId)
+  }
+
+  public deleteImage(
+    productTypeId: number,
+    activeUserId: number,
+  ): Promise<ProductType> {
+    return this.deleteProductTypeImageProvider.deleteImage(
+      productTypeId,
+      activeUserId,
+    )
   }
 }

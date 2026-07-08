@@ -52,7 +52,7 @@ export class UploadFileProvider {
     file: Express.Multer.File,
     userId: number,
     folder = 'uploads',
-    links: { postId?: number; productId?: number } = {},
+    links: { postId?: number; productId?: number; productTypeId?: number } = {},
   ): Promise<UploadFile> {
     // Step 1: make sure the file's actual content is a real image, not just its
     // mimetype header (which the client can set to anything).
@@ -87,6 +87,7 @@ export class UploadFileProvider {
       userId,
       postId: links.postId,
       productId: links.productId,
+      productTypeId: links.productTypeId,
     })
 
     // Step 4: persist the record so the file can be looked up later.

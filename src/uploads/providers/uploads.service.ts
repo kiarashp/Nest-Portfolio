@@ -22,14 +22,14 @@ export class UploadsService {
 
   /**
    * Validates, uploads, and records a file for the given user under `folder`.
-   * `links` optionally ties the row to a post or a product so it can be cleaned
-   * up when that parent is deleted.
+   * `links` optionally ties the row to a post, a product, or a product type so
+   * it can be cleaned up when that parent is deleted.
    */
   public async uploadFile(
     file: Express.Multer.File,
     userId: number,
     folder = 'uploads',
-    links: { postId?: number; productId?: number } = {},
+    links: { postId?: number; productId?: number; productTypeId?: number } = {},
   ): Promise<UploadFile> {
     return await this.uploadFileProvider.uploadFile(file, userId, folder, links)
   }

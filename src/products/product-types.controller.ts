@@ -2,15 +2,29 @@ import {
   Body,
   Controller,
   Delete,
+  FileTypeValidator,
   Get,
+  MaxFileSizeValidator,
   Param,
+  ParseFilePipe,
   ParseIntPipe,
   Patch,
   Post,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common'
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { memoryStorage } from 'multer'
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger'
 import { ProductTypesService } from './providers/product-types.service'
 import { ProductType } from './entities/product-type.entity'
+import { UploadFile } from 'src/uploads/entities/upload-file.entity'
 import { CreateProductTypeDto } from './dto/create-product-type.dto'
 import { UpdateProductTypeDto } from './dto/update-product-type.dto'
 import { DeleteResultDto } from 'src/common/dto/delete-result.dto'
@@ -115,6 +129,79 @@ export class ProductTypesController {
     @ActiveUser('sub') adminId: number,
   ) {
     return this.productTypesService.update(id, dto, adminId)
+  }
+
+  /**
+   * upload and set a product type's image (admin only) — unlike products/posts,
+   * this is a single combined call: it uploads the file and sets imageUrl in one
+   * request, replacing any previously tracked image
+   */
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary:
+      "Upload and set a product type's image (admin only). Replaces any previous image.",
+  })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiDataResponse(ProductType, {
+    description: 'Product type updated with the new imageUrl',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file type or size' })
+  @Post(':id/image')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  public uploadImage(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: /^image\/(jpeg|png|webp)$/ }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @Param('id', ParseIntPipe) productTypeId: number,
+    @ActiveUser('sub') adminId: number,
+  ) {
+    return this.productTypesService.uploadImage(file, productTypeId, adminId)
+  }
+
+  /**
+   * get the tracked image for a product type (admin only) — used by the admin
+   * edit form to show upload metadata (size, mime, etc.)
+   */
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Get the tracked image for a product type (admin only)',
+  })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
+  @ApiDataResponse(UploadFile, { description: 'The UploadFile record' })
+  @ApiResponse({ status: 404, description: 'Product type or image not found' })
+  @Get(':id/image')
+  public findImage(@Param('id', ParseIntPipe) productTypeId: number) {
+    return this.productTypesService.findImage(productTypeId)
+  }
+
+  /**
+   * clear a product type's image (admin only) — removes it from Cloudinary + DB
+   * and clears imageUrl if it was still pointing at the deleted file
+   */
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: "Clear a product type's image (admin only)" })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
+  @ApiDataResponse(ProductType)
+  @ApiResponse({ status: 404, description: 'Product type or image not found' })
+  @Delete(':id/image')
+  public deleteImage(
+    @Param('id', ParseIntPipe) productTypeId: number,
+    @ActiveUser('sub') adminId: number,
+  ) {
+    return this.productTypesService.deleteImage(productTypeId, adminId)
   }
 
   /**

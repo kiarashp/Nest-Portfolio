@@ -11,6 +11,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { User } from 'src/users/entities/user.entity'
 import { Post } from 'src/posts/entities/post.entity'
 import { Product } from 'src/products/entities/product.entity'
+import { ProductType } from 'src/products/entities/product-type.entity'
 import { FileType } from '../enums/file-type.enum'
 
 @Entity()
@@ -63,8 +64,8 @@ export class UploadFile {
   @ManyToOne(() => Post, (post) => post.uploadFiles, { nullable: true })
   @JoinColumn({ name: 'postId' })
   post?: Post
-  // product id — null for uploads not tied to a product. A row links to either a
-  // post or a product (or neither, e.g. avatars), never both.
+  // product id — null for uploads not tied to a product. A row links to a post,
+  // a product, or a product type (or none, e.g. avatars) — never more than one.
   @ApiPropertyOptional({ example: 7, nullable: true })
   @Column({ type: 'int', nullable: true })
   productId?: number
@@ -72,6 +73,14 @@ export class UploadFile {
   @ManyToOne(() => Product, { nullable: true })
   @JoinColumn({ name: 'productId' })
   product?: Product
+  // product type id — null for uploads not tied to a product type
+  @ApiPropertyOptional({ example: 3, nullable: true })
+  @Column({ type: 'int', nullable: true })
+  productTypeId?: number
+  // product type — relation, not serialized into the images response; left undecorated
+  @ManyToOne(() => ProductType, { nullable: true })
+  @JoinColumn({ name: 'productTypeId' })
+  productType?: ProductType
   // created at
   @ApiProperty()
   @CreateDateColumn()
