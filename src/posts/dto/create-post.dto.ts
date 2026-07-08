@@ -77,6 +77,17 @@ export class CreatePostDto {
   @MaxLength(1024)
   @IsOptional()
   featuredImage?: string
+  // images — curated gallery, a subset of the files uploaded via
+  // POST /posts/:id/images
+  @ApiPropertyOptional({
+    description: 'Gallery of additional Cloudinary URLs',
+    type: [String],
+    nullable: true,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUrl({}, { each: true })
+  images?: string[] | null
   // publishOn
   @ApiPropertyOptional({
     description: 'The date and time when the post will be published',

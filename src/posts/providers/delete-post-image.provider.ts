@@ -36,9 +36,10 @@ export class DeletePostImageProvider {
 
   /**
    * Deletes a single uploaded image from a post: removes it from Cloudinary and
-   * the upload_file table, then clears it from the post's featuredImage if it was
-   * pointing there. Lets an editor/author/admin remove a wrong image without
-   * deleting the whole post. Editors may only touch posts they authored.
+   * the upload_file table, then clears it from the post's featuredImage and/or
+   * images gallery if it was referenced there. Lets an editor/author/admin
+   * remove a wrong image without deleting the whole post. Editors may only
+   * touch posts they authored.
    */
   public async deletePostImage(
     postId: number,
@@ -71,9 +72,18 @@ export class DeletePostImageProvider {
 
     // Clear the reference from the post so it no longer points at a dead URL.
     // Must be null (not undefined) — TypeORM's save() skips undefined columns,
-    // which would leave the stale URL in place.
+    // which would leave the stale URL in place. Track whether either field
+    // changed so we only save once, covering both at the same time.
+    let postChanged = false
     if (post.featuredImage === file.path) {
       post.featuredImage = null
+      postChanged = true
+    }
+    if (post.images?.includes(file.path)) {
+      post.images = post.images.filter((url) => url !== file.path)
+      postChanged = true
+    }
+    if (postChanged) {
       await this.postsRepository.save(post)
     }
 

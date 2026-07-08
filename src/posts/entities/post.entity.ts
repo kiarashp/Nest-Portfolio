@@ -90,6 +90,15 @@ export class Post {
     nullable: true,
   })
   featuredImage?: string | null
+  //   images — curated gallery of additional Cloudinary URLs, a subset of the
+  //   files uploaded via POST /posts/:id/images (which lists every uploaded
+  //   file, not just the ones chosen for the gallery)
+  @ApiPropertyOptional({ type: [String], nullable: true })
+  @Column({
+    type: 'jsonb',
+    nullable: true,
+  })
+  images?: string[] | null
   //   publishOn
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   @Column({
@@ -115,9 +124,10 @@ export class Post {
   @ManyToMany(() => Tag, (tag) => tag.posts, { eager: true })
   @JoinTable()
   tags?: Tag[]
-  // images uploaded for this post — not eager, only loaded when needed (e.g. on
-  // delete). Intentionally not decorated with @ApiProperty: it never appears on
-  // a normal post read (images come from GET /posts/:id/images).
+  // uploadFiles — every file ever uploaded for this post, not eager, only
+  // loaded when needed (e.g. on delete). Intentionally not decorated with
+  // @ApiProperty: it never appears on a normal post read (the full list comes
+  // from GET /posts/:id/images; the curated subset is the `images` column above).
   @OneToMany(() => UploadFile, (uploadFile) => uploadFile.post)
   uploadFiles?: UploadFile[]
   // timestamp set automatically by TypeORM when the row is first inserted

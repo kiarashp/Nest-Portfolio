@@ -104,6 +104,12 @@ export class UpdatePostProvider {
     if (patchPostDto.featuredImage !== undefined) {
       post.featuredImage = patchPostDto.featuredImage
     }
+    // images is nullable/array; only an explicitly-omitted field (undefined)
+    // should leave the existing gallery unchanged — null or [] are valid
+    // "clear it" / "replace wholesale" requests.
+    if (patchPostDto.images !== undefined) {
+      post.images = patchPostDto.images
+    }
     post.publishOn = patchPostDto.publishOn ?? post.publishOn
     if (tags) {
       post.tags = tags

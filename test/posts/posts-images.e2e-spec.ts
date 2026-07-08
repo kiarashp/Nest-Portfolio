@@ -206,6 +206,48 @@ describe('Posts images (e2e)', () => {
     expect(post!.featuredImage).toBeNull()
   })
 
+  it('DELETE /posts/:id/images/:fileId (ADMIN) → 200, removes the file and clears it from the images gallery', async () => {
+    // Upload two images, then curate a gallery containing both.
+    const upRes1 = await request(app.getHttpServer())
+      .post(`/posts/${postId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'gallery-1.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file1 = (upRes1.body as ApiResponse<UploadFile>).data
+
+    const upRes2 = await request(app.getHttpServer())
+      .post(`/posts/${postId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'gallery-2.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file2 = (upRes2.body as ApiResponse<UploadFile>).data
+
+    await request(app.getHttpServer())
+      .patch(`/posts/${postId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ images: [file1.path, file2.path] })
+      .expect(200)
+
+    const delRes = await request(app.getHttpServer())
+      .delete(`/posts/${postId}/images/${file1.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+
+    expect(
+      (delRes.body as ApiResponse<{ deleted: boolean; id: number }>).data,
+    ).toEqual({ deleted: true, id: file1.id })
+
+    // Only the deleted file's URL is removed from the gallery — the other stays.
+    const post: Post | null = await postRepo.findOneBy({ id: postId })
+    expect(post!.images).toEqual([file2.path])
+  })
+
   // ── PATCH /posts/:id (featuredImage clear) ──────────────────────────────
 
   it('PATCH /posts/:id with featuredImage: null clears an existing featured image', async () => {
@@ -268,6 +310,98 @@ describe('Posts images (e2e)', () => {
 
     const post: Post | null = await postRepo.findOneBy({ id: postId })
     expect(post!.featuredImage).toBe(file.path)
+  })
+
+  // ── PATCH /posts/:id (images gallery) ────────────────────────────────────
+
+  it('PATCH /posts/:id with images sets the curated gallery subset', async () => {
+    const upRes1 = await request(app.getHttpServer())
+      .post(`/posts/${postId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'set-gallery-1.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file1 = (upRes1.body as ApiResponse<UploadFile>).data
+
+    const upRes2 = await request(app.getHttpServer())
+      .post(`/posts/${postId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'set-gallery-2.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file2 = (upRes2.body as ApiResponse<UploadFile>).data
+
+    const patchRes = await request(app.getHttpServer())
+      .patch(`/posts/${postId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ images: [file1.path, file2.path] })
+      .expect(200)
+
+    expect((patchRes.body as ApiResponse<Post>).data.images).toEqual([
+      file1.path,
+      file2.path,
+    ])
+
+    const post: Post | null = await postRepo.findOneBy({ id: postId })
+    expect(post!.images).toEqual([file1.path, file2.path])
+  })
+
+  it('PATCH /posts/:id with images: null clears an existing gallery', async () => {
+    const upRes = await request(app.getHttpServer())
+      .post(`/posts/${postId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'clear-gallery.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file = (upRes.body as ApiResponse<UploadFile>).data
+
+    await request(app.getHttpServer())
+      .patch(`/posts/${postId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ images: [file.path] })
+      .expect(200)
+
+    await request(app.getHttpServer())
+      .patch(`/posts/${postId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ images: null })
+      .expect(200)
+
+    const post: Post | null = await postRepo.findOneBy({ id: postId })
+    expect(post!.images).toBeNull()
+  })
+
+  it('PATCH /posts/:id with images omitted leaves the existing gallery untouched', async () => {
+    const upRes = await request(app.getHttpServer())
+      .post(`/posts/${postId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', JPEG_MAGIC, {
+        filename: 'untouched-gallery.jpg',
+        contentType: 'image/jpeg',
+      })
+      .expect(201)
+    const file = (upRes.body as ApiResponse<UploadFile>).data
+
+    await request(app.getHttpServer())
+      .patch(`/posts/${postId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ images: [file.path] })
+      .expect(200)
+
+    await request(app.getHttpServer())
+      .patch(`/posts/${postId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ title: 'Untouched gallery title' })
+      .expect(200)
+
+    const post: Post | null = await postRepo.findOneBy({ id: postId })
+    expect(post!.images).toEqual([file.path])
   })
 
   it('DELETE /posts/:id/images/:fileId for a non-existent file → 404', async () => {

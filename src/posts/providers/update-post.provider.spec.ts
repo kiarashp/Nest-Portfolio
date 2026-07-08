@@ -214,4 +214,47 @@ describe('UpdatePostProvider', () => {
     expect(result.content).toBe('Existing content')
     expect(result.contentHtml).toBe('<p>Existing content</p>')
   })
+
+  it('replaces the images gallery when images is sent', async () => {
+    const existingPost = {
+      ...ownedPost,
+      images: ['url-1'],
+    } as unknown as Post
+    findOnePostProvider.findOneByIdOrFail.mockResolvedValue(existingPost)
+    postsRepo.save.mockImplementation((post: Post) => Promise.resolve(post))
+
+    const result = await provider.update(
+      10,
+      { images: ['url-2', 'url-3'] },
+      editor,
+    )
+
+    expect(result.images).toEqual(['url-2', 'url-3'])
+  })
+
+  it('clears the images gallery when images is explicitly sent as null', async () => {
+    const existingPost = {
+      ...ownedPost,
+      images: ['url-1'],
+    } as unknown as Post
+    findOnePostProvider.findOneByIdOrFail.mockResolvedValue(existingPost)
+    postsRepo.save.mockImplementation((post: Post) => Promise.resolve(post))
+
+    const result = await provider.update(10, { images: null }, editor)
+
+    expect(result.images).toBeNull()
+  })
+
+  it('leaves the images gallery untouched when images is omitted', async () => {
+    const existingPost = {
+      ...ownedPost,
+      images: ['url-1'],
+    } as unknown as Post
+    findOnePostProvider.findOneByIdOrFail.mockResolvedValue(existingPost)
+    postsRepo.save.mockImplementation((post: Post) => Promise.resolve(post))
+
+    const result = await provider.update(10, { title: 'New Title' }, editor)
+
+    expect(result.images).toEqual(['url-1'])
+  })
 })

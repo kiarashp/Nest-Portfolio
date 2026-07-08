@@ -49,8 +49,13 @@ describe('DeletePostImageProvider', () => {
     provider = module.get(DeletePostImageProvider)
   })
 
-  it('deletes the file and clears featuredImage when it pointed at the deleted image', async () => {
-    const post = { id: 6, author: { id: 1 }, featuredImage: 'url-1' }
+  it('deletes the file and clears featuredImage and the images gallery when it pointed at the deleted image', async () => {
+    const post = {
+      id: 6,
+      author: { id: 1 },
+      featuredImage: 'url-1',
+      images: ['url-1', 'url-2'],
+    }
     findOnePostProvider.findOneByIdOrFail.mockResolvedValue(post)
     uploadFilesRepository.findOneBy.mockResolvedValue({
       id: 3,
@@ -62,6 +67,7 @@ describe('DeletePostImageProvider', () => {
 
     expect(uploadsService.deleteFile).toHaveBeenCalledWith('url-1')
     expect(post.featuredImage).toBeNull()
+    expect(post.images).toEqual(['url-2'])
     expect(postsRepository.save).toHaveBeenCalledWith(post)
     expect(auditLogService.log).toHaveBeenCalledWith(
       9,
@@ -72,8 +78,34 @@ describe('DeletePostImageProvider', () => {
     expect(result).toEqual({ deleted: true, id: 3 })
   })
 
-  it('does not save the post when the deleted image was not the featuredImage', async () => {
-    const post = { id: 6, author: { id: 1 }, featuredImage: 'other' }
+  it('clears only the images gallery when the deleted image is not the featuredImage', async () => {
+    const post = {
+      id: 6,
+      author: { id: 1 },
+      featuredImage: 'other',
+      images: ['url-1', 'url-2'],
+    }
+    findOnePostProvider.findOneByIdOrFail.mockResolvedValue(post)
+    uploadFilesRepository.findOneBy.mockResolvedValue({
+      id: 3,
+      postId: 6,
+      path: 'url-1',
+    })
+
+    await provider.deletePostImage(6, 3, adminUser)
+
+    expect(post.featuredImage).toBe('other')
+    expect(post.images).toEqual(['url-2'])
+    expect(postsRepository.save).toHaveBeenCalledWith(post)
+  })
+
+  it('does not save the post when the deleted image was not referenced', async () => {
+    const post = {
+      id: 6,
+      author: { id: 1 },
+      featuredImage: 'other',
+      images: ['other'],
+    }
     findOnePostProvider.findOneByIdOrFail.mockResolvedValue(post)
     uploadFilesRepository.findOneBy.mockResolvedValue({
       id: 3,
