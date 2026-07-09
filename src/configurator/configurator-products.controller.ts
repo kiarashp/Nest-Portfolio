@@ -27,9 +27,11 @@ import {
 } from '@nestjs/swagger'
 import { ConfiguratorProductsService } from './providers/configurator-products.service'
 import { ConfigurableProduct } from './entities/configurable-product.entity'
+import { ProductSegmentAssignment } from './entities/product-segment-assignment.entity'
 import { CreateConfigurableProductDto } from './dtos/create-configurable-product.dto'
 import { UpdateConfigurableProductDto } from './dtos/update-configurable-product.dto'
 import { GetConfiguratorProductsDto } from './dtos/get-configurator-products.dto'
+import { CreateAssignmentDto } from './dtos/create-assignment.dto'
 import { DeleteResultDto } from 'src/common/dto/delete-result.dto'
 import {
   ApiDataResponse,
@@ -68,10 +70,15 @@ export class ConfiguratorProductsController {
   }
 
   /**
-   * get a single configurable product by id — admin only, includes unpublished
+   * get a single configurable product by id — admin only, includes
+   * unpublished, includes ordered assignments with their definitions and
+   * options
    */
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Get a configurable product by id (admin only)' })
+  @ApiOperation({
+    summary:
+      'Get a configurable product by id, including ordered assignments (admin only)',
+  })
   @ApiAuth({ roles: [UserRole.ADMIN] })
   @ApiDataResponse(ConfigurableProduct)
   @ApiResponse({ status: 404, description: 'Configurable product not found' })
@@ -201,5 +208,45 @@ export class ConfiguratorProductsController {
     @ActiveUser('sub') adminId: number,
   ) {
     return this.configuratorProductsService.deleteImage(productId, adminId)
+  }
+
+  /**
+   * add an assignment placing a segment definition at a position inside a
+   * configurable product — defaults to appending when no position is given
+   */
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary:
+      'Add an assignment to a configurable product (admin only). Defaults to appending.',
+  })
+  @ApiAuth({ roles: [UserRole.ADMIN] })
+  @ApiDataResponse(ProductSegmentAssignment, {
+    status: 201,
+    description: 'Assignment created',
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid position or condition, or definition not eligible (e.g. SELECT with < 2 options)',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Configurable product or segment definition not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'This definition is already assigned to this product',
+  })
+  @Post(':id/assignments')
+  public createAssignment(
+    @Param('id', ParseIntPipe) productId: number,
+    @Body() dto: CreateAssignmentDto,
+    @ActiveUser('sub') adminId: number,
+  ) {
+    return this.configuratorProductsService.createAssignment(
+      productId,
+      dto,
+      adminId,
+    )
   }
 }

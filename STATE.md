@@ -56,9 +56,48 @@ to `StorageProvider.delete()`. Soft-deleting a product (`DELETE /configurator-pr
 deliberately keeps its Cloudinary image rather than purging it, per CONFIGURATOR.md §2.1/§7 —
 the opposite of `Product`'s soft-delete, which does purge. No entity/migration changes were
 needed — Step 1 already had every column. Covered by 36 new e2e tests in
-`test/configurator/products.e2e-spec.ts`. **Next: Step 4** (Assignments — linking
-`SegmentDefinition`s to a `ConfigurableProduct` at a position, with conditions/zero-fill, per
-`CONFIGURATOR.md` §7).
+`test/configurator/products.e2e-spec.ts`.
+
+**Step 4 (Assignments) is done** — `ProductSegmentAssignment` now has a working CRUD surface:
+`POST /configurator-products/:id/assignments` (on the existing `ConfiguratorProductsController`,
+default position = append) plus a new `ConfiguratorAssignmentsController`
+(`PATCH`/`DELETE /configurator-assignments/:assignmentId`, base prefix — not nested under a
+product id, since the assignment id alone locates its product). `ConfigurableProduct` gained
+the inverse `assignments` relation (pure TypeORM metadata, no migration — the FK already
+existed via `productId`), and `FindOneConfigurableProductProvider` now eager-loads
+`assignments.definition.options` ordered by `position`/`sortOrder`, so `GET
+/configurator-products/:id` returns the full ordered assignment tree per CONFIGURATOR.md §5.1.
+New provider-layer utils: `validate-assignment-condition.util.ts` (shape dispatch on `operator`,
+mirrors `validate-segment-constraints.util.ts`; has a colocated unit spec) and
+`validate-assignment-condition-rules.util.ts` (DB-dependent rules: controller exists in the same
+product at a strictly lower position, operator×dataType matrix — SELECT allows eq/neq, NUMBER
+allows all 5, STRING never a controller — and a NUMBER-typed target definition must have
+`constraints.min >= 1`). Gapless renumbering (insert/reorder/delete) runs inside a
+`DataSource.createQueryRunner()` transaction (the same manual-transaction pattern
+`UserCreateManyProvider` already uses) via `renumber-assignments.util.ts` —
+**non-obvious gotcha**: a naive single-statement bulk `position = position ± 1` shift is
+**not** safe against the `(productId, position)` unique constraint, because PostgreSQL checks a
+unique constraint per row as it processes a multi-row `UPDATE`, not once at statement end, so a
+shifted row can momentarily try to write a value a not-yet-processed sibling in the same
+statement still holds — a genuine 23505, not a race with another transaction (this was caught
+by the e2e suite, not code review: two tests failed with unexpected 409s). The fix is a
+negate-then-finalize two-step shift (negative positions can never collide with any real
+positive position, and negation is injective so the shifted rows can't collide with each other
+either) — reuse `shiftRange` from `renumber-assignments.util.ts` for any future bulk position
+shift, do not reach for a single-statement `position = position ± 1` update. A position change
+(`PATCH .../:assignmentId` with a new `position`) is re-validated against every direction rule
+a shift could break: the assignment's own condition (if any) must still point at a strictly
+lower position (400, input-invalid), and every other assignment that targets this one as its
+controller must still end up at a strictly higher position (409, conflict with existing sibling
+state) — a uniform ±1 shift can only ever flip order at the edges touching the one deliberately
+repositioned row, so only those two edges need re-checking. Deleting a controller with
+dependents is rejected outright (409, lists the dependent positions) — no reorder can rescue
+that. Covered by 36 new e2e tests in `test/configurator/assignments.e2e-spec.ts`, built through
+the real Step 2/3 HTTP APIs (no more direct-repository assignment seeding needed, though
+`definitions.e2e-spec.ts` was left as-is — swapping it would only churn a passing suite).
+**Next: Step 5** (the resolver + public `GET /configurators/:slug` /
+`POST /configurators/:slug/resolve` endpoints, per `CONFIGURATOR.md` §7 — the largest remaining
+step).
 
 ---
 

@@ -3,10 +3,12 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { ProductSegmentAssignment } from './product-segment-assignment.entity'
 
 // A configurable product family the admin defines (e.g. "Resistive sensor
 // with cap", code prefix "FRH"). Customers compose an ordering code for it
@@ -60,6 +62,11 @@ export class ConfigurableProduct {
   @ApiProperty({ example: false })
   @Column({ type: 'boolean', default: false, nullable: false })
   isPublished!: boolean
+
+  // assignments — inverse side of ProductSegmentAssignment; every position
+  // this product has, ordered by position when loaded, not eager
+  @OneToMany(() => ProductSegmentAssignment, (assignment) => assignment.product)
+  assignments?: ProductSegmentAssignment[]
 
   // createdAt
   @ApiProperty()

@@ -26,18 +26,27 @@ import { UpdateConfigurableProductProvider } from './providers/update-configurab
 import { DeleteConfigurableProductProvider } from './providers/delete-configurable-product.provider'
 import { UploadConfigurableProductImageProvider } from './providers/upload-configurable-product-image.provider'
 import { DeleteConfigurableProductImageProvider } from './providers/delete-configurable-product-image.provider'
+import { ConfiguratorAssignmentsController } from './configurator-assignments.controller'
+import { ConfiguratorAssignmentsService } from './providers/configurator-assignments.service'
+import { FindOneAssignmentProvider } from './providers/find-one-assignment.provider'
+import { CreateAssignmentProvider } from './providers/create-assignment.provider'
+import { UpdateAssignmentProvider } from './providers/update-assignment.provider'
+import { DeleteAssignmentProvider } from './providers/delete-assignment.provider'
 
 // Ordering-code configurator: the admin defines reusable segment
 // definitions and assembles them into configurable products; customers
 // compose an ordering code position by position and the resolver validates
 // selections and renders the code + human summary. Fully separate from the
 // existing products module. Step 2 added the segment-definition library CRUD
-// (+ options); Step 3 adds ConfigurableProduct CRUD + image. Assignments and
-// the public resolver land in later steps (see CONFIGURATOR.md).
+// (+ options); Step 3 added ConfigurableProduct CRUD + image; Step 4 adds
+// assignments (placing a SegmentDefinition at a position inside a
+// ConfigurableProduct, with optional zero-fill conditions). The public
+// resolver lands in a later step (see CONFIGURATOR.md).
 @Module({
   controllers: [
     ConfiguratorDefinitionsController,
     ConfiguratorProductsController,
+    ConfiguratorAssignmentsController,
   ],
   providers: [
     ConfiguratorDefinitionsService,
@@ -57,6 +66,11 @@ import { DeleteConfigurableProductImageProvider } from './providers/delete-confi
     DeleteConfigurableProductProvider,
     UploadConfigurableProductImageProvider,
     DeleteConfigurableProductImageProvider,
+    ConfiguratorAssignmentsService,
+    FindOneAssignmentProvider,
+    CreateAssignmentProvider,
+    UpdateAssignmentProvider,
+    DeleteAssignmentProvider,
   ],
   imports: [
     TypeOrmModule.forFeature([

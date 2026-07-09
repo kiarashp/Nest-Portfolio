@@ -41,7 +41,7 @@ export class ProductSegmentAssignment {
   // product — the ConfigurableProduct this position belongs to; deleting
   // the product deletes its assignments
   @ApiProperty({ type: () => ConfigurableProduct })
-  @ManyToOne(() => ConfigurableProduct, {
+  @ManyToOne(() => ConfigurableProduct, (product) => product.assignments, {
     nullable: false,
     onDelete: 'CASCADE',
   })

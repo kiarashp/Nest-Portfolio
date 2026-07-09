@@ -7,9 +7,11 @@ import { UpdateConfigurableProductProvider } from './update-configurable-product
 import { DeleteConfigurableProductProvider } from './delete-configurable-product.provider'
 import { UploadConfigurableProductImageProvider } from './upload-configurable-product-image.provider'
 import { DeleteConfigurableProductImageProvider } from './delete-configurable-product-image.provider'
+import { CreateAssignmentProvider } from './create-assignment.provider'
 import { CreateConfigurableProductDto } from '../dtos/create-configurable-product.dto'
 import { UpdateConfigurableProductDto } from '../dtos/update-configurable-product.dto'
 import { GetConfiguratorProductsDto } from '../dtos/get-configurator-products.dto'
+import { CreateAssignmentDto } from '../dtos/create-assignment.dto'
 
 /**
  * Thin facade over the ConfigurableProduct CRUD and image providers, one
@@ -25,6 +27,7 @@ export class ConfiguratorProductsService {
     private readonly deleteConfigurableProductProvider: DeleteConfigurableProductProvider,
     private readonly uploadConfigurableProductImageProvider: UploadConfigurableProductImageProvider,
     private readonly deleteConfigurableProductImageProvider: DeleteConfigurableProductImageProvider,
+    private readonly createAssignmentProvider: CreateAssignmentProvider,
   ) {}
 
   public create(dto: CreateConfigurableProductDto, activeUserId: number) {
@@ -68,5 +71,13 @@ export class ConfiguratorProductsService {
       productId,
       activeUserId,
     )
+  }
+
+  public createAssignment(
+    productId: number,
+    dto: CreateAssignmentDto,
+    activeUserId: number,
+  ) {
+    return this.createAssignmentProvider.create(productId, dto, activeUserId)
   }
 }
