@@ -25,8 +25,22 @@ its steps 1–7 in order, one step per session/commit, each ending fully green.
 
 **Step 1 (module skeleton + entities + migration) is done** — `src/configurator/` has the
 four Phase-1 entities, the `SegmentDataType` enum, `ConfiguratorModule` (registered in
-`AppModule`), and migration `1783085011665-AddConfiguratorTables`. No controllers,
-providers, or routes yet. **Next: Step 2** (segment definition library CRUD + options, per
+`AppModule`), and migration `1783085011665-AddConfiguratorTables`.
+
+**Step 2 (segment definition library CRUD + options) is done** — `ConfiguratorDefinitionsController`
+(no base prefix; mixes `/configurator-definitions/*` and `/configurator-options/*` literal
+paths per CONFIGURATOR.md §5.1), `ConfiguratorDefinitionsService` facade, and single-purpose
+providers for create/find-all(paginated)/find-one/update/delete on `SegmentDefinition` plus
+create/update/delete on `SegmentOption`. `validate-segment-constraints.util.ts` does the
+per-type dispatch for the `constraints` jsonb shape (mirrors `classify-type-change.util.ts`).
+Enforced: option `value` never `'0'`; options only addable to a `SELECT` definition;
+`dataType` immutable once any `ProductSegmentAssignment` references the definition (409);
+deleting a definition RESTRICTs (409, names the product) if assigned; deleting an option
+RESTRICTs (409) if it would drop an assigned SELECT below 2 options. The "assigned" guard
+paths are exercised in `test/configurator/definitions.e2e-spec.ts` by seeding a
+`ConfigurableProduct`/`ProductSegmentAssignment` row directly through the repositories,
+since assignment creation has no route yet. No entity/migration changes were needed — Step 1
+already had the right columns. **Next: Step 3** (`ConfigurableProduct` CRUD + image, per
 `CONFIGURATOR.md` §7).
 
 ---
