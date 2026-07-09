@@ -58,7 +58,30 @@ The `products` inverse relation (`@OneToMany`) is non-eager and is never auto-lo
 
 ### Product (`src/products/entities/product.entity.ts`)
 
-Columns: `id`, `name`, `slug` (unique), `sku` (unique, nullable), `shortDescription`, `description` (nullable text), `imageUrl` (nullable), `images` (jsonb, nullable), `specs` (jsonb, nullable), `isPublished` (boolean, default false), `isFeatured` (boolean, default false — mirrors `isPublished`'s shape, surfaces the product in a featured section), `productTypeId` (FK), `createdAt`, `updatedAt`, `deletedAt` (soft-delete).
+Columns: `id`, `name`, `slug` (unique), `sku` (unique, nullable), `shortDescription`, `description` (nullable text), `descriptionHtml` (nullable text — sanitized HTML rendered from `description`, see below), `imageUrl` (nullable), `images` (jsonb, nullable), `specs` (jsonb, nullable), `isPublished` (boolean, default false), `isFeatured` (boolean, default false — mirrors `isPublished`'s shape, surfaces the product in a featured section), `productTypeId` (FK), `createdAt`, `updatedAt`, `deletedAt` (soft-delete).
+
+#### Description markdown → HTML
+
+`description` is the raw markdown an admin writes; `descriptionHtml` is sanitized HTML rendered
+from it, so clients don't need their own markdown parser/sanitizer — the same split `Post.content`/
+`Post.contentHtml` uses (see the root `CLAUDE.md`). Both providers call the shared
+`renderMarkdownToHtml` util (`src/common/utils/render-markdown-to-html.util.ts`, `marked` +
+`sanitize-html` — this single implementation backs both posts and products):
+
+- `CreateProductProvider` computes `descriptionHtml` once, up front, from `dto.description`
+  (`undefined` if no description was sent), and passes it alongside the `...dto` spread into
+  `productsRepository.create({...})`.
+- `UpdateProductProvider` re-renders `descriptionHtml` only when `description` is explicitly present
+  in the patch body (`dto.description !== undefined`, not `??`, so an omitted field leaves both
+  columns untouched) — sending `description: null` clears both `description` and `descriptionHtml`.
+
+`descriptionHtml` is **never client-settable** — absent from `CreateProductDto`/`UpdateProductDto`,
+so `forbidNonWhitelisted` 400s any direct attempt to set it, mirroring `Post.contentHtml`.
+
+A one-off backfill script, `src/database/scripts/backfill-product-description-html.ts`, re-renders
+`descriptionHtml` for products that predate the column (including soft-deleted rows) — not wired
+into any npm script, run manually the same way as `backfill-post-content-html.ts` (see the root
+`CLAUDE.md` Architecture section).
 
 One index:
 - `@Index(['productTypeId'])` at class level — B-tree index on the FK column for fast type-based filtering.

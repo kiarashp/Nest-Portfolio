@@ -1,6 +1,6 @@
 import AppDataSource from '../data-source'
 import { Post } from 'src/posts/entities/post.entity'
-import { renderMarkdownToHtml } from 'src/posts/providers/render-post-content.util'
+import { renderMarkdownToHtml } from 'src/common/utils/render-markdown-to-html.util'
 
 const BATCH_SIZE = 50
 

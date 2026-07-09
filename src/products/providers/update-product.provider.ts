@@ -14,6 +14,7 @@ import { FindOneProductProvider } from './find-one-product.provider'
 import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 import { validateSpecsAgainstType } from './validate-specs.util'
+import { renderMarkdownToHtml } from 'src/common/utils/render-markdown-to-html.util'
 
 @Injectable()
 export class UpdateProductProvider {
@@ -51,7 +52,15 @@ export class UpdateProductProvider {
     if (dto.sku !== undefined) product.sku = dto.sku
     if (dto.shortDescription !== undefined)
       product.shortDescription = dto.shortDescription
-    if (dto.description !== undefined) product.description = dto.description
+    // Re-render descriptionHtml alongside description whenever description is
+    // explicitly sent — null clears both (a resend of the same text still
+    // re-renders, which is harmless since rendering is deterministic).
+    if (dto.description !== undefined) {
+      product.description = dto.description
+      product.descriptionHtml = dto.description
+        ? renderMarkdownToHtml(dto.description)
+        : dto.description
+    }
     if (dto.imageUrl !== undefined) product.imageUrl = dto.imageUrl
     if (dto.images !== undefined) product.images = dto.images
     if (dto.specs !== undefined) product.specs = dto.specs

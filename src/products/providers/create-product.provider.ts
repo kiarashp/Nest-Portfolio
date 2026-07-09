@@ -13,6 +13,7 @@ import { CreateProductDto } from '../dto/create-product.dto'
 import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
 import { validateSpecsAgainstType } from './validate-specs.util'
+import { renderMarkdownToHtml } from 'src/common/utils/render-markdown-to-html.util'
 
 @Injectable()
 export class CreateProductProvider {
@@ -54,10 +55,15 @@ export class CreateProductProvider {
       validateSpecsAgainstType(dto.specs, type.filterableFields)
     }
 
+    const descriptionHtml = dto.description
+      ? renderMarkdownToHtml(dto.description)
+      : undefined
+
     const product = this.productsRepository.create({
       ...dto,
       isPublished: dto.isPublished ?? false,
       isFeatured: dto.isFeatured ?? false,
+      descriptionHtml,
     })
 
     try {

@@ -49,6 +49,14 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   description?: string | null
 
+  // descriptionHtml — sanitized HTML rendered from `description` at write
+  // time so clients don't need their own markdown parser/sanitizer. Never
+  // client-settable: absent from CreateProductDto/UpdateProductDto, so
+  // forbidNonWhitelisted rejects any attempt to set it directly.
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @Column({ type: 'text', nullable: true })
+  descriptionHtml?: string | null
+
   // imageUrl — main Cloudinary image (set via the /image upload endpoint)
   @ApiPropertyOptional({ type: String, nullable: true })
   @Column({ type: 'varchar', length: 1024, nullable: true })

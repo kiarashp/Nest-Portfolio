@@ -1188,6 +1188,59 @@ describe('Products (e2e)', () => {
       .expect(400)
   })
 
+  // ── descriptionHtml ───────────────────────────────────────────────────────
+
+  it('POST /products with description → 201 with sanitized descriptionHtml', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'E2E Description Html Product',
+        slug: 'e2e-description-html-product',
+        productTypeId,
+        shortDescription: 'has a markdown description',
+        description: '# Heading\n\nSome <script>alert(1)</script> text.',
+      })
+      .expect(201)
+
+    const product = (res.body as ApiResponse<Product>).data
+    expect(product.descriptionHtml).toContain('<h1>Heading</h1>')
+    expect(product.descriptionHtml).not.toContain('<script>')
+    createdProductIds.push(product.id)
+  })
+
+  it('PATCH /products/:id with a new description value re-renders descriptionHtml', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/products/${publishedProductId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ description: '## Updated Heading' })
+      .expect(200)
+
+    expect((res.body as ApiResponse<Product>).data.descriptionHtml).toContain(
+      '<h2>Updated Heading</h2>',
+    )
+  })
+
+  it('PATCH /products/:id or POST /products with descriptionHtml in the body → 400 (server-derived only)', async () => {
+    await request(app.getHttpServer())
+      .patch(`/products/${publishedProductId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ descriptionHtml: '<p>hijacked</p>' })
+      .expect(400)
+
+    await request(app.getHttpServer())
+      .post('/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'E2E DescriptionHtml Forbidden',
+        slug: 'e2e-description-html-forbidden',
+        productTypeId,
+        shortDescription: 'attempts to set descriptionHtml directly',
+        descriptionHtml: '<p>hijacked</p>',
+      })
+      .expect(400)
+  })
+
   // ── PATCH /products/:id ───────────────────────────────────────────────────
 
   it('PATCH /products/:id (ADMIN) → 200 with updated field', async () => {

@@ -2,10 +2,10 @@ import { marked } from 'marked'
 import sanitizeHtml from 'sanitize-html'
 
 /**
- * Renders a post's markdown content to sanitized HTML for storage in
- * Post.contentHtml. Runs synchronously in the request path — markdown
- * rendering is fast enough that async/queued rendering would add complexity
- * with no measurable benefit.
+ * Renders markdown to sanitized HTML for storage alongside the raw markdown
+ * source (e.g. Post.contentHtml, Product.descriptionHtml). Runs synchronously
+ * in the request path — markdown rendering is fast enough that async/queued
+ * rendering would add complexity with no measurable benefit.
  */
 export function renderMarkdownToHtml(markdown: string): string {
   const rawHtml = marked.parse(markdown, { async: false })

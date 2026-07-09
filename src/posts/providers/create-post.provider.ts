@@ -17,7 +17,7 @@ import { User } from 'src/users/entities/user.entity'
 import { PostStatus } from '../enums/postStatus.enum'
 import { AuditLogService } from 'src/audit-log/providers/audit-log.service'
 import { AuditAction } from 'src/audit-log/enums/audit-action.enum'
-import { renderMarkdownToHtml } from './render-post-content.util'
+import { renderMarkdownToHtml } from 'src/common/utils/render-markdown-to-html.util'
 
 @Injectable()
 export class CreatePostProvider {

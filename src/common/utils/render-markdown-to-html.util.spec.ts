@@ -1,7 +1,7 @@
-import { renderMarkdownToHtml } from './render-post-content.util'
+import { renderMarkdownToHtml } from './render-markdown-to-html.util'
 
-// renderMarkdownToHtml converts a post's raw markdown content to sanitized
-// HTML for storage in Post.contentHtml.
+// renderMarkdownToHtml converts raw markdown (e.g. Post.content,
+// Product.description) to sanitized HTML for storage in the paired *Html column.
 describe('renderMarkdownToHtml', () => {
   it('renders basic markdown to HTML', () => {
     const html = renderMarkdownToHtml('# Heading\n\nSome **bold** text.')
