@@ -40,7 +40,24 @@ RESTRICTs (409) if it would drop an assigned SELECT below 2 options. The "assign
 paths are exercised in `test/configurator/definitions.e2e-spec.ts` by seeding a
 `ConfigurableProduct`/`ProductSegmentAssignment` row directly through the repositories,
 since assignment creation has no route yet. No entity/migration changes were needed — Step 1
-already had the right columns. **Next: Step 3** (`ConfigurableProduct` CRUD + image, per
+already had the right columns.
+
+**Step 3 (ConfigurableProduct CRUD + image) is done** — `ConfiguratorProductsController`
+(base prefix `/configurator-products`, a single path family unlike its Step 2 sibling),
+`ConfiguratorProductsService` facade, and single-purpose providers for
+create/find-all(paginated, admin view incl. unpublished)/find-one/update/soft-delete on
+`ConfigurableProduct`, plus upload/delete for its single image slot. Image handling follows
+the avatar-options pattern (`src/users/`): `imageUrl`/`imagePublicId` are bare columns with no
+`UploadFile` row, uploaded/replaced/cleared directly via the injected `StorageProvider`
+(destroy-old-before-new on replace). `imageUrl`/`imagePublicId` are deliberately absent from
+the create/update DTOs — only reachable via `POST`/`DELETE /configurator-products/:id/image` —
+so a client can never hand-supply a Cloudinary `publicId` that a later delete call would pass
+to `StorageProvider.delete()`. Soft-deleting a product (`DELETE /configurator-products/:id`)
+deliberately keeps its Cloudinary image rather than purging it, per CONFIGURATOR.md §2.1/§7 —
+the opposite of `Product`'s soft-delete, which does purge. No entity/migration changes were
+needed — Step 1 already had every column. Covered by 36 new e2e tests in
+`test/configurator/products.e2e-spec.ts`. **Next: Step 4** (Assignments — linking
+`SegmentDefinition`s to a `ConfigurableProduct` at a position, with conditions/zero-fill, per
 `CONFIGURATOR.md` §7).
 
 ---

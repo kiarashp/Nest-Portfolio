@@ -17,16 +17,28 @@ import { DeleteSegmentDefinitionProvider } from './providers/delete-segment-defi
 import { CreateSegmentOptionProvider } from './providers/create-segment-option.provider'
 import { UpdateSegmentOptionProvider } from './providers/update-segment-option.provider'
 import { DeleteSegmentOptionProvider } from './providers/delete-segment-option.provider'
+import { ConfiguratorProductsController } from './configurator-products.controller'
+import { ConfiguratorProductsService } from './providers/configurator-products.service'
+import { CreateConfigurableProductProvider } from './providers/create-configurable-product.provider'
+import { FindAllConfigurableProductsProvider } from './providers/find-all-configurable-products.provider'
+import { FindOneConfigurableProductProvider } from './providers/find-one-configurable-product.provider'
+import { UpdateConfigurableProductProvider } from './providers/update-configurable-product.provider'
+import { DeleteConfigurableProductProvider } from './providers/delete-configurable-product.provider'
+import { UploadConfigurableProductImageProvider } from './providers/upload-configurable-product-image.provider'
+import { DeleteConfigurableProductImageProvider } from './providers/delete-configurable-product-image.provider'
 
 // Ordering-code configurator: the admin defines reusable segment
 // definitions and assembles them into configurable products; customers
 // compose an ordering code position by position and the resolver validates
 // selections and renders the code + human summary. Fully separate from the
-// existing products module. Step 2 adds the segment-definition library CRUD
-// (+ options); ConfigurableProduct CRUD, assignments, and the public resolver
-// land in later steps (see CONFIGURATOR.md).
+// existing products module. Step 2 added the segment-definition library CRUD
+// (+ options); Step 3 adds ConfigurableProduct CRUD + image. Assignments and
+// the public resolver land in later steps (see CONFIGURATOR.md).
 @Module({
-  controllers: [ConfiguratorDefinitionsController],
+  controllers: [
+    ConfiguratorDefinitionsController,
+    ConfiguratorProductsController,
+  ],
   providers: [
     ConfiguratorDefinitionsService,
     CreateSegmentDefinitionProvider,
@@ -37,6 +49,14 @@ import { DeleteSegmentOptionProvider } from './providers/delete-segment-option.p
     CreateSegmentOptionProvider,
     UpdateSegmentOptionProvider,
     DeleteSegmentOptionProvider,
+    ConfiguratorProductsService,
+    CreateConfigurableProductProvider,
+    FindAllConfigurableProductsProvider,
+    FindOneConfigurableProductProvider,
+    UpdateConfigurableProductProvider,
+    DeleteConfigurableProductProvider,
+    UploadConfigurableProductImageProvider,
+    DeleteConfigurableProductImageProvider,
   ],
   imports: [
     TypeOrmModule.forFeature([

@@ -22,7 +22,7 @@ Every write provider calls `auditLogService.log(...)` after a successful save �
 
 Two userId-source patterns:
 - `activeUser.sub` — Posts, read directly from `@ActiveUser()` decorator in the provider.
-- Threaded `activeUserId` parameter — Users, Tags, Products, AvatarOptions. The controller reads `@ActiveUser('sub') activeUserId: number`, passes it to the service method, which passes it to the provider.
+- Threaded `activeUserId` parameter — Users, Tags, Products, AvatarOptions, Configurator (`SegmentDefinition`/`SegmentOption` since Step 2, `ConfigurableProduct` since Step 3). The controller reads `@ActiveUser('sub') activeUserId: number`, passes it to the service method, which passes it to the provider.
 
 `CreateUserProvider` logs `null` as userId (self-registration; no authenticated actor).
 
