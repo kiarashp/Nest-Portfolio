@@ -32,21 +32,26 @@ import { FindOneAssignmentProvider } from './providers/find-one-assignment.provi
 import { CreateAssignmentProvider } from './providers/create-assignment.provider'
 import { UpdateAssignmentProvider } from './providers/update-assignment.provider'
 import { DeleteAssignmentProvider } from './providers/delete-assignment.provider'
+import { ConfiguratorsController } from './configurators.controller'
+import { ConfiguratorsService } from './providers/configurators.service'
+import { ConfiguratorResolverService } from './providers/configurator-resolver.service'
 
 // Ordering-code configurator: the admin defines reusable segment
 // definitions and assembles them into configurable products; customers
 // compose an ordering code position by position and the resolver validates
 // selections and renders the code + human summary. Fully separate from the
 // existing products module. Step 2 added the segment-definition library CRUD
-// (+ options); Step 3 added ConfigurableProduct CRUD + image; Step 4 adds
+// (+ options); Step 3 added ConfigurableProduct CRUD + image; Step 4 added
 // assignments (placing a SegmentDefinition at a position inside a
-// ConfigurableProduct, with optional zero-fill conditions). The public
-// resolver lands in a later step (see CONFIGURATOR.md).
+// ConfigurableProduct, with optional zero-fill conditions); Step 5 adds the
+// public endpoints — GET /configurators/:slug (form schema) and POST
+// /configurators/:slug/resolve (the resolver) — see CONFIGURATOR.md.
 @Module({
   controllers: [
     ConfiguratorDefinitionsController,
     ConfiguratorProductsController,
     ConfiguratorAssignmentsController,
+    ConfiguratorsController,
   ],
   providers: [
     ConfiguratorDefinitionsService,
@@ -71,6 +76,8 @@ import { DeleteAssignmentProvider } from './providers/delete-assignment.provider
     CreateAssignmentProvider,
     UpdateAssignmentProvider,
     DeleteAssignmentProvider,
+    ConfiguratorsService,
+    ConfiguratorResolverService,
   ],
   imports: [
     TypeOrmModule.forFeature([

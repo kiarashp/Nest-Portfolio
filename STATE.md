@@ -95,9 +95,36 @@ dependents is rejected outright (409, lists the dependent positions) — no reor
 that. Covered by 36 new e2e tests in `test/configurator/assignments.e2e-spec.ts`, built through
 the real Step 2/3 HTTP APIs (no more direct-repository assignment seeding needed, though
 `definitions.e2e-spec.ts` was left as-is — swapping it would only churn a passing suite).
-**Next: Step 5** (the resolver + public `GET /configurators/:slug` /
-`POST /configurators/:slug/resolve` endpoints, per `CONFIGURATOR.md` §7 — the largest remaining
-step).
+
+**Step 5 (resolver + public endpoints) is done** — the public surface is live: `ConfiguratorsController`
+(`/configurators`, base prefix, both routes `@Auth(AuthType.None)`) exposes `GET /configurators/:slug`
+(curated form schema per §5.2 — product header limited to name/description/imageUrl/codePrefix/separator,
+segments flattened to one object per assignment keyed by `assignmentId`, options only for SELECT) and
+`POST /configurators/:slug/resolve` (`@HttpCode(200)` — a computed result, not a created resource).
+Neither route audit-logs (reads/stateless), and `ConfiguratorsService` is the one facade that injects no
+`AuditLogService`. `FindOneConfigurableProductProvider` gained `findOneBySlugPublishedOrFail(slug)`
+(`isPublished: true` + soft-delete auto-exclusion → public 404s for drafts, same rule as `Product`),
+sharing the ordered assignment-tree `relations`/`order` constants with the admin `findOneByIdOrFail`.
+`ConfiguratorResolverService` implements the §4.3 algorithm as a dependency-free `@Injectable`
+(unit-tested via `new`, in-memory §6 fixture): single forward pass in position order, all errors
+collected (never stops at the first), inactive segments zero-fill and are omitted from the summary,
+`code`/`summary` keys present only when valid, and a per-segment `segments` state array on every
+response (errored segments echo the raw input). The pure pieces are six utils in
+`src/configurator/providers/` (each with a colocated spec): `render-zero-fill`, `evaluate-condition`
+(cascade rule: inactive controller → false for every operator incl. `neq`), `validate-segment-value`
+(NUMBER normalizes `'50'`→`'0050'`; STRING `'0'` reserved; SELECT exact case-sensitive),
+`render-meaning` (`{value}` always, `{label}` SELECT-only), `parse-selections` (malformed shape → 400),
+and `build-form-schema` — placed in `providers/` alongside the Step 2/4 utils, a **user-confirmed
+deviation** from CONFIGURATOR.md's literal `utils/` wording. Two further user-confirmed edge decisions
+(documented in the new `src/configurator/CLAUDE.md`): unknown-but-well-formed selection keys are
+silently ignored (stale form after an admin edit must not hard-fail), and a dependent whose controller
+is active-but-errored zero-fills (cascade rule extended — no derived error, the result is already
+invalid via the controller's own error). No entity/migration changes; no per-route throttle (global
+default suffices). Covered by 20 new e2e tests in `test/configurator/resolve.e2e-spec.ts` (seeds the
+§6 worked example through the real admin HTTP API; asserts every §6 bullet plus 404/400 shapes)
+and ~71 new unit tests. **Next: Step 6** (Phase 2 — `SavedConfiguration` entity + migration,
+`POST /configurators/:slug/save` with server-side re-resolve + snapshot, owner-scoped
+`GET`/`DELETE /saved-configurations`, per `CONFIGURATOR.md` §7).
 
 ---
 
