@@ -122,9 +122,40 @@ is active-but-errored zero-fills (cascade rule extended — no derived error, th
 invalid via the controller's own error). No entity/migration changes; no per-route throttle (global
 default suffices). Covered by 20 new e2e tests in `test/configurator/resolve.e2e-spec.ts` (seeds the
 §6 worked example through the real admin HTTP API; asserts every §6 bullet plus 404/400 shapes)
-and ~71 new unit tests. **Next: Step 6** (Phase 2 — `SavedConfiguration` entity + migration,
-`POST /configurators/:slug/save` with server-side re-resolve + snapshot, owner-scoped
-`GET`/`DELETE /saved-configurations`, per `CONFIGURATOR.md` §7).
+and ~71 new unit tests.
+
+**Step 6 (Phase 2 — SavedConfiguration) is done** — registered users can now persist frozen
+snapshots of resolved configurations. New entity `SavedConfiguration`
+(`configurator_saved_configuration`, migration `1783690069236-AddConfiguratorSavedConfiguration`;
+also added to `data-source.ts`): `userId` FK → `user` `ON DELETE CASCADE`, nullable `productId`
+FK → `configurator_product` `ON DELETE SET NULL` (the row survives a hard product delete;
+soft-delete doesn't touch it), snapshot columns `productName`/`code`/`summary` (jsonb
+`string[]`)/`selections` (jsonb raw map), and a nullable `quoteRequestedAt` column that ships
+now but is only written by Step 7's request-quote endpoint. No inverse relation on `User`
+(matches `UploadFile.userId`), no soft delete (only `ConfigurableProduct` soft-deletes).
+`POST /configurators/:slug/save` lives on the existing `ConfiguratorsController` (same path
+family; `@Auth(AuthType.None)` there is per-route, so this one handler is plain Bearer + bare
+`@ApiAuth()`) but delegates to a new `SavedConfigurationsService` facade — keeping
+`ConfiguratorsService` the one facade with no `AuditLogService`. Save re-resolves server-side
+via `FindOneConfigurableProductProvider.findOneBySlugPublishedOrFail` +
+`ConfiguratorResolverService` (never trusts a client-composed code; unknown/unpublished/deleted
+slug → 404) and rejects an invalid resolve with 400 carrying the resolver's per-segment error
+messages as a class-validator-style string array. `SavedConfigurationsController`
+(`/saved-configurations`, base prefix, all routes bare `@ApiAuth()` — any authenticated role)
+exposes `GET /` (paginated, `paginateQueryBuilder` for the guaranteed `createdAt DESC, id DESC`
+ordering, contact-inbox reasoning) plus `GET`/`DELETE /:id`. Ownership is enforced by scoping
+the lookup `where: { id, userId }` and throwing `NotFoundException` — a foreign snapshot 404s
+exactly like a missing id (spec wants 404, not the posts-style 403, so ids can't be probed).
+Deletes are hard deletes returning `DeleteResultDto`; audit logs: `CREATE`/`DELETE` on entity
+`'SavedConfiguration'`. Covered by 17 new e2e tests in
+`test/configurator/saved-configurations.e2e-spec.ts` (built through the real admin HTTP API;
+includes the §2.5 snapshot-immutability proof: option relabel + product soft-delete leave a
+saved snapshot's `code`/`summary` byte-identical). No new unit tests — the only logic (the
+resolver) was already unit-tested in Step 5. `openapi-types.ts` regen deliberately deferred to
+Step 7 per CONFIGURATOR.md §7 (end-of-phase). **Next: Step 7** (request-quote:
+`POST /saved-configurations/:id/request-quote`, `quoteRequestedAt` idempotency 409,
+`AppEvents.QUOTE_REQUESTED` → listener → `MailService.sendQuoteRequestMail()`,
+`QUOTE_NOTIFY_EMAIL` optional env, per `CONFIGURATOR.md` §5.3/§7).
 
 ---
 

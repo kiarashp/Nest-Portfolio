@@ -13,6 +13,7 @@ import { ConfigurableProduct } from 'src/configurator/entities/configurable-prod
 import { SegmentDefinition } from 'src/configurator/entities/segment-definition.entity'
 import { SegmentOption } from 'src/configurator/entities/segment-option.entity'
 import { ProductSegmentAssignment } from 'src/configurator/entities/product-segment-assignment.entity'
+import { SavedConfiguration } from 'src/configurator/entities/saved-configuration.entity'
 
 config({ path: `.env.${process.env.NODE_ENV ?? 'development'}` })
 
@@ -37,6 +38,7 @@ export default new DataSource({
     SegmentDefinition,
     SegmentOption,
     ProductSegmentAssignment,
+    SavedConfiguration,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,

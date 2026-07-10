@@ -18,7 +18,7 @@ Defined in `src/auth/enums/user-role.enum.ts`:
 
 | Role | What they can do |
 |---|---|
-| `USER` | Read-only for now |
+| `USER` | Read-only on staff-managed content; self-service writes only (own profile/avatar, own configurator saved configurations) |
 | `EDITOR` | Create/update/delete/upload images for **their own posts** only |
 | `AUTHOR` | Create/update/delete/upload images for **any post** |
 | `ADMIN` | Full access — same as AUTHOR plus user management |

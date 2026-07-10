@@ -8,7 +8,7 @@ The ordering-code configurator: the admin defines reusable segment definitions a
 
 ## Module structure
 
-Four entities, four controllers, four service facades, single-purpose providers, and a set of pure utils.
+Five entities, five controllers, five service facades, single-purpose providers, and a set of pure utils.
 
 ```
 src/configurator/
@@ -17,24 +17,28 @@ src/configurator/
     segment-definition.entity.ts        — exports StringConstraints / NumberConstraints / SegmentConstraints
     segment-option.entity.ts            — SELECT choices, onDelete: CASCADE from definition
     product-segment-assignment.entity.ts — exports AssignmentCondition; (productId, position) unique
+    saved-configuration.entity.ts       — Phase 2 frozen snapshot; userId FK CASCADE, productId FK SET NULL, no soft delete
   enums/
     segment-data-type.enum.ts           — STRING | NUMBER | SELECT
   dtos/                                  — create/update/get DTOs per entity, plus:
     configurator-form-schema.dto.ts     — response-only classes for GET /configurators/:slug
-    resolve-configuration.dto.ts        — { selections: Record<string, string> } (@IsObject only — deep validation in parse-selections.util)
+    resolve-configuration.dto.ts        — { selections: Record<string, string> } (@IsObject only — deep validation in parse-selections.util); also the save body
     resolve-result.dto.ts               — ResolveResultDto / ResolveErrorDto / ResolveSegmentStateDto
+    get-saved-configurations.dto.ts     — pagination only
   providers/
     configurator-definitions.service.ts — facade: SegmentDefinition + SegmentOption CRUD (Step 2)
     configurator-products.service.ts    — facade: ConfigurableProduct CRUD + image + assignment create (Steps 3–4)
     configurator-assignments.service.ts — facade: assignment update/delete (Step 4)
     configurators.service.ts            — facade: the two public endpoints (Step 5); no AuditLogService
+    saved-configurations.service.ts     — facade: save/list/get/delete snapshots (Step 6)
     configurator-resolver.service.ts    — the §4.3 resolve algorithm; @Injectable but dependency-free
     <single-purpose providers>          — create/find/update/delete per entity, image upload/delete
     <pure utils, *.util.ts>             — see below; each has a colocated *.spec.ts
   configurator-definitions.controller.ts — admin; NO base prefix (mixes /configurator-definitions/* and /configurator-options/*)
   configurator-products.controller.ts    — admin; /configurator-products (+ POST :id/assignments)
   configurator-assignments.controller.ts — admin; /configurator-assignments/:assignmentId
-  configurators.controller.ts            — PUBLIC; /configurators/:slug and /configurators/:slug/resolve
+  configurators.controller.ts            — PUBLIC; /configurators/:slug and /configurators/:slug/resolve, plus the Bearer-only POST /configurators/:slug/save
+  saved-configurations.controller.ts     — authenticated (any role); owner-scoped /saved-configurations[/:id]
   configurator.module.ts
 ```
 
@@ -72,6 +76,17 @@ Behavior contract (§4.3 plus two user-confirmed edge decisions):
 - Condition evaluation (`evaluate-condition.util.ts`) order: inactive controller → `false` for **every** operator including `neq` (the cascade rule); errored controller (`value: null`) → `false`; then SELECT string `eq`/`neq` or NUMBER numeric compare (`between` inclusive).
 - Summary lines come from `render-meaning.util.ts`: `{value}` is always replaced; `{label}` only for SELECT segments (the matched option's label).
 
+## Saved configurations (Step 6, Phase 2)
+
+`SavedConfiguration` is a **frozen snapshot** (§2.5): `productName`, `code`, `summary` (jsonb `string[]`), and the raw `selections` map are copied at save time and never re-resolved — admin edits to definitions/options/products afterwards have zero effect on saved rows (e2e-proven: option relabel + product soft-delete leave a snapshot byte-identical). `productId` exists for listing/filtering only and is `SET NULL` on a hard product delete; `userId` is `CASCADE`, so deleting a user removes their snapshots at the DB level (nothing in `RemoveOneByIdProvider` needs to know). `quoteRequestedAt` is a Step-6 column written only by Step 7's request-quote endpoint.
+
+Non-obvious wiring:
+
+- **`POST /configurators/:slug/save` lives on `ConfiguratorsController`** (the slug belongs to that path family) but delegates to `SavedConfigurationsService`, not `ConfiguratorsService` — the latter stays the one facade with no `AuditLogService`. `@Auth(AuthType.None)` on the sibling routes is per-route, so `save` is plain Bearer (any role, bare `@ApiAuth()`).
+- **Save re-resolves server-side** (`findOneBySlugPublishedOrFail` + `ConfiguratorResolverService`) and never trusts a client-composed code. An invalid resolve → 400 whose `message` is the resolver's per-segment error messages as a string array (the class-validator 400 shape). Unknown/unpublished/soft-deleted slug → 404, same rule as resolve.
+- **Ownership → 404, not 403.** `FindOneSavedConfigurationProvider.findOneOwnedOrFail(id, userId)` scopes the query `where: { id, userId }`, so a foreign snapshot is indistinguishable from a missing id — deliberately unlike the posts `FindOnePostForEditProvider` 403 pattern, per §5.3.
+- List ordering uses `paginateQueryBuilder` purely for the guaranteed `createdAt DESC, id DESC` (the contact-inbox reasoning); deletes are hard (`DeleteResultDto`); audit entity string is `'SavedConfiguration'`.
+
 ## Non-obvious admin-side rules (Steps 2–4)
 
 Detail lives in the root `CLAUDE.md` architecture paragraph and `STATE.md`; headlines only:
@@ -84,4 +99,4 @@ Detail lives in the root `CLAUDE.md` architecture paragraph and `STATE.md`; head
 ## Testing
 
 - Pure utils and the resolver have colocated `*.spec.ts` unit tests (plain Jest, no `TestingModule`); the resolver spec builds the §6 fixture in memory.
-- e2e: `test/configurator/definitions.e2e-spec.ts`, `products.e2e-spec.ts`, `assignments.e2e-spec.ts`, `resolve.e2e-spec.ts`. The resolve suite seeds the §6 worked example through the real admin HTTP API (four products: published, unpublished, soft-deleted, and a STRING-segment one) and exercises every §6 bullet tokenlessly.
+- e2e: `test/configurator/definitions.e2e-spec.ts`, `products.e2e-spec.ts`, `assignments.e2e-spec.ts`, `resolve.e2e-spec.ts`, `saved-configurations.e2e-spec.ts`. The resolve suite seeds the §6 worked example through the real admin HTTP API (four products: published, unpublished, soft-deleted, and a STRING-segment one) and exercises every §6 bullet tokenlessly. The saved-configurations suite uses a compact two-segment fixture, three users (admin/owner/other), and ends with the snapshot-immutability proof — it mutates the shared fixture (option relabel, product soft-delete), so its immutability describe must stay last in the file.

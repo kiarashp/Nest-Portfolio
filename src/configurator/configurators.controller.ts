@@ -9,23 +9,32 @@ import {
 } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ConfiguratorsService } from './providers/configurators.service'
+import { SavedConfigurationsService } from './providers/saved-configurations.service'
 import { ConfiguratorFormSchemaDto } from './dtos/configurator-form-schema.dto'
 import { ResolveConfigurationDto } from './dtos/resolve-configuration.dto'
 import { ResolveResultDto } from './dtos/resolve-result.dto'
+import { SavedConfiguration } from './entities/saved-configuration.entity'
 import { ApiDataResponse } from 'src/common/swagger/api-response.helpers'
+import { ApiAuth } from 'src/common/swagger/api-auth.helpers'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { AuthType } from 'src/auth/enums/auth-type.enum'
+import { ActiveUser } from 'src/auth/decorators/active-user.decorator'
 
 /**
- * Public configurator endpoints (CONFIGURATOR.md §5.2, §7 Step 5): guests and
- * customers fetch a published configurator's form schema and resolve their
- * selections into an ordering code. Both routes are unauthenticated; the
- * global throttle default is sufficient, so there is no per-route @Throttle.
+ * Customer-facing configurator endpoints (CONFIGURATOR.md §5.2/§5.3, §7
+ * Steps 5–6): guests and customers fetch a published configurator's form
+ * schema and resolve their selections into an ordering code — both
+ * unauthenticated — while registered users can additionally save a frozen
+ * snapshot of a valid resolve (Bearer-only). The global throttle default is
+ * sufficient, so there is no per-route @Throttle.
  */
 @ApiTags('Configurators (public)')
 @Controller('configurators')
 export class ConfiguratorsController {
-  constructor(private readonly configuratorsService: ConfiguratorsService) {}
+  constructor(
+    private readonly configuratorsService: ConfiguratorsService,
+    private readonly savedConfigurationsService: SavedConfigurationsService,
+  ) {}
 
   /**
    * get the public form schema for a published configurator by slug —
@@ -66,5 +75,36 @@ export class ConfiguratorsController {
     @Body() dto: ResolveConfigurationDto,
   ) {
     return this.configuratorsService.resolve(slug, dto)
+  }
+
+  /**
+   * save a frozen snapshot of a resolved configuration for the calling user —
+   * the server re-resolves the selections itself and never trusts a
+   * client-composed code; an invalid resolve is rejected with 400. Bearer
+   * auth (any role) — the only authenticated route on this controller.
+   */
+  @ApiOperation({
+    summary: 'Save a snapshot of a resolved configuration (authenticated)',
+  })
+  @ApiAuth()
+  @ApiDataResponse(SavedConfiguration, {
+    status: 201,
+    description: 'Snapshot saved',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Malformed selections object, or the resolve is invalid',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Configurator not found or not published',
+  })
+  @Post(':slug/save')
+  public save(
+    @Param('slug') slug: string,
+    @Body() dto: ResolveConfigurationDto,
+    @ActiveUser('sub') userId: number,
+  ) {
+    return this.savedConfigurationsService.save(slug, dto, userId)
   }
 }

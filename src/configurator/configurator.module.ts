@@ -35,6 +35,13 @@ import { DeleteAssignmentProvider } from './providers/delete-assignment.provider
 import { ConfiguratorsController } from './configurators.controller'
 import { ConfiguratorsService } from './providers/configurators.service'
 import { ConfiguratorResolverService } from './providers/configurator-resolver.service'
+import { SavedConfiguration } from './entities/saved-configuration.entity'
+import { SavedConfigurationsController } from './saved-configurations.controller'
+import { SavedConfigurationsService } from './providers/saved-configurations.service'
+import { SaveConfigurationProvider } from './providers/save-configuration.provider'
+import { FindMySavedConfigurationsProvider } from './providers/find-my-saved-configurations.provider'
+import { FindOneSavedConfigurationProvider } from './providers/find-one-saved-configuration.provider'
+import { DeleteSavedConfigurationProvider } from './providers/delete-saved-configuration.provider'
 
 // Ordering-code configurator: the admin defines reusable segment
 // definitions and assembles them into configurable products; customers
@@ -43,15 +50,19 @@ import { ConfiguratorResolverService } from './providers/configurator-resolver.s
 // existing products module. Step 2 added the segment-definition library CRUD
 // (+ options); Step 3 added ConfigurableProduct CRUD + image; Step 4 added
 // assignments (placing a SegmentDefinition at a position inside a
-// ConfigurableProduct, with optional zero-fill conditions); Step 5 adds the
+// ConfigurableProduct, with optional zero-fill conditions); Step 5 added the
 // public endpoints — GET /configurators/:slug (form schema) and POST
-// /configurators/:slug/resolve (the resolver) — see CONFIGURATOR.md.
+// /configurators/:slug/resolve (the resolver); Step 6 adds Phase 2's
+// SavedConfiguration — frozen snapshots of resolved configurations owned by
+// registered users (POST /configurators/:slug/save + the owner-scoped
+// /saved-configurations routes) — see CONFIGURATOR.md.
 @Module({
   controllers: [
     ConfiguratorDefinitionsController,
     ConfiguratorProductsController,
     ConfiguratorAssignmentsController,
     ConfiguratorsController,
+    SavedConfigurationsController,
   ],
   providers: [
     ConfiguratorDefinitionsService,
@@ -78,6 +89,11 @@ import { ConfiguratorResolverService } from './providers/configurator-resolver.s
     DeleteAssignmentProvider,
     ConfiguratorsService,
     ConfiguratorResolverService,
+    SavedConfigurationsService,
+    SaveConfigurationProvider,
+    FindMySavedConfigurationsProvider,
+    FindOneSavedConfigurationProvider,
+    DeleteSavedConfigurationProvider,
   ],
   imports: [
     TypeOrmModule.forFeature([
@@ -85,6 +101,7 @@ import { ConfiguratorResolverService } from './providers/configurator-resolver.s
       SegmentDefinition,
       SegmentOption,
       ProductSegmentAssignment,
+      SavedConfiguration,
     ]),
     AuditLogModule,
     PaginationModule,
