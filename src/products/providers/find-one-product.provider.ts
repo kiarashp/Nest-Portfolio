@@ -82,4 +82,24 @@ export class FindOneProductProvider {
     }
     return product
   }
+
+  /**
+   * Public-facing lookup by SKU — same published-only rule as the slug variant.
+   */
+  public async findOneBySkuOrFail(sku: string): Promise<Product> {
+    let product: Product | null = null
+    try {
+      product = await this.productsRepository.findOne({
+        where: { sku, isPublished: true },
+      })
+    } catch {
+      throw new RequestTimeoutException(
+        'Unable to process your request, please try again later',
+      )
+    }
+    if (!product) {
+      throw new NotFoundException(`Product with SKU "${sku}" not found`)
+    }
+    return product
+  }
 }

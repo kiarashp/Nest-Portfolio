@@ -73,6 +73,7 @@ describe('Products (e2e)', () => {
   const PASSWORD = 'Password1!'
 
   const PUBLISHED_SLUG = 'e2e-product-published'
+  const PUBLISHED_SKU = 'E2E-SKU-001'
 
   beforeAll(async () => {
     ;({ app, dataSource } = await createApp({
@@ -172,6 +173,7 @@ describe('Products (e2e)', () => {
       .send({
         name: 'E2E Thermocouple',
         slug: PUBLISHED_SLUG,
+        sku: PUBLISHED_SKU,
         productTypeId,
         shortDescription: 'Thermocouple for e2e tests',
         specs: { tempRange: 1260, sheathMaterial: 'Inconel 600' },
@@ -827,6 +829,60 @@ describe('Products (e2e)', () => {
   it('GET /products/slug/:slug?includeRelated=-1 → 400', async () => {
     await request(app.getHttpServer())
       .get(`/products/slug/${PUBLISHED_SLUG}?includeRelated=-1`)
+      .expect(400)
+  })
+
+  // ── GET /products/sku/:sku ────────────────────────────────────────────────
+
+  it('GET /products/sku/:sku → 200 with published product', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/sku/${PUBLISHED_SKU}`)
+      .expect(200)
+
+    const p = (res.body as ApiResponse<Product>).data
+    expect(p.id).toBe(publishedProductId)
+    expect(p.sku).toBe(PUBLISHED_SKU)
+  })
+
+  it('GET /products/sku/ghost-sku → 404', async () => {
+    await request(app.getHttpServer())
+      .get('/products/sku/ghost-sku')
+      .expect(404)
+  })
+
+  it('GET /products/sku/:sku (no includeRelated) → response has no related key', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/sku/${PUBLISHED_SKU}`)
+      .expect(200)
+
+    const p = res.body as ApiResponse<Record<string, unknown>>
+    expect(p.data).not.toHaveProperty('related')
+  })
+
+  it('GET /products/sku/:sku?includeRelated=2 → embeds up to 2 related products', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/products/sku/${PUBLISHED_SKU}?includeRelated=2`)
+      .expect(200)
+
+    const p = (res.body as ApiResponse<Product>).data
+    expect(Array.isArray(p.related)).toBe(true)
+    expect(p.related!.length).toBeLessThanOrEqual(2)
+    for (const r of p.related!) {
+      expect(r.id).not.toBe(p.id)
+      expect(r.productTypeId).toBe(productTypeId)
+      expect(r.isPublished).toBe(true)
+    }
+  })
+
+  it('GET /products/sku/:sku?includeRelated=0 → 400', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/sku/${PUBLISHED_SKU}?includeRelated=0`)
+      .expect(400)
+  })
+
+  it('GET /products/sku/:sku?includeRelated=-1 → 400', async () => {
+    await request(app.getHttpServer())
+      .get(`/products/sku/${PUBLISHED_SKU}?includeRelated=-1`)
       .expect(400)
   })
 

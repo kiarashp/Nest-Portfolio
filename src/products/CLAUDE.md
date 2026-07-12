@@ -17,7 +17,7 @@ src/products/
     create-product.dto.ts
     update-product.dto.ts
     get-products.dto.ts         — extends PaginationQueryDto; adds productTypeId, typeSlug, q, sortBy, order, isPublished, isFeatured, specs
-    get-product-by-slug.dto.ts  — includeRelated for GET /products/slug/:slug
+    get-product-by-slug.dto.ts  — includeRelated for GET /products/slug/:slug and GET /products/sku/:sku
   providers/
     find-all-product-types.provider.ts
     find-one-product-type.provider.ts   — by id or by slug
@@ -101,9 +101,10 @@ In `ProductTypesController`, `GET /product-types/slug/:slug` must be declared **
 In `ProductsController`, these routes are declared **before** `GET /:id`:
 
 1. `GET /slug/:slug` — if declared after `/:id`, NestJS tries to pass the literal `"slug"` through `ParseIntPipe` and throws 400.
-2. `GET /admin` — same reason: `"admin"` fails `ParseIntPipe`.
-3. `GET /:id/admin` — declared before `GET /:id` (though it would also work after, since `ParseIntPipe` only applies to the `:id` segment and the extra `/admin` segment makes the path more specific — kept before `/:id` for readability, matching the `/admin` list route above it).
-4. `POST /:id/images`, `GET /:id/images`, `GET /:id/images/:fileId`, `DELETE /:id/images/:fileId`, `GET /:id/related` — `ParseIntPipe` is on the `:id`/`:fileId` segments, so these are fine in any order relative to `/:id` (longer path and/or different HTTP method).
+2. `GET /sku/:sku` — same reason: `"sku"` fails `ParseIntPipe`. Declared directly after `GET /slug/:slug`, an exact structural mirror of it (see the `GET /products/slug/:slug?includeRelated=N` note below).
+3. `GET /admin` — same reason: `"admin"` fails `ParseIntPipe`.
+4. `GET /:id/admin` — declared before `GET /:id` (though it would also work after, since `ParseIntPipe` only applies to the `:id` segment and the extra `/admin` segment makes the path more specific — kept before `/:id` for readability, matching the `/admin` list route above it).
+5. `POST /:id/images`, `GET /:id/images`, `GET /:id/images/:fileId`, `DELETE /:id/images/:fileId`, `GET /:id/related` — `ParseIntPipe` is on the `:id`/`:fileId` segments, so these are fine in any order relative to `/:id` (longer path and/or different HTTP method).
 
 ## FindOneProductProvider — four methods
 
@@ -115,12 +116,15 @@ In `ProductsController`, these routes are declared **before** `GET /:id`:
 | `findOneByIdOrFail(id)` | none (includes drafts) | 404 if not found |
 | `findOnePublishedByIdOrFail(id)` | `isPublished: true` | 404 if not found **or** draft |
 | `findOneBySlugOrFail(slug)` | `isPublished: true` | 404 if not found **or** draft |
+| `findOneBySkuOrFail(sku)` | `isPublished: true` | 404 if not found **or** draft |
 
-Write routes (`UpdateProductProvider`, `DeleteProductProvider`, `UploadProductImageProvider`) call `findOneByIdOrFail` — admins need to edit drafts. Public routes (`ProductsController.findOne`, `findBySlug`) call the published-only variants so drafts are invisible. `GET /products/:id/admin` (`ProductsController.findOneForEdit` → `ProductsService.findOneForEdit`, ADMIN-only) also calls `findOneByIdOrFail` directly — it's the single-product counterpart to `GET /products/admin` used by the admin edit form, since `GET /products/:id` cannot return a draft. Unlike the posts equivalent (`GET /posts/:id/admin`), there's no ownership check to layer on — product writes are already ADMIN-only, with no EDITOR-owns-own-product concept.
+Write routes (`UpdateProductProvider`, `DeleteProductProvider`, `UploadProductImageProvider`) call `findOneByIdOrFail` — admins need to edit drafts. Public routes (`ProductsController.findOne`, `findBySlug`, `findBySku`) call the published-only variants so drafts are invisible. `GET /products/:id/admin` (`ProductsController.findOneForEdit` → `ProductsService.findOneForEdit`, ADMIN-only) also calls `findOneByIdOrFail` directly — it's the single-product counterpart to `GET /products/admin` used by the admin edit form, since `GET /products/:id` cannot return a draft. Unlike the posts equivalent (`GET /posts/:id/admin`), there's no ownership check to layer on — product writes are already ADMIN-only, with no EDITOR-owns-own-product concept.
 
 `FindRelatedProductsProvider` (`GET /products/:id/related`) reuses `findOnePublishedByIdOrFail` to resolve and validate the anchor product — a missing or unpublished/draft id 404s exactly like `GET /products/:id`. It then runs a plain `productsRepository.find()` (not a `SelectQueryBuilder` — no jsonb/spec filtering is needed) on `productTypeId = anchor.productTypeId AND id != anchor.id AND isPublished = true`, ordered `createdAt DESC` with an `id` tiebreaker, capped by an optional `?limit=` query param (default 4, max 20). There is no fallback to other product types, so the result can be shorter than `limit` or empty. Read-only — no audit log entry is written.
 
 **`GET /products/slug/:slug?includeRelated=N`:** avoids a two-request waterfall (slug→id, then id→related) for a slug-only product detail page. `GetProductBySlugDto.includeRelated` (optional int, 1-20, same validation shape as `GetRelatedProductsDto.limit`) is read by `ProductsController.findBySlug` and passed to `ProductsService.findBySlug(slug, includeRelated?)`, which composes the two existing providers directly in the service facade (no new provider class — this is simple orchestration, not new business logic): it calls `FindOneProductProvider.findOneBySlugOrFail`, and when `includeRelated !== undefined` also calls `FindRelatedProductsProvider.findRelated(product.id, includeRelated)` and assigns the result to `product.related` before returning. `Product.related` is a transient (non-column) field, the same pattern as `ProductType.productCount` — it stays `undefined` (and is therefore omitted from the JSON response) unless `includeRelated` is sent, so every existing caller of the slug route is unaffected.
+
+**`GET /products/sku/:sku?includeRelated=N`:** an exact structural mirror of the slug route above, added so a frontend "scan/type a code" UI (`Product.sku` is the field meant for this — unique, nullable, no format constraint, purely a frontend UI concern) can resolve a SKU straight to a product without a slug in hand. `ProductsController.findBySku` reuses the same `GetProductBySlugDto` (it's generic, not slug-specific — no separate DTO). `ProductsService.findBySku(sku, includeRelated?)` composes `FindOneProductProvider.findOneBySkuOrFail` + `FindRelatedProductsProvider.findRelated` identically to `findBySlug`.
 
 ## Nullable field updates
 

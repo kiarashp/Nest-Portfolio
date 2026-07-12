@@ -98,6 +98,25 @@ export class ProductsController {
   }
 
   /**
+   * get a single published product by SKU — public
+   * Declared before /:id so NestJS does not try to parse "sku" as an integer.
+   */
+  @Auth(AuthType.None)
+  @ApiOperation({ summary: 'Get a published product by SKU' })
+  @ApiDataResponse(Product)
+  @ApiResponse({
+    status: 404,
+    description: 'Product not found or not published',
+  })
+  @Get('sku/:sku')
+  public findBySku(
+    @Param('sku') sku: string,
+    @Query() dto: GetProductBySlugDto,
+  ) {
+    return this.productsService.findBySku(sku, dto.includeRelated)
+  }
+
+  /**
    * list all products regardless of isPublished (admin only)
    * Declared before /:id so NestJS does not try to parse "admin" as an integer.
    */

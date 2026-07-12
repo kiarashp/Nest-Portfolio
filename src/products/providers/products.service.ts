@@ -93,6 +93,20 @@ export class ProductsService {
     return product
   }
 
+  public async findBySku(
+    sku: string,
+    includeRelated?: number,
+  ): Promise<Product> {
+    const product = await this.findOneProductProvider.findOneBySkuOrFail(sku)
+    if (includeRelated !== undefined) {
+      product.related = await this.findRelatedProductsProvider.findRelated(
+        product.id,
+        includeRelated,
+      )
+    }
+    return product
+  }
+
   public findRelated(id: number, limit?: number): Promise<Product[]> {
     return this.findRelatedProductsProvider.findRelated(id, limit)
   }

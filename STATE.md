@@ -244,26 +244,25 @@ No engagement tracking. Needs:
 
 ---
 
-### Add `GET /products/sku/:sku` lookup endpoint
+### Add `GET /products/sku/:sku` lookup endpoint — done
 
-**Why:** The frontend wants a UI where a user types/scans a short code (e.g. into
-a row of boxes, like `TC-K-1260-IC`) to jump straight to a specific product —
-similar to a barcode lookup. `Product.sku` (`product.entity.ts`) already exists
-as exactly the right field for this: unique, optional, varchar. What's missing
-is a way to resolve a SKU into a product — there is currently a
-`GET /products/slug/:slug` route but **no** `GET /products/sku/:sku` equivalent,
-so the frontend has no endpoint to call.
+Implemented as an exact structural mirror of `GET /products/slug/:slug`:
+`FindOneProductProvider.findOneBySkuOrFail` (published-only, 404 on miss),
+`ProductsService.findBySku` (same `includeRelated` composition, reusing
+`GetProductBySlugDto` as-is — it was already generic, not slug-specific), and
+`ProductsController.findBySku` (`GET /products/sku/:sku`, declared right after
+`slug/:slug` and before any `/:id` route for the usual `ParseIntPipe` reason).
 
-**What to do:** Add `GET /products/sku/:sku` to `ProductsController`, mirroring
-the existing slug lookup (`FindOneProductProvider.findOneBySlugOrFail` pattern —
-add a `findOneBySkuOrFail`, published-only, 404 if not found or draft). Route
-ordering doesn't matter relative to `/:id` since `/sku` is a literal segment,
-same as `/slug`. Document with the existing OpenAPI helpers
-(`ApiDataResponse(Product)`), same as the slug route.
+**Open question resolved with the user:** keep `sku` backend-agnostic — no DTO
+validation changes to `CreateProductDto`/`UpdateProductDto`. Fixed-width/format
+enforcement (if ever needed for a "boxes" UI) stays a frontend concern.
+`?includeRelated=N` was confirmed in scope, to keep the two identifier-lookup
+routes symmetric.
 
-**Open question (needs an answer before/while implementing):** `sku` is a free-form
-`varchar(128)` today with no length/format constraint. If the frontend UI is a
-fixed row of boxes (e.g. exactly 10 characters), should the backend enforce a
-fixed length/charset on `sku` (via DTO validation, e.g. `@Length(10, 10)` /
-a regex), or should the format stay backend-agnostic and be purely a frontend
-UI concern? Decide this before building the endpoint, since it affects the DTO.
+Covered by 6 new e2e tests in `test/products/products.e2e-spec.ts` (200, 404,
+no-includeRelated, includeRelated=2, includeRelated=0/-1 → 400), added right
+after the existing slug test block; the shared seeded product (`PUBLISHED_SLUG`)
+now also carries a `PUBLISHED_SKU`. Full suite green: 46 unit test files (231
+tests) and 32 e2e test files (543 tests). No entity/migration/DTO changes.
+`openapi-types.ts` regeneration is the usual manual step
+(`pnpm run generate:types` against the dev DB) — not run as part of this change.
