@@ -2,8 +2,11 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
+  Post,
   Query,
   Req,
 } from '@nestjs/common'
@@ -86,5 +89,29 @@ export class SavedConfigurationsController {
     @ActiveUser('sub') userId: number,
   ) {
     return this.savedConfigurationsService.delete(id, userId)
+  }
+
+  /**
+   * request a quote for one of the calling user's saved configurations —
+   * stamps quoteRequestedAt and emails the site owner; 404 when the id is
+   * missing or owned by another user, 409 if a quote was already requested
+   */
+  @ApiOperation({
+    summary: "Request a quote for one of the caller's saved configurations",
+  })
+  @ApiAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiDataResponse(SavedConfiguration)
+  @ApiResponse({
+    status: 404,
+    description: 'Saved configuration not found (or not owned by the caller)',
+  })
+  @ApiResponse({ status: 409, description: 'Quote already requested' })
+  @Post(':id/request-quote')
+  public requestQuote(
+    @Param('id', ParseIntPipe) id: number,
+    @ActiveUser('sub') userId: number,
+  ) {
+    return this.savedConfigurationsService.requestQuote(id, userId)
   }
 }

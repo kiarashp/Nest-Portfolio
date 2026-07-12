@@ -30,6 +30,8 @@ describe('Configurator saved configurations (e2e)', () => {
   let segmentDefinitionRepo: Repository<SegmentDefinition>
   let configurableProductRepo: Repository<ConfigurableProduct>
 
+  const sendQuoteRequestMailMock = jest.fn().mockResolvedValue(undefined)
+
   const ADMIN_EMAIL = 'configurator-saved-admin@e2e.test'
   const OWNER_EMAIL = 'configurator-saved-owner@e2e.test'
   const OTHER_EMAIL = 'configurator-saved-other@e2e.test'
@@ -98,7 +100,9 @@ describe('Configurator saved configurations (e2e)', () => {
   }
 
   beforeAll(async () => {
-    ;({ app, dataSource } = await createApp())
+    ;({ app, dataSource } = await createApp({
+      mailMock: { sendQuoteRequestMail: sendQuoteRequestMailMock },
+    }))
 
     segmentDefinitionRepo = dataSource.getRepository(SegmentDefinition)
     configurableProductRepo = dataSource.getRepository(ConfigurableProduct)
@@ -398,6 +402,92 @@ describe('Configurator saved configurations (e2e)', () => {
         .delete('/saved-configurations/999999')
         .set('Authorization', `Bearer ${ownerToken}`)
         .expect(404)
+    })
+  })
+
+  // ── POST /saved-configurations/:id/request-quote ────────────────────────
+
+  describe('POST /saved-configurations/:id/request-quote', () => {
+    it('401s without a token', async () => {
+      await request(app.getHttpServer())
+        .post('/saved-configurations/1/request-quote')
+        .expect(401)
+    })
+
+    it('stamps quoteRequestedAt and returns the updated snapshot', async () => {
+      const created = await saveValid(ownerToken)
+      expect(created.quoteRequestedAt).toBeNull()
+
+      const res = await request(app.getHttpServer())
+        .post(`/saved-configurations/${created.id}/request-quote`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200)
+      const snapshot = (res.body as ApiResponse<SavedConfiguration>).data
+
+      expect(snapshot.id).toBe(created.id)
+      expect(snapshot.quoteRequestedAt).toEqual(expect.any(String))
+      expect(new Date(snapshot.quoteRequestedAt!).toString()).not.toBe(
+        'Invalid Date',
+      )
+      expect(snapshot.code).toBe(EXPECTED_CODE)
+      expect(snapshot.summary).toEqual(EXPECTED_SUMMARY)
+      expect(snapshot.productName).toBe(MAIN_NAME)
+    })
+
+    it('sends the quote-request mail with the requester and snapshot details', async () => {
+      const created = await saveValid(ownerToken)
+      sendQuoteRequestMailMock.mockClear()
+
+      await request(app.getHttpServer())
+        .post(`/saved-configurations/${created.id}/request-quote`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200)
+
+      expect(sendQuoteRequestMailMock).toHaveBeenCalledTimes(1)
+      expect(sendQuoteRequestMailMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          savedConfigurationId: created.id,
+          userEmail: OWNER_EMAIL,
+          userFirstName: 'ConfiguratorSavedOwner',
+          productName: MAIN_NAME,
+          code: EXPECTED_CODE,
+          summary: EXPECTED_SUMMARY,
+        }),
+      )
+    })
+
+    it('404s for a missing id', async () => {
+      await request(app.getHttpServer())
+        .post('/saved-configurations/999999/request-quote')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(404)
+    })
+
+    it("404s for another user's snapshot — indistinguishable from missing", async () => {
+      const created = await saveValid(ownerToken)
+
+      await request(app.getHttpServer())
+        .post(`/saved-configurations/${created.id}/request-quote`)
+        .set('Authorization', `Bearer ${otherToken}`)
+        .expect(404)
+    })
+
+    it('409s on a second request-quote call and does not re-send mail', async () => {
+      const created = await saveValid(ownerToken)
+      sendQuoteRequestMailMock.mockClear()
+
+      await request(app.getHttpServer())
+        .post(`/saved-configurations/${created.id}/request-quote`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200)
+
+      const second = await request(app.getHttpServer())
+        .post(`/saved-configurations/${created.id}/request-quote`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(409)
+      expect((second.body as { message: string }).message).toContain('already')
+
+      expect(sendQuoteRequestMailMock).toHaveBeenCalledTimes(1)
     })
   })
 

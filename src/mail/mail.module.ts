@@ -7,6 +7,7 @@ import { SendWelcomeMailProvider } from './providers/send-welcome-mail.provider'
 import { SendVerificationMailProvider } from './providers/send-verification-mail.provider'
 import { SendPasswordResetMailProvider } from './providers/send-password-reset-mail.provider'
 import { SendContactNotificationProvider } from './providers/send-contact-notification.provider'
+import { SendQuoteRequestMailProvider } from './providers/send-quote-request-mail.provider'
 import { MailService } from './mail.service'
 
 @Module({
@@ -18,6 +19,7 @@ import { MailService } from './mail.service'
     SendVerificationMailProvider,
     SendPasswordResetMailProvider,
     SendContactNotificationProvider,
+    SendQuoteRequestMailProvider,
     MailService,
   ],
   exports: [MailService],

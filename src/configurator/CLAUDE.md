@@ -18,6 +18,8 @@ src/configurator/
     segment-option.entity.ts            — SELECT choices, onDelete: CASCADE from definition
     product-segment-assignment.entity.ts — exports AssignmentCondition; (productId, position) unique
     saved-configuration.entity.ts       — Phase 2 frozen snapshot; userId FK CASCADE, productId FK SET NULL, no soft delete
+  listeners/
+    quote-events.listener.ts            — QuoteEventsListener (Step 7); @OnEvent(AppEvents.QUOTE_REQUESTED) → MailService.sendQuoteRequestMail()
   enums/
     segment-data-type.enum.ts           — STRING | NUMBER | SELECT
   dtos/                                  — create/update/get DTOs per entity, plus:
@@ -30,7 +32,8 @@ src/configurator/
     configurator-products.service.ts    — facade: ConfigurableProduct CRUD + image + assignment create (Steps 3–4)
     configurator-assignments.service.ts — facade: assignment update/delete (Step 4)
     configurators.service.ts            — facade: the two public endpoints (Step 5); no AuditLogService
-    saved-configurations.service.ts     — facade: save/list/get/delete snapshots (Step 6)
+    saved-configurations.service.ts     — facade: save/list/get/delete/request-quote snapshots (Steps 6–7)
+    request-quote-saved-configuration.provider.ts — Step 7: 404/409/mutate/audit-log/emit for POST .../request-quote
     configurator-resolver.service.ts    — the §4.3 resolve algorithm; @Injectable but dependency-free
     <single-purpose providers>          — create/find/update/delete per entity, image upload/delete
     <pure utils, *.util.ts>             — see below; each has a colocated *.spec.ts
@@ -87,6 +90,63 @@ Non-obvious wiring:
 - **Ownership → 404, not 403.** `FindOneSavedConfigurationProvider.findOneOwnedOrFail(id, userId)` scopes the query `where: { id, userId }`, so a foreign snapshot is indistinguishable from a missing id — deliberately unlike the posts `FindOnePostForEditProvider` 403 pattern, per §5.3.
 - List ordering uses `paginateQueryBuilder` purely for the guaranteed `createdAt DESC, id DESC` (the contact-inbox reasoning); deletes are hard (`DeleteResultDto`); audit entity string is `'SavedConfiguration'`.
 
+## Request-quote (Step 7)
+
+`POST /saved-configurations/:id/request-quote` stamps `quoteRequestedAt` and emails the site owner. It lives on `SavedConfigurationsController` alongside the other owner-scoped routes, delegating to `RequestQuoteSavedConfigurationProvider`.
+
+- **`@HttpCode(HttpStatus.OK)` (200), not the `@Post()` default 201.** This mutates one column on an existing row — it doesn't create a resource — so it's closer to `PATCH /contact/:id`'s `handled` toggle than to `save` (which inserts a new row and keeps 201).
+- **The 409 idempotency check runs before any mutation, save, audit log, or event emit.** `if (savedConfiguration.quoteRequestedAt) throw new ConflictException(...)` is the very first thing after the owner-scoped 404 lookup — this is what guarantees a repeat call never re-sends the notification email, since the provider throws before reaching the emit line.
+- **`User` is registered directly in `ConfiguratorModule`'s `TypeOrmModule.forFeature`** (alongside the five configurator entities) purely so the provider can look up the requester's `email`/`firstName` for the email — the same pattern `AdminModule` uses for read-only cross-cutting access to a foreign entity, rather than importing all of `UsersModule`. `FindOneSavedConfigurationProvider.findOneOwnedOrFail` — used by the hot `GET`/`DELETE` paths too — is untouched; it does not load the `user` relation.
+- **`MailModule` is now imported into `ConfiguratorModule`** (it wasn't needed before Step 7) — not global, per `src/mail/CLAUDE.md`.
+- The event payload (`QuoteRequestedPayload` in `src/common/events/app-events.ts`) carries `savedConfigurationId`, `userEmail`, `userFirstName`, `productName`, `code`, `summary` — everything `QuoteEventsListener` needs to call `MailService.sendQuoteRequestMail()` without a second DB round trip.
+- Audit action is `AuditAction.UPDATE` on entity `'SavedConfiguration'` — the same entity string the Step 6 `CREATE`/`DELETE` audit rows use, so `GET /audit-logs?entity=SavedConfiguration` groups the whole lifecycle together.
+
+## OpenAPI schema fixes (2026-07-12, found while briefing the frontend)
+
+Three `@nestjs/swagger` annotation gaps were fixed — none changed runtime behavior, only what
+`openapi-types.ts` exposes:
+
+- `SavedConfiguration.productId` was missing an explicit `type: Number` on its
+  `@ApiPropertyOptional` (a `number | null` union without an explicit `type` emits `Object`
+  metadata per the nullable-union gotcha in the root `CLAUDE.md` — this rendered as an unusable
+  type on the frontend). Fixed to `@ApiPropertyOptional({ type: Number, ... })`.
+- `SegmentDefinition.options` and `ConfigurableProduct.assignments` are both genuinely populated
+  at runtime (`FindOneSegmentDefinitionProvider`/`FindOneConfigurableProductProvider` always load
+  them), but neither had an `@ApiProperty` decorator, so they were silently absent from the
+  generated types even though the JSON response always includes them. Both are now decorated
+  (`@ApiPropertyOptional({ type: () => X, isArray: true })`), matching the sibling
+  `ProductSegmentAssignment.definition`/`.product` fields which were already decorated correctly.
+  Decorating `ConfigurableProduct.assignments` introduces a circular class reference
+  (`ConfigurableProduct` → `assignments: ProductSegmentAssignment[]` → `.product:
+  ConfigurableProduct` → …) — verified safe: `@nestjs/swagger` resolves this as a normal `$ref`
+  cycle in the OpenAPI document (confirmed via `pnpm run generate:schema` + inspecting
+  `openapi.json`), and `openapi-typescript` handles the resulting recursive type fine. No crash,
+  no infinite expansion.
+
+`SegmentDefinition.assignments` was deliberately left undecorated — nothing populates it for a
+definition-scoped read, so typing it would just be permanently `undefined`/empty.
+
+The real shapes behind the two jsonb fields that are intentionally typed as a generic object in
+Swagger (`constraints`, `condition`) — not worth breaking into a discriminated union in the
+schema, but the frontend needs the real TS shape by hand:
+
+```ts
+// SegmentDefinition.constraints, keyed by dataType
+interface StringConstraints { minLength: number; maxLength: number; pattern?: string }
+interface NumberConstraints { digits: number; min: number; max: number } // digits = zero-fill width
+// SELECT: constraints is empty/irrelevant
+
+// ProductSegmentAssignment.condition
+interface AssignmentCondition {
+  controllingAssignmentId: number
+  operator: 'eq' | 'neq' | 'gt' | 'lt' | 'between'
+  value?: string   // eq/neq
+  min?: number     // between
+  max?: number     // between
+  effect: 'zero_fill' // the only effect that currently exists
+}
+```
+
 ## Non-obvious admin-side rules (Steps 2–4)
 
 Detail lives in the root `CLAUDE.md` architecture paragraph and `STATE.md`; headlines only:
@@ -99,4 +159,4 @@ Detail lives in the root `CLAUDE.md` architecture paragraph and `STATE.md`; head
 ## Testing
 
 - Pure utils and the resolver have colocated `*.spec.ts` unit tests (plain Jest, no `TestingModule`); the resolver spec builds the §6 fixture in memory.
-- e2e: `test/configurator/definitions.e2e-spec.ts`, `products.e2e-spec.ts`, `assignments.e2e-spec.ts`, `resolve.e2e-spec.ts`, `saved-configurations.e2e-spec.ts`. The resolve suite seeds the §6 worked example through the real admin HTTP API (four products: published, unpublished, soft-deleted, and a STRING-segment one) and exercises every §6 bullet tokenlessly. The saved-configurations suite uses a compact two-segment fixture, three users (admin/owner/other), and ends with the snapshot-immutability proof — it mutates the shared fixture (option relabel, product soft-delete), so its immutability describe must stay last in the file.
+- e2e: `test/configurator/definitions.e2e-spec.ts`, `products.e2e-spec.ts`, `assignments.e2e-spec.ts`, `resolve.e2e-spec.ts`, `saved-configurations.e2e-spec.ts`. The resolve suite seeds the §6 worked example through the real admin HTTP API (four products: published, unpublished, soft-deleted, and a STRING-segment one) and exercises every §6 bullet tokenlessly. The saved-configurations suite uses a compact two-segment fixture, three users (admin/owner/other), and ends with the snapshot-immutability proof — it mutates the shared fixture (option relabel, product soft-delete), so its immutability describe must stay last in the file. Its `POST .../request-quote` block (inserted just before the immutability block) proves the 200 status, the mail payload contents, the 404/foreign-owner rule, and — critically — that a 409 second call does not re-send the mail (`sendQuoteRequestMailMock` called exactly once across both requests).

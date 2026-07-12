@@ -81,12 +81,18 @@ export class SegmentDefinition {
   meaningTemplate!: string
 
   // options — inverse side of SegmentOption; only meaningful for SELECT
-  // definitions, not eager to avoid loading options on every lookup
+  // definitions, not eager to avoid loading options on every lookup.
+  // FindOneSegmentDefinitionProvider always loads it explicitly, so it is
+  // genuinely present on GET /configurator-definitions/:id — decorated so
+  // that response is actually typed instead of silently missing the field.
+  @ApiPropertyOptional({ type: () => SegmentOption, isArray: true })
   @OneToMany(() => SegmentOption, (option) => option.definition)
   options?: SegmentOption[]
 
   // assignments — inverse side of ProductSegmentAssignment; every product
-  // position that uses this definition, not eager
+  // position that uses this definition, not eager. Left undecorated: unlike
+  // `options`, nothing loads it for a definition-scoped read, so it would
+  // always render as an empty/undefined array if typed.
   @OneToMany(
     () => ProductSegmentAssignment,
     (assignment) => assignment.definition,

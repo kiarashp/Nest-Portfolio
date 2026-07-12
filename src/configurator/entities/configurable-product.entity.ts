@@ -64,7 +64,12 @@ export class ConfigurableProduct {
   isPublished!: boolean
 
   // assignments — inverse side of ProductSegmentAssignment; every position
-  // this product has, ordered by position when loaded, not eager
+  // this product has, ordered by position when loaded, not eager.
+  // FindOneConfigurableProductProvider always loads the full ordered
+  // assignment tree, so it is genuinely present on GET
+  // /configurator-products/:id — decorated so that response is actually
+  // typed instead of silently missing the field.
+  @ApiPropertyOptional({ type: () => ProductSegmentAssignment, isArray: true })
   @OneToMany(() => ProductSegmentAssignment, (assignment) => assignment.product)
   assignments?: ProductSegmentAssignment[]
 

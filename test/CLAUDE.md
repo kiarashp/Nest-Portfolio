@@ -119,6 +119,7 @@ describe('Feature (e2e)', () => {
 | `sendVerificationMail` | `POST /auth/resend-verification` |
 | `sendPasswordResetMail` | `POST /auth/forgot-password` |
 | `sendContactNotification` | `POST /contact` |
+| `sendQuoteRequestMail` | `POST /saved-configurations/:id/request-quote` |
 
 Pass only the methods you need to assert on. Unspecified methods get a silent no-op automatically:
 

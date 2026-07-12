@@ -151,11 +151,50 @@ Deletes are hard deletes returning `DeleteResultDto`; audit logs: `CREATE`/`DELE
 `test/configurator/saved-configurations.e2e-spec.ts` (built through the real admin HTTP API;
 includes the §2.5 snapshot-immutability proof: option relabel + product soft-delete leave a
 saved snapshot's `code`/`summary` byte-identical). No new unit tests — the only logic (the
-resolver) was already unit-tested in Step 5. `openapi-types.ts` regen deliberately deferred to
-Step 7 per CONFIGURATOR.md §7 (end-of-phase). **Next: Step 7** (request-quote:
-`POST /saved-configurations/:id/request-quote`, `quoteRequestedAt` idempotency 409,
-`AppEvents.QUOTE_REQUESTED` → listener → `MailService.sendQuoteRequestMail()`,
-`QUOTE_NOTIFY_EMAIL` optional env, per `CONFIGURATOR.md` §5.3/§7).
+resolver) was already unit-tested in Step 5.
+
+**Step 7 (request-quote + mail) is done — this was the final step of the 7-step plan.**
+`POST /saved-configurations/:id/request-quote` (on the existing `SavedConfigurationsController`)
+stamps `quoteRequestedAt` and emails the site owner. It returns **200**
+(`@HttpCode(HttpStatus.OK)`), not the `@Post()` default 201 — it mutates one column on an
+existing row rather than creating a resource, the same reasoning as `PATCH /contact/:id`'s
+`handled` toggle rather than `save`'s (which does insert a new row and keeps 201). The 409
+idempotency guard (`quoteRequestedAt` already set) is checked **before** any mutation, save,
+audit log, or event emit — this is what a new e2e test proves directly: two calls in a row leave
+`sendQuoteRequestMailMock` at exactly one invocation, not two. A successful call sets
+`quoteRequestedAt = new Date()`, audit-logs `AuditAction.UPDATE`/`'SavedConfiguration'` (the same
+entity string Step 6's `CREATE`/`DELETE` rows use), then emits `AppEvents.QUOTE_REQUESTED` — a
+new constant plus a dedicated `QuoteRequestedPayload` interface in
+`src/common/events/app-events.ts` (unlike `CONTACT_SUBMITTED`, which reuses a DTO type with no
+payload interface). New provider `RequestQuoteSavedConfigurationProvider`
+(`src/configurator/providers/`) injects the `SavedConfiguration` repository, a `User` repository,
+`FindOneSavedConfigurationProvider` (reused unmodified — the hot `GET`/`DELETE` paths never load
+the `user` relation), `AuditLogService`, and `EventEmitter2`. `User` is registered directly in
+`ConfiguratorModule`'s `TypeOrmModule.forFeature` purely so the provider can resolve the
+requester's `email`/`firstName` for the notification — the same foreign-entity-in-a-cross-cutting-
+module pattern `AdminModule` uses, chosen over importing all of `UsersModule` for one lookup. New
+`src/configurator/listeners/` directory (anticipated by CONFIGURATOR.md's Phase-2 layout) holds
+`QuoteEventsListener`, an exact structural mirror of `ContactEventsListener` — `@OnEvent`, calls
+`MailService.sendQuoteRequestMail()`, try/catch + `Logger`, never throws/propagates. `MailModule`
+is now imported into `ConfiguratorModule` (not needed before this step). The mail side follows
+`src/mail/CLAUDE.md`'s 4-step recipe exactly: `templates/quote-request.ejs` (structurally mirrors
+`contact.ejs`, plus one new construct — an EJS `summary.forEach(...)` loop rendering the summary
+lines as `<li>`s), `SendQuoteRequestMailProvider` (mirrors `SendContactNotificationProvider`,
+reads `mail.quoteNotifyEmail`), registered in `mail.module.ts`, and `sendQuoteRequestMail()` on
+`MailService`. `QUOTE_NOTIFY_EMAIL` is optional (`environment.validation.ts`, `.env.example`),
+falling back to `MAIL_FROM` — the identical pattern `CONTACT_NOTIFICATION_EMAIL` already
+established. No entity or migration change was needed — `quoteRequestedAt` already existed from
+Step 6's migration. Covered by 6 new e2e tests appended to
+`test/configurator/saved-configurations.e2e-spec.ts` (inserted just before the snapshot-
+immutability block, which must stay last): 401, happy-path 200 + field assertions, mail-payload
+assertion, 404 missing id, 404 foreign owner, and the 409-does-not-resend-mail case. No new unit
+tests — no new pure logic, consistent with Step 6. `test/helpers/create-app.helper.ts`'s
+`MailMock` interface and default mock object gained a `sendQuoteRequestMail` key;
+`test/CLAUDE.md`'s mail-mocking table gained a matching row. `openapi-types.ts` regeneration
+(deferred since Step 6, per CONFIGURATOR.md §7's "steps 5 and 7" checkpoint) is the one remaining
+manual step — run `pnpm run generate:types` locally with the dev DB up.
+
+**All 7 steps of the Configurator module's implementation plan are now complete.**
 
 ---
 

@@ -4,6 +4,7 @@ import { SendWelcomeMailProvider } from './providers/send-welcome-mail.provider'
 import { SendVerificationMailProvider } from './providers/send-verification-mail.provider'
 import { SendPasswordResetMailProvider } from './providers/send-password-reset-mail.provider'
 import { SendContactNotificationProvider } from './providers/send-contact-notification.provider'
+import { SendQuoteRequestMailProvider } from './providers/send-quote-request-mail.provider'
 import { MailOptions } from './interfaces/mail-options.interface'
 
 @Injectable()
@@ -15,6 +16,8 @@ export class MailService {
     private readonly sendPasswordResetMailProvider: SendPasswordResetMailProvider,
     // dedicated provider for contact form notifications
     private readonly sendContactNotificationProvider: SendContactNotificationProvider,
+    // dedicated provider for configurator quote-request notifications
+    private readonly sendQuoteRequestMailProvider: SendQuoteRequestMailProvider,
   ) {}
 
   async sendMail(options: MailOptions): Promise<void> {
@@ -52,5 +55,17 @@ export class MailService {
     message: string
   }): Promise<void> {
     return this.sendContactNotificationProvider.send(submission)
+  }
+
+  /** Sends a configurator quote-request notification to the site owner. */
+  async sendQuoteRequestMail(request: {
+    savedConfigurationId: number
+    userEmail: string
+    userFirstName: string
+    productName: string
+    code: string
+    summary: string[]
+  }): Promise<void> {
+    return this.sendQuoteRequestMailProvider.send(request)
   }
 }

@@ -11,4 +11,7 @@ export default registerAs('mail', () => ({
   // no-reply MAIL_FROM sender doesn't force notifications into the same no-reply inbox
   contactNotificationEmail:
     process.env.CONTACT_NOTIFICATION_EMAIL || process.env.MAIL_FROM,
+  // recipient for configurator quote-request notifications — same fallback reasoning
+  // as contactNotificationEmail
+  quoteNotifyEmail: process.env.QUOTE_NOTIFY_EMAIL || process.env.MAIL_FROM,
 }))

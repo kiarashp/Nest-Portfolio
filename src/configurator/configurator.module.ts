@@ -4,9 +4,11 @@ import { ConfigurableProduct } from './entities/configurable-product.entity'
 import { SegmentDefinition } from './entities/segment-definition.entity'
 import { SegmentOption } from './entities/segment-option.entity'
 import { ProductSegmentAssignment } from './entities/product-segment-assignment.entity'
+import { User } from 'src/users/entities/user.entity'
 import { AuditLogModule } from 'src/audit-log/audit-log.module'
 import { PaginationModule } from 'src/common/pagination/pagination.module'
 import { UploadsModule } from 'src/uploads/uploads.module'
+import { MailModule } from 'src/mail/mail.module'
 import { ConfiguratorDefinitionsController } from './configurator-definitions.controller'
 import { ConfiguratorDefinitionsService } from './providers/configurator-definitions.service'
 import { CreateSegmentDefinitionProvider } from './providers/create-segment-definition.provider'
@@ -42,6 +44,8 @@ import { SaveConfigurationProvider } from './providers/save-configuration.provid
 import { FindMySavedConfigurationsProvider } from './providers/find-my-saved-configurations.provider'
 import { FindOneSavedConfigurationProvider } from './providers/find-one-saved-configuration.provider'
 import { DeleteSavedConfigurationProvider } from './providers/delete-saved-configuration.provider'
+import { RequestQuoteSavedConfigurationProvider } from './providers/request-quote-saved-configuration.provider'
+import { QuoteEventsListener } from './listeners/quote-events.listener'
 
 // Ordering-code configurator: the admin defines reusable segment
 // definitions and assembles them into configurable products; customers
@@ -55,7 +59,10 @@ import { DeleteSavedConfigurationProvider } from './providers/delete-saved-confi
 // /configurators/:slug/resolve (the resolver); Step 6 adds Phase 2's
 // SavedConfiguration — frozen snapshots of resolved configurations owned by
 // registered users (POST /configurators/:slug/save + the owner-scoped
-// /saved-configurations routes) — see CONFIGURATOR.md.
+// /saved-configurations routes); Step 7 adds the request-quote endpoint
+// (POST /saved-configurations/:id/request-quote), which stamps
+// quoteRequestedAt and emits AppEvents.QUOTE_REQUESTED to email the site
+// owner via MailModule — see CONFIGURATOR.md.
 @Module({
   controllers: [
     ConfiguratorDefinitionsController,
@@ -94,6 +101,8 @@ import { DeleteSavedConfigurationProvider } from './providers/delete-saved-confi
     FindMySavedConfigurationsProvider,
     FindOneSavedConfigurationProvider,
     DeleteSavedConfigurationProvider,
+    RequestQuoteSavedConfigurationProvider,
+    QuoteEventsListener,
   ],
   imports: [
     TypeOrmModule.forFeature([
@@ -102,10 +111,12 @@ import { DeleteSavedConfigurationProvider } from './providers/delete-saved-confi
       SegmentOption,
       ProductSegmentAssignment,
       SavedConfiguration,
+      User,
     ]),
     AuditLogModule,
     PaginationModule,
     UploadsModule,
+    MailModule,
   ],
 })
 export class ConfiguratorModule {}

@@ -7,6 +7,7 @@ import { SaveConfigurationProvider } from './save-configuration.provider'
 import { FindMySavedConfigurationsProvider } from './find-my-saved-configurations.provider'
 import { FindOneSavedConfigurationProvider } from './find-one-saved-configuration.provider'
 import { DeleteSavedConfigurationProvider } from './delete-saved-configuration.provider'
+import { RequestQuoteSavedConfigurationProvider } from './request-quote-saved-configuration.provider'
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
 
 // Thin facade for saved configurations (CONFIGURATOR.md §5.3, Phase 2):
@@ -23,6 +24,8 @@ export class SavedConfigurationsService {
     private readonly findOneSavedConfigurationProvider: FindOneSavedConfigurationProvider,
     // owner-scoped hard delete
     private readonly deleteSavedConfigurationProvider: DeleteSavedConfigurationProvider,
+    // owner-scoped quote request — stamps quoteRequestedAt and emits the mail event
+    private readonly requestQuoteSavedConfigurationProvider: RequestQuoteSavedConfigurationProvider,
   ) {}
 
   /**
@@ -76,5 +79,20 @@ export class SavedConfigurationsService {
     userId: number,
   ): Promise<{ deleted: boolean; id: number }> {
     return await this.deleteSavedConfigurationProvider.delete(id, userId)
+  }
+
+  /**
+   * Marks a quote as requested for one of the calling user's saved
+   * configurations; 404 when the id does not exist or belongs to another
+   * user, 409 if a quote was already requested.
+   */
+  public async requestQuote(
+    id: number,
+    userId: number,
+  ): Promise<SavedConfiguration> {
+    return await this.requestQuoteSavedConfigurationProvider.requestQuote(
+      id,
+      userId,
+    )
   }
 }

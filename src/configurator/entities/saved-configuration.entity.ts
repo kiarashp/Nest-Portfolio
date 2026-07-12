@@ -36,7 +36,7 @@ export class SavedConfiguration {
 
   // productId — kept for listing/filtering only; nullable so the snapshot
   // survives a hard product deletion (ON DELETE SET NULL)
-  @ApiPropertyOptional({ example: 3, nullable: true })
+  @ApiPropertyOptional({ type: Number, example: 3, nullable: true })
   @Column({ type: 'int', nullable: true })
   productId?: number | null
 
