@@ -26,15 +26,19 @@ src/configurator/
     configurator-form-schema.dto.ts     — response-only classes for GET /configurators/:slug
     resolve-configuration.dto.ts        — { selections: Record<string, string> } (@IsObject only — deep validation in parse-selections.util); also the save body
     resolve-result.dto.ts               — ResolveResultDto / ResolveErrorDto / ResolveSegmentStateDto
-    get-saved-configurations.dto.ts     — pagination only
+    get-saved-configurations.dto.ts     — pagination only (owner-scoped list)
+    get-saved-configurations-admin.dto.ts — pagination + quoteReviewed filter (admin inbox list)
+    patch-saved-configuration-reviewed.dto.ts — { quoteReviewed: boolean } (admin inbox PATCH body)
   providers/
     configurator-definitions.service.ts — facade: SegmentDefinition + SegmentOption CRUD (Step 2)
     configurator-products.service.ts    — facade: ConfigurableProduct CRUD + image + assignment create (Steps 3–4)
     configurator-assignments.service.ts — facade: assignment update/delete (Step 4)
     configurators.service.ts            — facade: the public endpoints (Step 5 + the later browse list); no AuditLogService
     find-published-configurator-products.provider.ts — GET /configurators: curated, published-only list, no pagination
-    saved-configurations.service.ts     — facade: save/list/get/delete/request-quote snapshots (Steps 6–7)
+    saved-configurations.service.ts     — facade: save/list/get/delete/request-quote snapshots (Steps 6–7) + admin quote-request inbox
     request-quote-saved-configuration.provider.ts — Step 7: 404/409/mutate/audit-log/emit for POST .../request-quote
+    find-all-saved-configurations-admin.provider.ts — admin inbox list: quoteRequestedAt IS NOT NULL, optional quoteReviewed filter
+    review-saved-configuration.provider.ts — admin inbox PATCH: toggles quoteReviewed, audit-logs
     configurator-resolver.service.ts    — the §4.3 resolve algorithm; @Injectable but dependency-free
     <single-purpose providers>          — create/find/update/delete per entity, image upload/delete
     <pure utils, *.util.ts>             — see below; each has a colocated *.spec.ts
@@ -42,7 +46,7 @@ src/configurator/
   configurator-products.controller.ts    — admin; /configurator-products (+ POST :id/assignments)
   configurator-assignments.controller.ts — admin; /configurator-assignments/:assignmentId
   configurators.controller.ts            — PUBLIC; GET /configurators (browse list), /configurators/:slug and /configurators/:slug/resolve, plus the Bearer-only POST /configurators/:slug/save
-  saved-configurations.controller.ts     — authenticated (any role); owner-scoped /saved-configurations[/:id]
+  saved-configurations.controller.ts     — owner-scoped /saved-configurations[/:id] (any role) + admin-only /saved-configurations/admin[/:id] inbox
   configurator.module.ts
 ```
 
@@ -104,6 +108,16 @@ Non-obvious wiring:
 - The event payload (`QuoteRequestedPayload` in `src/common/events/app-events.ts`) carries `savedConfigurationId`, `userEmail`, `userFirstName`, `productName`, `code`, `summary` — everything `QuoteEventsListener` needs to call `MailService.sendQuoteRequestMail()` without a second DB round trip.
 - Audit action is `AuditAction.UPDATE` on entity `'SavedConfiguration'` — the same entity string the Step 6 `CREATE`/`DELETE` audit rows use, so `GET /audit-logs?entity=SavedConfiguration` groups the whole lifecycle together.
 
+## Admin quote-request inbox
+
+`SavedConfiguration` has a `quoteReviewed` boolean column (default `false`) — an admin-settable read/unread flag, independent of `quoteRequestedAt` (which stays the immutable "when was this requested" timestamp, still stamped once, still 409-guarded by `RequestQuoteSavedConfigurationProvider`). Three `@Roles(UserRole.ADMIN)` routes on `SavedConfigurationsController`, declared **before** the owner-scoped `:id` routes on the same controller (route-ordering gotcha — `admin`/`admin/:id` would otherwise be swallowed by `:id`):
+
+- `GET /saved-configurations/admin` — paginated list, always scoped to rows where `quoteRequestedAt IS NOT NULL` (`FindAllSavedConfigurationsAdminProvider`) — this is a dedicated quote-request inbox, not a listing of every saved snapshot (a user can save a configuration without ever requesting a quote, and those rows never appear here). Optional `?quoteReviewed=` filter, ordered `quoteRequestedAt DESC, id DESC`.
+- `GET /saved-configurations/admin/:id` — single read via `FindOneSavedConfigurationProvider.findOneByIdOrFail`, a new method on that provider with **no owner scope** — deliberately unlike `findOneOwnedOrFail` (used by the owner-scoped routes), since an admin must be able to look up any user's request.
+- `PATCH /saved-configurations/admin/:id` — toggles `quoteReviewed` via `ReviewSavedConfigurationProvider`, same save-then-audit-log shape as `UpdateContactSubmissionProvider`; audits `AuditAction.UPDATE`/`'SavedConfiguration'`, the same entity string Step 6/7 already use.
+
+All three use `@ApiAuth({ roles: [UserRole.ADMIN] })` (not the bare `@ApiAuth()` the owner-scoped routes use). This closes the gap the module's Step 6 note used to call out — the facade is no longer "no admin surface at all," just admin-scoped where noted.
+
 ## OpenAPI schema fixes (2026-07-12, found while briefing the frontend)
 
 Three `@nestjs/swagger` annotation gaps were fixed — none changed runtime behavior, only what
@@ -161,5 +175,5 @@ Detail lives in the root `CLAUDE.md` architecture paragraph and `STATE.md`; head
 
 ## Testing
 
-- Pure utils and the resolver have colocated `*.spec.ts` unit tests (plain Jest, no `TestingModule`); the resolver spec builds the §6 fixture in memory.
-- e2e: `test/configurator/definitions.e2e-spec.ts`, `products.e2e-spec.ts`, `assignments.e2e-spec.ts`, `resolve.e2e-spec.ts`, `saved-configurations.e2e-spec.ts`, `list.e2e-spec.ts`. The resolve suite seeds the §6 worked example through the real admin HTTP API (four products: published, unpublished, soft-deleted, and a STRING-segment one) and exercises every §6 bullet tokenlessly. The saved-configurations suite uses a compact two-segment fixture, three users (admin/owner/other), and ends with the snapshot-immutability proof — it mutates the shared fixture (option relabel, product soft-delete), so its immutability describe must stay last in the file. Its `POST .../request-quote` block (inserted just before the immutability block) proves the 200 status, the mail payload contents, the 404/foreign-owner rule, and — critically — that a 409 second call does not re-send the mail (`sendQuoteRequestMailMock` called exactly once across both requests). The list suite covers `GET /configurators`: bare-array shape, curated field set on a seeded published item, exclusion of unpublished/soft-deleted slugs, and name-ascending order between two own fixtures — scoped to its own seeded slugs throughout (per `test/CLAUDE.md`'s whole-table-aggregate guidance) since the route has no filter param and other suites' published configurable products also appear in the response.
+- Pure utils and the resolver have colocated `*.spec.ts` unit tests (plain Jest, no `TestingModule`); the resolver spec builds the §6 fixture in memory. `review-saved-configuration.provider.spec.ts` is a `TestingModule`-based unit spec (mocked repository/find-one-provider/audit-log-service), mirroring `src/contact/providers/update-contact-submission.provider.spec.ts`.
+- e2e: `test/configurator/definitions.e2e-spec.ts`, `products.e2e-spec.ts`, `assignments.e2e-spec.ts`, `resolve.e2e-spec.ts`, `saved-configurations.e2e-spec.ts`, `list.e2e-spec.ts`. The resolve suite seeds the §6 worked example through the real admin HTTP API (four products: published, unpublished, soft-deleted, and a STRING-segment one) and exercises every §6 bullet tokenlessly. The saved-configurations suite uses a compact two-segment fixture, three users (admin/owner/other), and ends with the snapshot-immutability proof — it mutates the shared fixture (option relabel, product soft-delete), so its immutability describe must stay last in the file. Its `POST .../request-quote` block proves the 200 status, the mail payload contents, the 404/foreign-owner rule, and — critically — that a 409 second call does not re-send the mail (`sendQuoteRequestMailMock` called exactly once across both requests). Three admin-inbox blocks (`GET /saved-configurations/admin`, `GET .../admin/:id`, `PATCH .../admin/:id`), inserted just before the immutability block, prove: 401/403 for non-admin roles; the list excludes a saved-but-not-requested snapshot and orders by `quoteRequestedAt DESC`; `?quoteReviewed=` narrows correctly; the detail route returns a row regardless of owner (unlike the owner-scoped `GET /:id`, which 404s for `otherToken`); and the PATCH toggle persists and writes an `AuditLog` row (mirroring `test/contact/contact.e2e-spec.ts`'s `PATCH /contact/:id` block). The list suite covers `GET /configurators`: bare-array shape, curated field set on a seeded published item, exclusion of unpublished/soft-deleted slugs, and name-ascending order between two own fixtures — scoped to its own seeded slugs throughout (per `test/CLAUDE.md`'s whole-table-aggregate guidance) since the route has no filter param and other suites' published configurable products also appear in the response.

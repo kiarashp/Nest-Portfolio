@@ -83,6 +83,13 @@ export class SavedConfiguration {
   @Column({ type: 'timestamptz', nullable: true })
   quoteRequestedAt?: Date | null
 
+  // quoteReviewed — admin-settable read/unread flag for the quote-request
+  // inbox; independent of quoteRequestedAt, which stays the immutable
+  // "when was this requested" timestamp
+  @ApiProperty({ example: false })
+  @Column({ type: 'boolean', default: false })
+  quoteReviewed!: boolean
+
   // createdAt
   @ApiProperty()
   @CreateDateColumn()

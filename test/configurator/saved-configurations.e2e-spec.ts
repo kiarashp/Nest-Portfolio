@@ -9,6 +9,8 @@ import { SegmentOption } from '../../src/configurator/entities/segment-option.en
 import { ConfigurableProduct } from '../../src/configurator/entities/configurable-product.entity'
 import { ProductSegmentAssignment } from '../../src/configurator/entities/product-segment-assignment.entity'
 import { SavedConfiguration } from '../../src/configurator/entities/saved-configuration.entity'
+import { AuditLog } from '../../src/audit-log/entities/audit-log.entity'
+import { AuditAction } from '../../src/audit-log/enums/audit-action.enum'
 import { Paginated } from '../../src/common/pagination/interfaces/paginated.interface'
 import { ApiResponse, getAuthToken } from '../helpers/auth.helper'
 import { createApp } from '../helpers/create-app.helper'
@@ -29,6 +31,7 @@ describe('Configurator saved configurations (e2e)', () => {
 
   let segmentDefinitionRepo: Repository<SegmentDefinition>
   let configurableProductRepo: Repository<ConfigurableProduct>
+  let auditLogRepo: Repository<AuditLog>
 
   const sendQuoteRequestMailMock = jest.fn().mockResolvedValue(undefined)
 
@@ -106,6 +109,7 @@ describe('Configurator saved configurations (e2e)', () => {
 
     segmentDefinitionRepo = dataSource.getRepository(SegmentDefinition)
     configurableProductRepo = dataSource.getRepository(ConfigurableProduct)
+    auditLogRepo = dataSource.getRepository(AuditLog)
 
     // Pre-cleanup: users first (their saved configurations cascade away via
     // the userId FK), then products (assignments cascade), then definitions —
@@ -488,6 +492,198 @@ describe('Configurator saved configurations (e2e)', () => {
       expect((second.body as { message: string }).message).toContain('already')
 
       expect(sendQuoteRequestMailMock).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // ── GET /saved-configurations/admin (admin quote-request inbox) ─────────
+
+  describe('GET /saved-configurations/admin', () => {
+    it('401s without a token', async () => {
+      await request(app.getHttpServer())
+        .get('/saved-configurations/admin')
+        .expect(401)
+    })
+
+    it('403s for a non-admin role', async () => {
+      await request(app.getHttpServer())
+        .get('/saved-configurations/admin')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(403)
+    })
+
+    it('only returns rows where a quote was requested, newest request first', async () => {
+      const notRequested = await saveValid(ownerToken)
+
+      const first = await saveValid(ownerToken)
+      await request(app.getHttpServer())
+        .post(`/saved-configurations/${first.id}/request-quote`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200)
+
+      const second = await saveValid(ownerToken)
+      await request(app.getHttpServer())
+        .post(`/saved-configurations/${second.id}/request-quote`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200)
+
+      const res = await request(app.getHttpServer())
+        .get('/saved-configurations/admin')
+        .query({ limit: 100 })
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200)
+      const page = (res.body as ApiResponse<Paginated<SavedConfiguration>>).data
+      const ids = page.data.map((row) => row.id)
+
+      expect(ids).not.toContain(notRequested.id)
+      expect(ids).toContain(first.id)
+      expect(ids).toContain(second.id)
+      expect(page.data.every((row) => row.quoteRequestedAt !== null)).toBe(true)
+      // Newest request first.
+      expect(ids.indexOf(second.id)).toBeLessThan(ids.indexOf(first.id))
+    })
+
+    it('?quoteReviewed= narrows to reviewed/unreviewed requests', async () => {
+      const reviewed = await saveValid(ownerToken)
+      await request(app.getHttpServer())
+        .post(`/saved-configurations/${reviewed.id}/request-quote`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200)
+      await request(app.getHttpServer())
+        .patch(`/saved-configurations/admin/${reviewed.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ quoteReviewed: true })
+        .expect(200)
+
+      const unreviewed = await saveValid(ownerToken)
+      await request(app.getHttpServer())
+        .post(`/saved-configurations/${unreviewed.id}/request-quote`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200)
+
+      const reviewedRes = await request(app.getHttpServer())
+        .get('/saved-configurations/admin')
+        .query({ quoteReviewed: 'true', limit: 100 })
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200)
+      const reviewedIds = (
+        reviewedRes.body as ApiResponse<Paginated<SavedConfiguration>>
+      ).data.data.map((row) => row.id)
+      expect(reviewedIds).toContain(reviewed.id)
+      expect(reviewedIds).not.toContain(unreviewed.id)
+
+      const unreviewedRes = await request(app.getHttpServer())
+        .get('/saved-configurations/admin')
+        .query({ quoteReviewed: 'false', limit: 100 })
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200)
+      const unreviewedIds = (
+        unreviewedRes.body as ApiResponse<Paginated<SavedConfiguration>>
+      ).data.data.map((row) => row.id)
+      expect(unreviewedIds).toContain(unreviewed.id)
+      expect(unreviewedIds).not.toContain(reviewed.id)
+    })
+  })
+
+  // ── GET /saved-configurations/admin/:id ──────────────────────────────────
+
+  describe('GET /saved-configurations/admin/:id', () => {
+    it('401s without a token', async () => {
+      await request(app.getHttpServer())
+        .get('/saved-configurations/admin/1')
+        .expect(401)
+    })
+
+    it('403s for a non-admin role', async () => {
+      const created = await saveValid(ownerToken)
+
+      await request(app.getHttpServer())
+        .get(`/saved-configurations/admin/${created.id}`)
+        .set('Authorization', `Bearer ${otherToken}`)
+        .expect(403)
+    })
+
+    it("returns any user's snapshot, unlike the owner-scoped route", async () => {
+      const created = await saveValid(ownerToken)
+
+      const res = await request(app.getHttpServer())
+        .get(`/saved-configurations/admin/${created.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200)
+      const snapshot = (res.body as ApiResponse<SavedConfiguration>).data
+
+      expect(snapshot.id).toBe(created.id)
+      expect(snapshot.userId).toBe(ownerId)
+    })
+
+    it('404s for a missing id', async () => {
+      await request(app.getHttpServer())
+        .get('/saved-configurations/admin/999999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404)
+    })
+  })
+
+  // ── PATCH /saved-configurations/admin/:id ────────────────────────────────
+
+  describe('PATCH /saved-configurations/admin/:id', () => {
+    it('401s without a token', async () => {
+      await request(app.getHttpServer())
+        .patch('/saved-configurations/admin/1')
+        .send({ quoteReviewed: true })
+        .expect(401)
+    })
+
+    it('403s for a non-admin role', async () => {
+      const created = await saveValid(ownerToken)
+
+      await request(app.getHttpServer())
+        .patch(`/saved-configurations/admin/${created.id}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ quoteReviewed: true })
+        .expect(403)
+    })
+
+    it('missing quoteReviewed in body → 400', async () => {
+      const created = await saveValid(ownerToken)
+
+      await request(app.getHttpServer())
+        .patch(`/saved-configurations/admin/${created.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({})
+        .expect(400)
+    })
+
+    it('404s for a missing id', async () => {
+      await request(app.getHttpServer())
+        .patch('/saved-configurations/admin/999999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ quoteReviewed: true })
+        .expect(404)
+    })
+
+    it('toggles quoteReviewed and writes an AuditLog row', async () => {
+      const created = await saveValid(ownerToken)
+      expect(created.quoteReviewed).toBe(false)
+
+      const res = await request(app.getHttpServer())
+        .patch(`/saved-configurations/admin/${created.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ quoteReviewed: true })
+        .expect(200)
+      const snapshot = (res.body as ApiResponse<SavedConfiguration>).data
+      expect(snapshot.quoteReviewed).toBe(true)
+
+      const row: SavedConfiguration | null = await dataSource
+        .getRepository(SavedConfiguration)
+        .findOneBy({ id: created.id })
+      expect(row!.quoteReviewed).toBe(true)
+
+      const auditRow: AuditLog | null = await auditLogRepo.findOneBy({
+        entity: 'SavedConfiguration',
+        entityId: created.id,
+        action: AuditAction.UPDATE,
+      })
+      expect(auditRow).not.toBeNull()
     })
   })
 

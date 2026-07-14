@@ -46,6 +46,8 @@ import { FindMySavedConfigurationsProvider } from './providers/find-my-saved-con
 import { FindOneSavedConfigurationProvider } from './providers/find-one-saved-configuration.provider'
 import { DeleteSavedConfigurationProvider } from './providers/delete-saved-configuration.provider'
 import { RequestQuoteSavedConfigurationProvider } from './providers/request-quote-saved-configuration.provider'
+import { FindAllSavedConfigurationsAdminProvider } from './providers/find-all-saved-configurations-admin.provider'
+import { ReviewSavedConfigurationProvider } from './providers/review-saved-configuration.provider'
 import { QuoteEventsListener } from './listeners/quote-events.listener'
 
 // Ordering-code configurator: the admin defines reusable segment
@@ -104,6 +106,8 @@ import { QuoteEventsListener } from './listeners/quote-events.listener'
     FindOneSavedConfigurationProvider,
     DeleteSavedConfigurationProvider,
     RequestQuoteSavedConfigurationProvider,
+    FindAllSavedConfigurationsAdminProvider,
+    ReviewSavedConfigurationProvider,
     QuoteEventsListener,
   ],
   imports: [

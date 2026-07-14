@@ -31,4 +31,18 @@ export class FindOneSavedConfigurationProvider {
     }
     return savedConfiguration
   }
+
+  /**
+   * Returns one saved configuration by id, regardless of owner — used by the
+   * admin quote-request inbox, which is deliberately unscoped unlike
+   * findOneOwnedOrFail above.
+   */
+  public async findOneByIdOrFail(id: number): Promise<SavedConfiguration> {
+    const savedConfiguration =
+      await this.savedConfigurationsRepository.findOneBy({ id })
+    if (!savedConfiguration) {
+      throw new NotFoundException(`Saved configuration ${id} not found`)
+    }
+    return savedConfiguration
+  }
 }
