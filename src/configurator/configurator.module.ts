@@ -36,6 +36,7 @@ import { UpdateAssignmentProvider } from './providers/update-assignment.provider
 import { DeleteAssignmentProvider } from './providers/delete-assignment.provider'
 import { ConfiguratorsController } from './configurators.controller'
 import { ConfiguratorsService } from './providers/configurators.service'
+import { FindPublishedConfiguratorProductsProvider } from './providers/find-published-configurator-products.provider'
 import { ConfiguratorResolverService } from './providers/configurator-resolver.service'
 import { SavedConfiguration } from './entities/saved-configuration.entity'
 import { SavedConfigurationsController } from './saved-configurations.controller'
@@ -95,6 +96,7 @@ import { QuoteEventsListener } from './listeners/quote-events.listener'
     UpdateAssignmentProvider,
     DeleteAssignmentProvider,
     ConfiguratorsService,
+    FindPublishedConfiguratorProductsProvider,
     ConfiguratorResolverService,
     SavedConfigurationsService,
     SaveConfigurationProvider,

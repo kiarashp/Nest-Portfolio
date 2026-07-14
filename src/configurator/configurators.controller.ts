@@ -11,10 +11,14 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { ConfiguratorsService } from './providers/configurators.service'
 import { SavedConfigurationsService } from './providers/saved-configurations.service'
 import { ConfiguratorFormSchemaDto } from './dtos/configurator-form-schema.dto'
+import { ConfiguratorListItemDto } from './dtos/configurator-list-item.dto'
 import { ResolveConfigurationDto } from './dtos/resolve-configuration.dto'
 import { ResolveResultDto } from './dtos/resolve-result.dto'
 import { SavedConfiguration } from './entities/saved-configuration.entity'
-import { ApiDataResponse } from 'src/common/swagger/api-response.helpers'
+import {
+  ApiArrayDataResponse,
+  ApiDataResponse,
+} from 'src/common/swagger/api-response.helpers'
 import { ApiAuth } from 'src/common/swagger/api-auth.helpers'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { AuthType } from 'src/auth/enums/auth-type.enum'
@@ -35,6 +39,21 @@ export class ConfiguratorsController {
     private readonly configuratorsService: ConfiguratorsService,
     private readonly savedConfigurationsService: SavedConfigurationsService,
   ) {}
+
+  /**
+   * list every published configurator, curated for a browse page — no
+   * pagination, ordered by name. Declared before :slug for readability
+   * (no real path ambiguity: this route has no extra segment).
+   */
+  @Auth(AuthType.None)
+  @ApiOperation({
+    summary: 'List published configurators',
+  })
+  @ApiArrayDataResponse(ConfiguratorListItemDto)
+  @Get()
+  public findAll() {
+    return this.configuratorsService.getPublishedList()
+  }
 
   /**
    * get the public form schema for a published configurator by slug —

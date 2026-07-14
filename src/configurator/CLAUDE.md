@@ -31,7 +31,8 @@ src/configurator/
     configurator-definitions.service.ts — facade: SegmentDefinition + SegmentOption CRUD (Step 2)
     configurator-products.service.ts    — facade: ConfigurableProduct CRUD + image + assignment create (Steps 3–4)
     configurator-assignments.service.ts — facade: assignment update/delete (Step 4)
-    configurators.service.ts            — facade: the two public endpoints (Step 5); no AuditLogService
+    configurators.service.ts            — facade: the public endpoints (Step 5 + the later browse list); no AuditLogService
+    find-published-configurator-products.provider.ts — GET /configurators: curated, published-only list, no pagination
     saved-configurations.service.ts     — facade: save/list/get/delete/request-quote snapshots (Steps 6–7)
     request-quote-saved-configuration.provider.ts — Step 7: 404/409/mutate/audit-log/emit for POST .../request-quote
     configurator-resolver.service.ts    — the §4.3 resolve algorithm; @Injectable but dependency-free
@@ -40,7 +41,7 @@ src/configurator/
   configurator-definitions.controller.ts — admin; NO base prefix (mixes /configurator-definitions/* and /configurator-options/*)
   configurator-products.controller.ts    — admin; /configurator-products (+ POST :id/assignments)
   configurator-assignments.controller.ts — admin; /configurator-assignments/:assignmentId
-  configurators.controller.ts            — PUBLIC; /configurators/:slug and /configurators/:slug/resolve, plus the Bearer-only POST /configurators/:slug/save
+  configurators.controller.ts            — PUBLIC; GET /configurators (browse list), /configurators/:slug and /configurators/:slug/resolve, plus the Bearer-only POST /configurators/:slug/save
   saved-configurations.controller.ts     — authenticated (any role); owner-scoped /saved-configurations[/:id]
   configurator.module.ts
 ```
@@ -50,6 +51,8 @@ src/configurator/
 ## The public surface (Step 5)
 
 `GET /configurators/:slug` (form schema) and `POST /configurators/:slug/resolve` — both `@Auth(AuthType.None)`, both backed by `ConfiguratorsService`. The resolve route is a `POST` that returns **200** (`@HttpCode(HttpStatus.OK)`): it computes a result, it creates nothing. Neither route writes audit logs (reads/stateless computation — the admin facades audit, this one doesn't inject `AuditLogService` at all). The global throttle default suffices; no per-route `@Throttle`.
+
+`GET /configurators` (also `@Auth(AuthType.None)`, added later as a browse/discovery endpoint) lists every published configurator as a **bare, unpaginated array** — `FindPublishedConfiguratorProductsProvider.findPublishedList()` queries `ConfigurableProduct` with `{ isPublished: true }`, `order: { name: 'ASC' }` (no `QueryBuilder`, no pagination — mirrors `FindAllProductTypesProvider`'s shape, since this is a small landing/browse catalog, not a paginated list like `GET /products`/`GET /configurator-products`). Each row is mapped field-by-field to `ConfiguratorListItemDto` (`slug`, `name`, `description`, `imageUrl`) rather than returning the entity, matching the curation discipline `buildFormSchema` already established — `id`/`imagePublicId`/`isPublished`/timestamps never leak. Declared before `GET :slug` on the controller for readability; there is no real route-ordering ambiguity since the two paths differ in segment count.
 
 ### Visibility — FindOneConfigurableProductProvider
 
@@ -159,4 +162,4 @@ Detail lives in the root `CLAUDE.md` architecture paragraph and `STATE.md`; head
 ## Testing
 
 - Pure utils and the resolver have colocated `*.spec.ts` unit tests (plain Jest, no `TestingModule`); the resolver spec builds the §6 fixture in memory.
-- e2e: `test/configurator/definitions.e2e-spec.ts`, `products.e2e-spec.ts`, `assignments.e2e-spec.ts`, `resolve.e2e-spec.ts`, `saved-configurations.e2e-spec.ts`. The resolve suite seeds the §6 worked example through the real admin HTTP API (four products: published, unpublished, soft-deleted, and a STRING-segment one) and exercises every §6 bullet tokenlessly. The saved-configurations suite uses a compact two-segment fixture, three users (admin/owner/other), and ends with the snapshot-immutability proof — it mutates the shared fixture (option relabel, product soft-delete), so its immutability describe must stay last in the file. Its `POST .../request-quote` block (inserted just before the immutability block) proves the 200 status, the mail payload contents, the 404/foreign-owner rule, and — critically — that a 409 second call does not re-send the mail (`sendQuoteRequestMailMock` called exactly once across both requests).
+- e2e: `test/configurator/definitions.e2e-spec.ts`, `products.e2e-spec.ts`, `assignments.e2e-spec.ts`, `resolve.e2e-spec.ts`, `saved-configurations.e2e-spec.ts`, `list.e2e-spec.ts`. The resolve suite seeds the §6 worked example through the real admin HTTP API (four products: published, unpublished, soft-deleted, and a STRING-segment one) and exercises every §6 bullet tokenlessly. The saved-configurations suite uses a compact two-segment fixture, three users (admin/owner/other), and ends with the snapshot-immutability proof — it mutates the shared fixture (option relabel, product soft-delete), so its immutability describe must stay last in the file. Its `POST .../request-quote` block (inserted just before the immutability block) proves the 200 status, the mail payload contents, the 404/foreign-owner rule, and — critically — that a 409 second call does not re-send the mail (`sendQuoteRequestMailMock` called exactly once across both requests). The list suite covers `GET /configurators`: bare-array shape, curated field set on a seeded published item, exclusion of unpublished/soft-deleted slugs, and name-ascending order between two own fixtures — scoped to its own seeded slugs throughout (per `test/CLAUDE.md`'s whole-table-aggregate guidance) since the route has no filter param and other suites' published configurable products also appear in the response.
