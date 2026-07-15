@@ -27,8 +27,9 @@ src/configurator/
     resolve-configuration.dto.ts        — { selections: Record<string, string> } (@IsObject only — deep validation in parse-selections.util); also the save body
     resolve-result.dto.ts               — ResolveResultDto / ResolveErrorDto / ResolveSegmentStateDto
     get-saved-configurations.dto.ts     — pagination only (owner-scoped list)
-    get-saved-configurations-admin.dto.ts — pagination + quoteReviewed filter (admin inbox list)
+    get-saved-configurations-admin.dto.ts — pagination + quoteReviewed/startDate/endDate/email filters (admin inbox list)
     patch-saved-configuration-reviewed.dto.ts — { quoteReviewed: boolean } (admin inbox PATCH body)
+    saved-configuration-requester.dto.ts — SavedConfigurationRequester (id/firstName/lastName/email), embedded on admin reads only
   providers/
     configurator-definitions.service.ts — facade: SegmentDefinition + SegmentOption CRUD (Step 2)
     configurator-products.service.ts    — facade: ConfigurableProduct CRUD + image + assignment create (Steps 3–4)
@@ -37,8 +38,9 @@ src/configurator/
     find-published-configurator-products.provider.ts — GET /configurators: curated, published-only list, no pagination
     saved-configurations.service.ts     — facade: save/list/get/delete/request-quote snapshots (Steps 6–7) + admin quote-request inbox
     request-quote-saved-configuration.provider.ts — Step 7: 404/409/mutate/audit-log/emit for POST .../request-quote
-    find-all-saved-configurations-admin.provider.ts — admin inbox list: quoteRequestedAt IS NOT NULL, optional quoteReviewed filter
+    find-all-saved-configurations-admin.provider.ts — admin inbox list: quoteRequestedAt IS NOT NULL, optional quoteReviewed/startDate/endDate/email filters, joins user for requester
     review-saved-configuration.provider.ts — admin inbox PATCH: toggles quoteReviewed, audit-logs
+    build-saved-configuration-requester.util.ts — maps a loaded User to SavedConfigurationRequester; shared by the admin list/single-read providers
     configurator-resolver.service.ts    — the §4.3 resolve algorithm; @Injectable but dependency-free
     <single-purpose providers>          — create/find/update/delete per entity, image upload/delete
     <pure utils, *.util.ts>             — see below; each has a colocated *.spec.ts
@@ -112,11 +114,13 @@ Non-obvious wiring:
 
 `SavedConfiguration` has a `quoteReviewed` boolean column (default `false`) — an admin-settable read/unread flag, independent of `quoteRequestedAt` (which stays the immutable "when was this requested" timestamp, still stamped once, still 409-guarded by `RequestQuoteSavedConfigurationProvider`). Three `@Roles(UserRole.ADMIN)` routes on `SavedConfigurationsController`, declared **before** the owner-scoped `:id` routes on the same controller (route-ordering gotcha — `admin`/`admin/:id` would otherwise be swallowed by `:id`):
 
-- `GET /saved-configurations/admin` — paginated list, always scoped to rows where `quoteRequestedAt IS NOT NULL` (`FindAllSavedConfigurationsAdminProvider`) — this is a dedicated quote-request inbox, not a listing of every saved snapshot (a user can save a configuration without ever requesting a quote, and those rows never appear here). Optional `?quoteReviewed=` filter, ordered `quoteRequestedAt DESC, id DESC`.
-- `GET /saved-configurations/admin/:id` — single read via `FindOneSavedConfigurationProvider.findOneByIdOrFail`, a new method on that provider with **no owner scope** — deliberately unlike `findOneOwnedOrFail` (used by the owner-scoped routes), since an admin must be able to look up any user's request.
-- `PATCH /saved-configurations/admin/:id` — toggles `quoteReviewed` via `ReviewSavedConfigurationProvider`, same save-then-audit-log shape as `UpdateContactSubmissionProvider`; audits `AuditAction.UPDATE`/`'SavedConfiguration'`, the same entity string Step 6/7 already use.
+- `GET /saved-configurations/admin` — paginated list, always scoped to rows where `quoteRequestedAt IS NOT NULL` (`FindAllSavedConfigurationsAdminProvider`) — this is a dedicated quote-request inbox, not a listing of every saved snapshot (a user can save a configuration without ever requesting a quote, and those rows never appear here). Optional `?quoteReviewed=` filter, plus `?startDate=`/`?endDate=` (ISO date-only, filtering `quoteRequestedAt`, same `BETWEEN`/`>=`/`<=` idiom as `GET /contact`) and `?email=` (case-insensitive substring match against the requester's email, same idiom as `GET /users`' `q`), ordered `quoteRequestedAt DESC, id DESC`.
+- `GET /saved-configurations/admin/:id` — single read via `FindOneSavedConfigurationProvider.findOneByIdOrFail`, a method on that provider with **no owner scope** — deliberately unlike `findOneOwnedOrFail` (used by the owner-scoped routes), since an admin must be able to look up any user's request.
+- `PATCH /saved-configurations/admin/:id` — toggles `quoteReviewed` via `ReviewSavedConfigurationProvider`, same save-then-audit-log shape as `UpdateContactSubmissionProvider`; audits `AuditAction.UPDATE`/`'SavedConfiguration'`, the same entity string Step 6/7 already use. Incidentally also returns `requester` (below) since it reuses `findOneByIdOrFail`.
 
 All three use `@ApiAuth({ roles: [UserRole.ADMIN] })` (not the bare `@ApiAuth()` the owner-scoped routes use). This closes the gap the module's Step 6 note used to call out — the facade is no longer "no admin surface at all," just admin-scoped where noted.
+
+**`requester` field (admin routes only):** `SavedConfiguration.requester?: SavedConfigurationRequester` (`src/configurator/dtos/saved-configuration-requester.dto.ts` — `id`, `firstName`, `lastName`, `email`) is a transient field, not a stored column — same pattern as `Product.related`/`ProductType.productCount`, populated only by the two admin providers above via `buildSavedConfigurationRequester()` (`src/configurator/providers/build-saved-configuration-requester.util.ts`). It is deliberately leaner than `PublicAuthor` (no `avatarUrl`/`bio` — the inbox only needs enough to identify who asked). The entity's `user` relation is loaded by these two providers (`leftJoinAndSelect` for the list, to support the `?email=` filter; `relations: { user: true }` for the single read) but is decorated `@Exclude()` so the raw `User` entity never serializes into the response — only the mapped `requester` object does. The owner-scoped routes (`findOneOwnedOrFail`, `FindMySavedConfigurationsProvider`) do not load `user` and never populate `requester`.
 
 ## OpenAPI schema fixes (2026-07-12, found while briefing the frontend)
 

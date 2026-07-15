@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { SavedConfiguration } from '../entities/saved-configuration.entity'
+import { buildSavedConfigurationRequester } from './build-saved-configuration-requester.util'
 
 @Injectable()
 export class FindOneSavedConfigurationProvider {
@@ -35,14 +36,22 @@ export class FindOneSavedConfigurationProvider {
   /**
    * Returns one saved configuration by id, regardless of owner — used by the
    * admin quote-request inbox, which is deliberately unscoped unlike
-   * findOneOwnedOrFail above.
+   * findOneOwnedOrFail above. Loads the user relation to embed the
+   * requester's identity on the response.
    */
   public async findOneByIdOrFail(id: number): Promise<SavedConfiguration> {
-    const savedConfiguration =
-      await this.savedConfigurationsRepository.findOneBy({ id })
+    const savedConfiguration = await this.savedConfigurationsRepository.findOne(
+      {
+        where: { id },
+        relations: { user: true },
+      },
+    )
     if (!savedConfiguration) {
       throw new NotFoundException(`Saved configuration ${id} not found`)
     }
+    savedConfiguration.requester = buildSavedConfigurationRequester(
+      savedConfiguration.user,
+    )
     return savedConfiguration
   }
 }

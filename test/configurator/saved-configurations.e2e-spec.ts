@@ -582,6 +582,92 @@ describe('Configurator saved configurations (e2e)', () => {
       expect(unreviewedIds).toContain(unreviewed.id)
       expect(unreviewedIds).not.toContain(reviewed.id)
     })
+
+    it('embeds the requester identity on each row', async () => {
+      const created = await saveValid(ownerToken)
+      await request(app.getHttpServer())
+        .post(`/saved-configurations/${created.id}/request-quote`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200)
+
+      const res = await request(app.getHttpServer())
+        .get('/saved-configurations/admin')
+        .query({ limit: 100 })
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200)
+      const page = (res.body as ApiResponse<Paginated<SavedConfiguration>>).data
+      const row = page.data.find((r) => r.id === created.id)
+
+      expect(row?.requester).toEqual({
+        id: ownerId,
+        firstName: 'ConfiguratorSavedOwner',
+        lastName: null,
+        email: OWNER_EMAIL,
+      })
+    })
+
+    it('?startDate=/?endDate= narrows by quoteRequestedAt date range', async () => {
+      const inRange = await saveValid(ownerToken)
+      await request(app.getHttpServer())
+        .post(`/saved-configurations/${inRange.id}/request-quote`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200)
+
+      const yesterday = new Date(Date.now() - 86400000)
+        .toISOString()
+        .slice(0, 10)
+      const tomorrow = new Date(Date.now() + 86400000)
+        .toISOString()
+        .slice(0, 10)
+
+      const withinRes = await request(app.getHttpServer())
+        .get('/saved-configurations/admin')
+        .query({ startDate: yesterday, endDate: tomorrow, limit: 100 })
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200)
+      const withinIds = (
+        withinRes.body as ApiResponse<Paginated<SavedConfiguration>>
+      ).data.data.map((row) => row.id)
+      expect(withinIds).toContain(inRange.id)
+
+      const outsideRes = await request(app.getHttpServer())
+        .get('/saved-configurations/admin')
+        .query({ endDate: yesterday, limit: 100 })
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200)
+      const outsideIds = (
+        outsideRes.body as ApiResponse<Paginated<SavedConfiguration>>
+      ).data.data.map((row) => row.id)
+      expect(outsideIds).not.toContain(inRange.id)
+    })
+
+    it('?email= narrows to a case-insensitive substring match on the requester email', async () => {
+      const created = await saveValid(ownerToken)
+      await request(app.getHttpServer())
+        .post(`/saved-configurations/${created.id}/request-quote`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200)
+
+      const matchRes = await request(app.getHttpServer())
+        .get('/saved-configurations/admin')
+        .query({ email: 'CONFIGURATOR-SAVED-OWNER', limit: 100 })
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200)
+      const matchIds = (
+        matchRes.body as ApiResponse<Paginated<SavedConfiguration>>
+      ).data.data.map((row) => row.id)
+      expect(matchIds).toContain(created.id)
+
+      const noMatchRes = await request(app.getHttpServer())
+        .get('/saved-configurations/admin')
+        .query({ email: 'configurator-saved-other', limit: 100 })
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200)
+      const noMatchIds = (
+        noMatchRes.body as ApiResponse<Paginated<SavedConfiguration>>
+      ).data.data.map((row) => row.id)
+      expect(noMatchIds).not.toContain(created.id)
+    })
   })
 
   // ── GET /saved-configurations/admin/:id ──────────────────────────────────
@@ -613,6 +699,23 @@ describe('Configurator saved configurations (e2e)', () => {
 
       expect(snapshot.id).toBe(created.id)
       expect(snapshot.userId).toBe(ownerId)
+    })
+
+    it('embeds the requester identity', async () => {
+      const created = await saveValid(ownerToken)
+
+      const res = await request(app.getHttpServer())
+        .get(`/saved-configurations/admin/${created.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200)
+      const snapshot = (res.body as ApiResponse<SavedConfiguration>).data
+
+      expect(snapshot.requester).toEqual({
+        id: ownerId,
+        firstName: 'ConfiguratorSavedOwner',
+        lastName: null,
+        email: OWNER_EMAIL,
+      })
     })
 
     it('404s for a missing id', async () => {

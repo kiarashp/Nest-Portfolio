@@ -8,8 +8,10 @@ import {
   UpdateDateColumn,
 } from 'typeorm'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { Exclude } from 'class-transformer'
 import { User } from 'src/users/entities/user.entity'
 import { ConfigurableProduct } from './configurable-product.entity'
+import { SavedConfigurationRequester } from '../dtos/saved-configuration-requester.dto'
 
 // A frozen snapshot of a resolved configuration owned by a registered user
 // (CONFIGURATOR.md §2.5). The snapshot is never re-resolved against live
@@ -29,7 +31,10 @@ export class SavedConfiguration {
   userId!: number
 
   // user — relation, never serialized into responses; left undecorated so it
-  // stays out of the OpenAPI schema (same as UploadFile.user)
+  // stays out of the OpenAPI schema (same as UploadFile.user). The admin
+  // providers below now load it via join to populate `requester`, so
+  // @Exclude() is required here to keep the raw entity out of the JSON body.
+  @Exclude()
   @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user!: User
@@ -99,4 +104,11 @@ export class SavedConfiguration {
   @ApiProperty()
   @UpdateDateColumn()
   updatedAt!: Date
+
+  // requester — transient, not a stored column. Populated only by the admin
+  // inbox providers (list + single-read) from the joined user relation,
+  // mirroring the ProductType.productCount / Product.related pattern of a
+  // computed field that's undefined unless the serving endpoint opts in.
+  @ApiPropertyOptional({ type: () => SavedConfigurationRequester })
+  requester?: SavedConfigurationRequester
 }
