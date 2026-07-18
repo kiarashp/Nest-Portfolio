@@ -36,6 +36,12 @@ describe('classifyTypeChange', () => {
     expect(classifyTypeChange(baseFields, next)).toEqual([])
   })
 
+  it('returns [] when only isFilterable changes on a kept field', () => {
+    const next = clone()
+    next[2].isFilterable = false
+    expect(classifyTypeChange(baseFields, next)).toEqual([])
+  })
+
   it('returns [] when enum options are only added', () => {
     const next = clone()
     next[1].options = ['withHead', 'noHead', 'partialHead']

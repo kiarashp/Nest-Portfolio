@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common'
 import { FilterableField } from '../entities/product-type.entity'
 import {
   findFilterableField,
+  findQueryableField,
   validateSpecsAgainstType,
 } from './validate-specs.util'
 
@@ -29,6 +30,39 @@ describe('findFilterableField', () => {
 
   it('throws when filterableFields is null', () => {
     expect(() => findFilterableField(null, 'tempRange')).toThrow(
+      BadRequestException,
+    )
+  })
+})
+
+describe('findQueryableField', () => {
+  it('returns the field when isFilterable is true', () => {
+    const withFlag: FilterableField[] = [
+      {
+        key: 'tempRange',
+        label: 'Temperature Range',
+        type: 'number',
+        isFilterable: true,
+      },
+    ]
+    expect(findQueryableField(withFlag, 'tempRange').key).toBe('tempRange')
+  })
+
+  it('returns the field when isFilterable is omitted (defaults to filterable)', () => {
+    expect(findQueryableField(fields, 'tempRange').key).toBe('tempRange')
+  })
+
+  it('throws BadRequestException when isFilterable is false', () => {
+    const nonFilterable: FilterableField[] = [
+      { key: 'note', label: 'Note', type: 'string', isFilterable: false },
+    ]
+    expect(() => findQueryableField(nonFilterable, 'note')).toThrow(
+      BadRequestException,
+    )
+  })
+
+  it('throws BadRequestException for an undeclared key, same as findFilterableField', () => {
+    expect(() => findQueryableField(fields, 'ghost')).toThrow(
       BadRequestException,
     )
   })

@@ -198,8 +198,11 @@ removed it — use the explicit grouped query instead.
 | Change a field's `key` | reads as remove-old + add-new; the removal check on the old key applies |
 | Change a field's `type` | **400** — immutable (a type change is the data-breaker) |
 | Change a field's `label`/`unit` | allowed (display-only) |
+| Toggle a field's `isFilterable` | allowed (display-only — see below) |
 | Add enum `options` | allowed |
 | Remove enum `options` | allowed only if **no product** holds one of the removed values → else 409 |
+
+`isFilterable` (optional, defaults to `true` when omitted — existing rows predate this flag) controls whether a field is offered as a catalog filter facet; it has no bearing on whether the key is a valid stored spec, so `classifyTypeChange` never inspects it and toggling it in either direction needs no usage-check, same as `label`/`unit`.
 
 Because `type` is immutable, a `number` field can never come to hold non-numeric data, so the `(specs ->> key)::numeric` cast in `FindAllProductsProvider` can never hit bad data — no read-side hardening is needed.
 
@@ -237,12 +240,13 @@ Spec filtering **requires a type context** (`productTypeId` or `typeSlug`) so th
 - **enum / string** → exact text match: `(product.specs ->> :key) = :value`. For enum, the value must be one of `options`.
 - **number** → exact (`= value`) when a scalar is sent, or a range when `[min]`/`[max]` is sent: `(product.specs ->> :key)::numeric >= min` / `<= max`.
 
-Unknown keys, non-object `specs`, non-numeric number values, or out-of-range enum values all throw `BadRequestException`.
+Unknown keys, non-object `specs`, non-numeric number values, out-of-range enum values, or a key whose field has `isFilterable: false` all throw `BadRequestException`.
 
 ### validate-specs.util.ts (shared, no DI)
 
-- `findFilterableField(fields, key)` — returns the field def or throws if the key is not declared. Used by the filter builder.
-- `validateSpecsAgainstType(specs, fields)` — validates a product's stored specs (every key declared, every value matching its field type). Called by `CreateProductProvider` and `UpdateProductProvider` so the data that powers the filters stays well-formed.
+- `findFilterableField(fields, key)` — the **schema** lookup: returns the field def or throws if the key is not declared as a spec at all. Ignores `isFilterable` — a non-filterable field is still a valid stored spec. Used by `validateSpecsAgainstType`.
+- `findQueryableField(fields, key)` — the **filter-query** lookup used by `FindAllProductsProvider.applySpecFilters`. Calls `findFilterableField` and additionally throws `BadRequestException` if the matched field has `isFilterable: false`.
+- `validateSpecsAgainstType(specs, fields)` — validates a product's stored specs (every key declared, every value matching its field type). Called by `CreateProductProvider` and `UpdateProductProvider` so the data that powers the filters stays well-formed. Uses `findFilterableField`, not `findQueryableField` — a spec write should succeed regardless of the field's filterable flag.
 
 **Write-side validation cost:** `CreateProductProvider` only loads the `ProductType` (a pre-flight SELECT) **when specs are present** — without specs it still relies on the FK `23503` error to report a bad `productTypeId`, preserving the no-preflight rule below. `UpdateProductProvider` re-validates whenever `specs` **or** `productTypeId` changes and the product has specs.
 

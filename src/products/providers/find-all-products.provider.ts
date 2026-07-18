@@ -11,7 +11,7 @@ import {
 } from '../dto/get-products.dto'
 import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
-import { findFilterableField } from './validate-specs.util'
+import { findQueryableField } from './validate-specs.util'
 
 @Injectable()
 export class FindAllProductsProvider {
@@ -150,7 +150,8 @@ export class FindAllProductsProvider {
   /**
    * Adds one WHERE condition per spec filter. Enum/string facets match exactly;
    * number facets accept an exact value or a [min]/[max] range. Each key is
-   * validated against the type's filterableFields before use.
+   * validated against the type's filterableFields before use, and rejected if
+   * the matched field has isFilterable set to false.
    *
    * Values arrive as strings from the bracket-nested query params (a range is a
    * { min, max } object of strings), so number facets are coerced with Number()
@@ -163,7 +164,7 @@ export class FindAllProductsProvider {
   ): void {
     let i = 0
     for (const [key, value] of Object.entries(specs)) {
-      const field = findFilterableField(fields, key)
+      const field = findQueryableField(fields, key)
       const keyParam = `specKey${i}`
       qb.setParameter(keyParam, key)
 

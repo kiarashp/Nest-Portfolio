@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsNotEmpty,
   IsOptional,
@@ -56,6 +57,15 @@ export class FilterableFieldDto {
   @IsArray()
   @IsString({ each: true })
   options?: string[]
+
+  @ApiPropertyOptional({
+    default: true,
+    description:
+      'Whether this field is offered as a filter facet on the catalog listing. Defaults to true — a spec can still be stored/displayed even when this is false.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isFilterable?: boolean
 }
 
 export class CreateProductTypeDto {

@@ -20,6 +20,23 @@ export function findFilterableField(
 }
 
 /**
+ * Finds the field definition for a spec key used in a catalog filter query.
+ * Builds on findFilterableField (the key must still be a declared spec), then
+ * additionally rejects a key whose field has isFilterable set to false — a
+ * valid stored spec that the admin has opted out of the filter UI.
+ */
+export function findQueryableField(
+  fields: FilterableField[] | null | undefined,
+  key: string,
+): FilterableField {
+  const field = findFilterableField(fields, key)
+  if (field.isFilterable === false) {
+    throw new BadRequestException(`Spec "${key}" is not filterable`)
+  }
+  return field
+}
+
+/**
  * Validates a product's stored specs against its product type's filterableFields.
  * Every spec key must be declared on the type, and each value must match the
  * declared field type (number/string, or one of the enum options). This runs on

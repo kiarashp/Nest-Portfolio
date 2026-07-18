@@ -18,6 +18,8 @@ export interface FilterableField {
   unit?: string
   /** Only meaningful when type is 'enum'. */
   options?: string[]
+  /** Whether this field is offered as a catalog filter facet. Defaults to true when omitted — existing rows predate this flag. */
+  isFilterable?: boolean
 }
 
 @Entity()

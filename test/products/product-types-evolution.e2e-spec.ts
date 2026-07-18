@@ -191,6 +191,39 @@ describe('Product type evolution (e2e)', () => {
     await patchFields(initialFields).expect(200)
   })
 
+  it('allows toggling isFilterable on a kept field → 200', async () => {
+    const fields: FilterableField[] = [
+      { key: 'brand', label: 'Brand', type: 'string', isFilterable: false },
+      {
+        key: 'head',
+        label: 'Head',
+        type: 'enum',
+        options: ['withHead', 'noHead'],
+      },
+      { key: 'temp', label: 'Temperature', type: 'number', unit: '°C' },
+    ]
+    await patchFields(fields).expect(200)
+  })
+
+  it('rejects a GET /products filter on a field marked isFilterable: false → 400', async () => {
+    // The seeded product holds brand: 'Omega' — still a valid stored spec,
+    // just no longer offered as a filter facet once isFilterable is false.
+    await patchFields([
+      { key: 'brand', label: 'Brand', type: 'string', isFilterable: false },
+      {
+        key: 'head',
+        label: 'Head',
+        type: 'enum',
+        options: ['withHead', 'noHead'],
+      },
+      { key: 'temp', label: 'Temperature', type: 'number', unit: '°C' },
+    ]).expect(200)
+
+    await request(app.getHttpServer())
+      .get(`/products?typeSlug=${TYPE_SLUG}&specs[brand]=Omega`)
+      .expect(400)
+  })
+
   // ── BLOCKED changes ───────────────────────────────────────────────────────
 
   it("rejects changing a field's type → 400", async () => {
