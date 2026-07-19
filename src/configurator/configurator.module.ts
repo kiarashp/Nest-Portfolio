@@ -39,6 +39,7 @@ import { ConfiguratorsService } from './providers/configurators.service'
 import { FindPublishedConfiguratorProductsProvider } from './providers/find-published-configurator-products.provider'
 import { ConfiguratorResolverService } from './providers/configurator-resolver.service'
 import { SavedConfiguration } from './entities/saved-configuration.entity'
+import { QuoteMessage } from './entities/quote-message.entity'
 import { SavedConfigurationsController } from './saved-configurations.controller'
 import { SavedConfigurationsService } from './providers/saved-configurations.service'
 import { SaveConfigurationProvider } from './providers/save-configuration.provider'
@@ -47,7 +48,10 @@ import { FindOneSavedConfigurationProvider } from './providers/find-one-saved-co
 import { DeleteSavedConfigurationProvider } from './providers/delete-saved-configuration.provider'
 import { RequestQuoteSavedConfigurationProvider } from './providers/request-quote-saved-configuration.provider'
 import { FindAllSavedConfigurationsAdminProvider } from './providers/find-all-saved-configurations-admin.provider'
-import { ReviewSavedConfigurationProvider } from './providers/review-saved-configuration.provider'
+import { UpdateQuoteStatusProvider } from './providers/update-quote-status.provider'
+import { CountUnreadQuoteMessagesProvider } from './providers/count-unread-quote-messages.provider'
+import { FindQuoteMessagesProvider } from './providers/find-quote-messages.provider'
+import { CreateQuoteMessageProvider } from './providers/create-quote-message.provider'
 import { QuoteEventsListener } from './listeners/quote-events.listener'
 
 // Ordering-code configurator: the admin defines reusable segment
@@ -65,7 +69,11 @@ import { QuoteEventsListener } from './listeners/quote-events.listener'
 // /saved-configurations routes); Step 7 adds the request-quote endpoint
 // (POST /saved-configurations/:id/request-quote), which stamps
 // quoteRequestedAt and emits AppEvents.QUOTE_REQUESTED to email the site
-// owner via MailModule — see CONFIGURATOR.md.
+// owner via MailModule — see CONFIGURATOR.md. Each quote request also
+// carries a ticket-style message thread (QuoteMessage): owner and admin
+// */messages routes, a quoteStatus lifecycle (PENDING/ANSWERED/CLOSED),
+// per-side unread counts, and two-way email notifications via the
+// quote-message events.
 @Module({
   controllers: [
     ConfiguratorDefinitionsController,
@@ -107,7 +115,10 @@ import { QuoteEventsListener } from './listeners/quote-events.listener'
     DeleteSavedConfigurationProvider,
     RequestQuoteSavedConfigurationProvider,
     FindAllSavedConfigurationsAdminProvider,
-    ReviewSavedConfigurationProvider,
+    UpdateQuoteStatusProvider,
+    CountUnreadQuoteMessagesProvider,
+    FindQuoteMessagesProvider,
+    CreateQuoteMessageProvider,
     QuoteEventsListener,
   ],
   imports: [
@@ -117,6 +128,7 @@ import { QuoteEventsListener } from './listeners/quote-events.listener'
       SegmentOption,
       ProductSegmentAssignment,
       SavedConfiguration,
+      QuoteMessage,
       User,
     ]),
     AuditLogModule,

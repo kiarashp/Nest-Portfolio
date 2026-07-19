@@ -7,6 +7,7 @@ import { GetSavedConfigurationsAdminDto } from '../dtos/get-saved-configurations
 import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider'
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface'
 import { buildSavedConfigurationRequester } from './build-saved-configuration-requester.util'
+import { CountUnreadQuoteMessagesProvider } from './count-unread-quote-messages.provider'
 
 @Injectable()
 export class FindAllSavedConfigurationsAdminProvider {
@@ -16,6 +17,8 @@ export class FindAllSavedConfigurationsAdminProvider {
     private readonly savedConfigurationsRepository: Repository<SavedConfiguration>,
     /** inject shared pagination provider */
     private readonly paginationProvider: PaginationProvider,
+    /** inject the grouped unread counter to attach unreadCount per row */
+    private readonly countUnreadQuoteMessagesProvider: CountUnreadQuoteMessagesProvider,
   ) {}
 
   /**
@@ -23,8 +26,10 @@ export class FindAllSavedConfigurationsAdminProvider {
    * request first. Always scoped to rows where a quote was actually
    * requested (quoteRequestedAt IS NOT NULL) — this is a quote-request
    * inbox, not a listing of every saved configuration. Supports optional
-   * quoteReviewed, quoteRequestedAt date-range, and requester email filters
-   * on top of that base scope, and embeds each row's requester identity.
+   * quoteStatus, quoteRequestedAt date-range, and requester email filters
+   * on top of that base scope, and embeds each row's requester identity
+   * plus the transient unreadCount (user messages newer than the admin's
+   * last read of that thread).
    */
   public async findAll(
     dto: GetSavedConfigurationsAdminDto,
@@ -35,9 +40,9 @@ export class FindAllSavedConfigurationsAdminProvider {
       .leftJoinAndSelect('savedConfiguration.user', 'user')
       .where('savedConfiguration.quoteRequestedAt IS NOT NULL')
 
-    if (dto.quoteReviewed !== undefined) {
-      qb.andWhere('savedConfiguration.quoteReviewed = :quoteReviewed', {
-        quoteReviewed: dto.quoteReviewed,
+    if (dto.quoteStatus !== undefined) {
+      qb.andWhere('savedConfiguration.quoteStatus = :quoteStatus', {
+        quoteStatus: dto.quoteStatus,
       })
     }
 
@@ -70,8 +75,13 @@ export class FindAllSavedConfigurationsAdminProvider {
       qb,
       request,
     )
+    const unread = await this.countUnreadQuoteMessagesProvider.countUnread(
+      result.data.map((item) => item.id),
+      'admin',
+    )
     result.data.forEach((item) => {
       item.requester = buildSavedConfigurationRequester(item.user)
+      item.unreadCount = unread.get(item.id) ?? 0
     })
     return result
   }

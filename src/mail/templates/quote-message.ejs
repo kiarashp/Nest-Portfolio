@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>New Quote Request</title>
+    <title>New Quote Message</title>
     <style>
       body {
         margin: 0;
@@ -56,10 +56,7 @@
         background-color: #f9f9f9;
         border-left: 3px solid #1a1a2e;
         border-radius: 2px;
-      }
-      .field-value ul {
-        margin: 0;
-        padding-left: 20px;
+        white-space: pre-wrap;
       }
       .footer {
         background-color: #f4f4f4;
@@ -73,10 +70,10 @@
   <body>
     <div class="wrapper">
       <div class="header">
-        <h1>New quote request</h1>
+        <h1>New quote message</h1>
       </div>
       <div class="body">
-        <p>A registered user requested a quote for a configured product.</p>
+        <p>A user posted a new message on their quote request.</p>
 
         <p class="field-label">From</p>
         <p class="field-value"><%= userFirstName %> &lt;<%= userEmail %>&gt;</p>
@@ -87,22 +84,11 @@
         <p class="field-label">Code</p>
         <p class="field-value"><%= code %></p>
 
-        <p class="field-label">Summary</p>
-        <div class="field-value">
-          <ul>
-            <% summary.forEach(function(line) { %>
-            <li><%= line %></li>
-            <% }) %>
-          </ul>
-        </div>
-
-        <% if (message) { %>
         <p class="field-label">Message</p>
-        <p class="field-value" style="white-space: pre-wrap"><%= message %></p>
-        <% } %>
+        <p class="field-value"><%= messageBody %></p>
       </div>
       <div class="footer">
-        <p>Reply directly to this email to respond to <%= userFirstName %>.</p>
+        <p>Reply from the quote-request inbox in the admin dashboard.</p>
       </div>
     </div>
   </body>

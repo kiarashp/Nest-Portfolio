@@ -14,6 +14,7 @@ import { SegmentDefinition } from 'src/configurator/entities/segment-definition.
 import { SegmentOption } from 'src/configurator/entities/segment-option.entity'
 import { ProductSegmentAssignment } from 'src/configurator/entities/product-segment-assignment.entity'
 import { SavedConfiguration } from 'src/configurator/entities/saved-configuration.entity'
+import { QuoteMessage } from 'src/configurator/entities/quote-message.entity'
 
 config({ path: `.env.${process.env.NODE_ENV ?? 'development'}` })
 
@@ -39,6 +40,7 @@ export default new DataSource({
     SegmentOption,
     ProductSegmentAssignment,
     SavedConfiguration,
+    QuoteMessage,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,

@@ -120,6 +120,8 @@ describe('Feature (e2e)', () => {
 | `sendPasswordResetMail` | `POST /auth/forgot-password` |
 | `sendContactNotification` | `POST /contact` |
 | `sendQuoteRequestMail` | `POST /saved-configurations/:id/request-quote` |
+| `sendQuoteMessageNotification` | `POST /saved-configurations/:id/messages` (owner message) |
+| `sendQuoteReplyMail` | `POST /saved-configurations/admin/:id/messages` (admin reply) |
 
 Pass only the methods you need to assert on. Unspecified methods get a silent no-op automatically:
 
@@ -160,6 +162,7 @@ Throttle limits that matter in tests:
 | `POST /auth/reset-password` | 5 / 60 s |
 | `POST /auth/change-password` | 5 / 60 s |
 | `POST /users` | 5 / 600 s |
+| `POST /saved-configurations/:id/messages` | 10 / 60 s |
 
 ## Minting tokens for Google-only users
 

@@ -196,6 +196,63 @@ manual step — run `pnpm run generate:types` locally with the dev DB up.
 
 **All 7 steps of the Configurator module's implementation plan are now complete.**
 
+**Quote-request message threads (post-plan feature) — done.** Each quote request (a
+`SavedConfiguration` with `quoteRequestedAt` set) now carries one ticket-style, async message
+thread. Full plan lived at `.claude\plans\do-the-plan-plz-mutable-honey.md`; implemented in one
+session, migration `1784468786797-AddQuoteMessagesAndStatus`. Key facts:
+
+- **New entity `QuoteMessage`** (`configurator_quote_message`, also added to `data-source.ts`):
+  `savedConfigurationId` FK CASCADE, `senderId` FK nullable **SET NULL** (deleting an admin must
+  not delete their replies out of users' threads — the denormalized `senderRole` `'user'|'admin'`
+  enum keeps threads renderable after sender deletion), `body` text, immutable (no `updatedAt`),
+  composite index `(savedConfigurationId, createdAt)`. No Thread entity — one snapshot = one thread.
+- **Breaking change (accepted): `quoteReviewed` boolean dropped**, replaced by nullable
+  `quoteStatus` enum (`PENDING`/`ANSWERED`/`CLOSED`) with the invariant `quoteStatus IS NULL ⇔
+  quoteRequestedAt IS NULL` (request-quote sets `PENDING` in the same save that stamps the
+  timestamp; the admin PATCH 400s when no quote was requested). Transitions: user message →
+  always `PENDING` (reopens `ANSWERED` and `CLOSED`); admin message → `PENDING`→`ANSWERED` only
+  (`CLOSED` stays closed); admin `PATCH /saved-configurations/admin/:id`
+  (`PatchSavedConfigurationStatusDto`, `UpdateQuoteStatusProvider` — renamed from
+  `ReviewSavedConfigurationProvider`) → any value. Automatic bumps write no `SavedConfiguration`
+  audit row (the message's `CREATE/'QuoteMessage'` row covers it); only the manual PATCH audits.
+  `GET /saved-configurations/admin`'s `?quoteReviewed=` filter became `?quoteStatus=` (plain
+  `@IsEnum` — no boolean-coercion `@Type/@Transform` dance needed for enum params).
+- **Four new routes** on `SavedConfigurationsController` (admin literals still declared before
+  `:id`): owner `GET`/`POST /saved-configurations/:id/messages` (bare `@ApiAuth()`; POST throttled
+  `10/60s` + dev `@SkipThrottle` — the one throttled configurator route) and admin
+  `GET`/`POST /saved-configurations/admin/:id/messages`. Reads are paginated `createdAt DESC, id
+  DESC` (frontend reverses); a snapshot without a quote request reads as an **empty page, not
+  400**; posts 400 until a quote is requested. Providers: `FindQuoteMessagesProvider`,
+  `CreateQuoteMessageProvider`.
+- **Unread model:** `userLastReadAt`/`adminLastReadAt` timestamptz columns on `SavedConfiguration`
+  (all admins share one — single-owner site). A thread `GET` stamps the reader's column via one
+  `repository.update` after fetching the page (no separate mark-read endpoint; bumps `updatedAt`,
+  accepted). Both list endpoints attach transient `unreadCount` (= other side's messages newer
+  than the reader's stamp) via `CountUnreadQuoteMessagesProvider.countUnread(ids, side)` — one
+  grouped `COUNT(*) ... GROUP BY` query per page, never per-row; covered by e2e, not a mock unit
+  spec (QueryBuilder-heavy).
+- **`POST .../request-quote` gained an optional `message` body field** (`RequestQuoteDto`) that
+  becomes the thread's first `QuoteMessage` and rides inside the existing quote-request email as
+  a `message` context key (always passed, even when null — absent EJS keys are `ReferenceError`s;
+  the template guards with `<% if (message) { %>`). The posted-by-user event is deliberately not
+  emitted there — no second email.
+- **Mail/events:** two new events sharing one `QuoteMessagePostedPayload`
+  (`QUOTE_MESSAGE_POSTED_BY_USER` → `SendQuoteMessageNotificationProvider`/`quote-message.ejs` to
+  the site owner; `QUOTE_MESSAGE_POSTED_BY_ADMIN` → `SendQuoteReplyMailProvider`/`quote-reply.ejs`
+  to the thread owner — `userEmail`/`userFirstName` are always the thread owner's), both handled
+  by the existing `QuoteEventsListener`. The two-write flows (message + status bump;
+  request-quote + first message) are deliberately non-transactional (benign failure modes).
+- **Tests:** `update-quote-status.provider.spec.ts` (rewrote the old review spec) and a new
+  `create-quote-message.provider.spec.ts` (18 unit tests total for the pair);
+  `saved-configurations.e2e-spec.ts` updated for the breaking assertions; new
+  `test/configurator/quote-messages.e2e-spec.ts` (17 tests — guards, transitions both
+  directions, unread 1→0 flows, request-quote-with-message single-email proof). `MailMock` gained
+  `sendQuoteMessageNotification`/`sendQuoteReplyMail`. Full suite green: 254 unit, 586 e2e.
+  **e2e fixture gotcha (re-learned):** a SELECT definition needs ≥2 options before
+  `POST .../assignments` accepts it — new configurator fixtures must seed two options.
+- `openapi-types.ts` **was** regenerated this time (`pnpm run generate:types`), clearing the
+  manual step Step 7 had left pending.
+
 ---
 
 ### Scheduled post auto-publishing

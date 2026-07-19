@@ -5,6 +5,8 @@ import { SendVerificationMailProvider } from './providers/send-verification-mail
 import { SendPasswordResetMailProvider } from './providers/send-password-reset-mail.provider'
 import { SendContactNotificationProvider } from './providers/send-contact-notification.provider'
 import { SendQuoteRequestMailProvider } from './providers/send-quote-request-mail.provider'
+import { SendQuoteMessageNotificationProvider } from './providers/send-quote-message-notification.provider'
+import { SendQuoteReplyMailProvider } from './providers/send-quote-reply-mail.provider'
 import { MailOptions } from './interfaces/mail-options.interface'
 
 @Injectable()
@@ -18,6 +20,10 @@ export class MailService {
     private readonly sendContactNotificationProvider: SendContactNotificationProvider,
     // dedicated provider for configurator quote-request notifications
     private readonly sendQuoteRequestMailProvider: SendQuoteRequestMailProvider,
+    // dedicated provider for user-posted quote-thread messages (to site owner)
+    private readonly sendQuoteMessageNotificationProvider: SendQuoteMessageNotificationProvider,
+    // dedicated provider for admin quote-thread replies (to the user)
+    private readonly sendQuoteReplyMailProvider: SendQuoteReplyMailProvider,
   ) {}
 
   async sendMail(options: MailOptions): Promise<void> {
@@ -65,7 +71,30 @@ export class MailService {
     productName: string
     code: string
     summary: string[]
+    message: string | null
   }): Promise<void> {
     return this.sendQuoteRequestMailProvider.send(request)
+  }
+
+  /** Notifies the site owner of a new user message on a quote-request thread. */
+  async sendQuoteMessageNotification(payload: {
+    userEmail: string
+    userFirstName: string
+    productName: string
+    code: string
+    messageBody: string
+  }): Promise<void> {
+    return this.sendQuoteMessageNotificationProvider.send(payload)
+  }
+
+  /** Notifies the thread owner of an admin reply on their quote-request thread. */
+  async sendQuoteReplyMail(payload: {
+    userEmail: string
+    userFirstName: string
+    productName: string
+    code: string
+    messageBody: string
+  }): Promise<void> {
+    return this.sendQuoteReplyMailProvider.send(payload)
   }
 }

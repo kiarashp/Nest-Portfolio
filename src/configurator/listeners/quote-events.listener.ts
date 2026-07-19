@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
 import { AppEvents } from 'src/common/events/app-events'
-import type { QuoteRequestedPayload } from 'src/common/events/app-events'
+import type {
+  QuoteMessagePostedPayload,
+  QuoteRequestedPayload,
+} from 'src/common/events/app-events'
 import { MailService } from 'src/mail/mail.service'
 
 @Injectable()
@@ -24,6 +27,42 @@ export class QuoteEventsListener {
     } catch (error) {
       this.logger.error(
         `Failed to send quote request notification — savedConfigurationId=${payload.savedConfigurationId}`,
+        (error as Error).stack,
+      )
+    }
+  }
+
+  /** Emails the site owner when a user posts a message on their quote thread. */
+  @OnEvent(AppEvents.QUOTE_MESSAGE_POSTED_BY_USER)
+  async handleQuoteMessagePostedByUser(
+    payload: QuoteMessagePostedPayload,
+  ): Promise<void> {
+    try {
+      await this.mailService.sendQuoteMessageNotification(payload)
+      this.logger.log(
+        `Quote message notification sent — savedConfigurationId=${payload.savedConfigurationId}`,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to send quote message notification — savedConfigurationId=${payload.savedConfigurationId}`,
+        (error as Error).stack,
+      )
+    }
+  }
+
+  /** Emails the thread owner when an admin replies on their quote thread. */
+  @OnEvent(AppEvents.QUOTE_MESSAGE_POSTED_BY_ADMIN)
+  async handleQuoteMessagePostedByAdmin(
+    payload: QuoteMessagePostedPayload,
+  ): Promise<void> {
+    try {
+      await this.mailService.sendQuoteReplyMail(payload)
+      this.logger.log(
+        `Quote reply mail sent — savedConfigurationId=${payload.savedConfigurationId}`,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to send quote reply mail — savedConfigurationId=${payload.savedConfigurationId}`,
         (error as Error).stack,
       )
     }

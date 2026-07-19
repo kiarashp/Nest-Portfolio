@@ -17,6 +17,8 @@ interface MailMock {
   sendPasswordResetMail?: jest.Mock
   sendContactNotification?: jest.Mock
   sendQuoteRequestMail?: jest.Mock
+  sendQuoteMessageNotification?: jest.Mock
+  sendQuoteReplyMail?: jest.Mock
 }
 
 // Per-method storage overrides. Unspecified methods get a sensible default mock.
@@ -62,6 +64,9 @@ export async function createApp(
       sendPasswordResetMail: mailMock.sendPasswordResetMail ?? noop(),
       sendContactNotification: mailMock.sendContactNotification ?? noop(),
       sendQuoteRequestMail: mailMock.sendQuoteRequestMail ?? noop(),
+      sendQuoteMessageNotification:
+        mailMock.sendQuoteMessageNotification ?? noop(),
+      sendQuoteReplyMail: mailMock.sendQuoteReplyMail ?? noop(),
     })
     // Always mock StorageProvider — prevents any spec from hitting Cloudinary.
     // Default upload returns a stable mock URL and publicId.

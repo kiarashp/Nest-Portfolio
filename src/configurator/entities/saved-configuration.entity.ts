@@ -12,6 +12,7 @@ import { Exclude } from 'class-transformer'
 import { User } from 'src/users/entities/user.entity'
 import { ConfigurableProduct } from './configurable-product.entity'
 import { SavedConfigurationRequester } from '../dtos/saved-configuration-requester.dto'
+import { QuoteStatus } from '../enums/quote-status.enum'
 
 // A frozen snapshot of a resolved configuration owned by a registered user
 // (CONFIGURATOR.md §2.5). The snapshot is never re-resolved against live
@@ -88,12 +89,27 @@ export class SavedConfiguration {
   @Column({ type: 'timestamptz', nullable: true })
   quoteRequestedAt?: Date | null
 
-  // quoteReviewed — admin-settable read/unread flag for the quote-request
-  // inbox; independent of quoteRequestedAt, which stays the immutable
-  // "when was this requested" timestamp
-  @ApiProperty({ example: false })
-  @Column({ type: 'boolean', default: false })
-  quoteReviewed!: boolean
+  // quoteStatus — lifecycle status of the quote request. Null until a quote
+  // is requested (invariant: quoteStatus IS NULL exactly when
+  // quoteRequestedAt IS NULL); set to PENDING in the same save that stamps
+  // quoteRequestedAt. A user message always moves it back to PENDING; an
+  // admin message moves PENDING to ANSWERED (CLOSED stays closed); the admin
+  // PATCH can set any value.
+  @ApiPropertyOptional({ enum: QuoteStatus, nullable: true })
+  @Column({ type: 'enum', enum: QuoteStatus, nullable: true })
+  quoteStatus?: QuoteStatus | null
+
+  // userLastReadAt — when the owner last fetched the message thread; a
+  // message from the admin newer than this counts as unread for the owner
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
+  userLastReadAt?: Date | null
+
+  // adminLastReadAt — when an admin last fetched the message thread; shared
+  // by all admins (single-owner site), same unread semantics as above
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
+  adminLastReadAt?: Date | null
 
   // createdAt
   @ApiProperty()
@@ -111,4 +127,11 @@ export class SavedConfiguration {
   // computed field that's undefined unless the serving endpoint opts in.
   @ApiPropertyOptional({ type: () => SavedConfigurationRequester })
   requester?: SavedConfigurationRequester
+
+  // unreadCount — transient, not a stored column. Number of messages from
+  // the other side newer than the reader's last-read timestamp; populated
+  // only by the list providers (owner list counts admin messages, admin
+  // inbox counts user messages).
+  @ApiPropertyOptional({ type: Number })
+  unreadCount?: number
 }

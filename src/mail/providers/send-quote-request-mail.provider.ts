@@ -17,6 +17,7 @@ export class SendQuoteRequestMailProvider {
     productName: string
     code: string
     summary: string[]
+    message: string | null
   }): Promise<void> {
     // owner's email comes from QUOTE_NOTIFY_EMAIL, falling back to MAIL_FROM
     // when unset — lets MAIL_FROM stay a no-reply sender while notifications land in a real inbox
@@ -31,6 +32,9 @@ export class SendQuoteRequestMailProvider {
         productName: request.productName,
         code: request.code,
         summary: request.summary,
+        // always present in the context — an absent key is a ReferenceError
+        // inside EJS; the template guards on truthiness
+        message: request.message,
       },
     })
   }

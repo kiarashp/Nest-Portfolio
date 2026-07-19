@@ -433,6 +433,8 @@ describe('Configurator saved configurations (e2e)', () => {
       expect(new Date(snapshot.quoteRequestedAt!).toString()).not.toBe(
         'Invalid Date',
       )
+      // The status is set in the same save that stamps the timestamp.
+      expect(snapshot.quoteStatus).toBe('PENDING')
       expect(snapshot.code).toBe(EXPECTED_CODE)
       expect(snapshot.summary).toEqual(EXPECTED_SUMMARY)
       expect(snapshot.productName).toBe(MAIN_NAME)
@@ -456,6 +458,8 @@ describe('Configurator saved configurations (e2e)', () => {
           productName: MAIN_NAME,
           code: EXPECTED_CODE,
           summary: EXPECTED_SUMMARY,
+          // Body-less call — no first thread message rides in the email.
+          message: null,
         }),
       )
     })
@@ -542,45 +546,53 @@ describe('Configurator saved configurations (e2e)', () => {
       expect(ids.indexOf(second.id)).toBeLessThan(ids.indexOf(first.id))
     })
 
-    it('?quoteReviewed= narrows to reviewed/unreviewed requests', async () => {
-      const reviewed = await saveValid(ownerToken)
+    it('?quoteStatus= narrows to requests in that status', async () => {
+      const answered = await saveValid(ownerToken)
       await request(app.getHttpServer())
-        .post(`/saved-configurations/${reviewed.id}/request-quote`)
+        .post(`/saved-configurations/${answered.id}/request-quote`)
         .set('Authorization', `Bearer ${ownerToken}`)
         .expect(200)
       await request(app.getHttpServer())
-        .patch(`/saved-configurations/admin/${reviewed.id}`)
+        .patch(`/saved-configurations/admin/${answered.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ quoteReviewed: true })
+        .send({ quoteStatus: 'ANSWERED' })
         .expect(200)
 
-      const unreviewed = await saveValid(ownerToken)
+      const pending = await saveValid(ownerToken)
       await request(app.getHttpServer())
-        .post(`/saved-configurations/${unreviewed.id}/request-quote`)
+        .post(`/saved-configurations/${pending.id}/request-quote`)
         .set('Authorization', `Bearer ${ownerToken}`)
         .expect(200)
 
-      const reviewedRes = await request(app.getHttpServer())
+      const answeredRes = await request(app.getHttpServer())
         .get('/saved-configurations/admin')
-        .query({ quoteReviewed: 'true', limit: 100 })
+        .query({ quoteStatus: 'ANSWERED', limit: 100 })
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
-      const reviewedIds = (
-        reviewedRes.body as ApiResponse<Paginated<SavedConfiguration>>
+      const answeredIds = (
+        answeredRes.body as ApiResponse<Paginated<SavedConfiguration>>
       ).data.data.map((row) => row.id)
-      expect(reviewedIds).toContain(reviewed.id)
-      expect(reviewedIds).not.toContain(unreviewed.id)
+      expect(answeredIds).toContain(answered.id)
+      expect(answeredIds).not.toContain(pending.id)
 
-      const unreviewedRes = await request(app.getHttpServer())
+      const pendingRes = await request(app.getHttpServer())
         .get('/saved-configurations/admin')
-        .query({ quoteReviewed: 'false', limit: 100 })
+        .query({ quoteStatus: 'PENDING', limit: 100 })
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200)
-      const unreviewedIds = (
-        unreviewedRes.body as ApiResponse<Paginated<SavedConfiguration>>
+      const pendingIds = (
+        pendingRes.body as ApiResponse<Paginated<SavedConfiguration>>
       ).data.data.map((row) => row.id)
-      expect(unreviewedIds).toContain(unreviewed.id)
-      expect(unreviewedIds).not.toContain(reviewed.id)
+      expect(pendingIds).toContain(pending.id)
+      expect(pendingIds).not.toContain(answered.id)
+    })
+
+    it('?quoteStatus= rejects an invalid enum value with 400', async () => {
+      await request(app.getHttpServer())
+        .get('/saved-configurations/admin')
+        .query({ quoteStatus: 'NOT_A_STATUS' })
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(400)
     })
 
     it('embeds the requester identity on each row', async () => {
@@ -732,7 +744,7 @@ describe('Configurator saved configurations (e2e)', () => {
     it('401s without a token', async () => {
       await request(app.getHttpServer())
         .patch('/saved-configurations/admin/1')
-        .send({ quoteReviewed: true })
+        .send({ quoteStatus: 'ANSWERED' })
         .expect(401)
     })
 
@@ -742,11 +754,11 @@ describe('Configurator saved configurations (e2e)', () => {
       await request(app.getHttpServer())
         .patch(`/saved-configurations/admin/${created.id}`)
         .set('Authorization', `Bearer ${ownerToken}`)
-        .send({ quoteReviewed: true })
+        .send({ quoteStatus: 'ANSWERED' })
         .expect(403)
     })
 
-    it('missing quoteReviewed in body → 400', async () => {
+    it('missing quoteStatus in body → 400', async () => {
       const created = await saveValid(ownerToken)
 
       await request(app.getHttpServer())
@@ -756,30 +768,55 @@ describe('Configurator saved configurations (e2e)', () => {
         .expect(400)
     })
 
+    it('invalid enum value → 400', async () => {
+      const created = await saveValid(ownerToken)
+
+      await request(app.getHttpServer())
+        .patch(`/saved-configurations/admin/${created.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ quoteStatus: 'NOT_A_STATUS' })
+        .expect(400)
+    })
+
+    it('400s when no quote was ever requested for the snapshot', async () => {
+      const created = await saveValid(ownerToken)
+
+      await request(app.getHttpServer())
+        .patch(`/saved-configurations/admin/${created.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ quoteStatus: 'ANSWERED' })
+        .expect(400)
+    })
+
     it('404s for a missing id', async () => {
       await request(app.getHttpServer())
         .patch('/saved-configurations/admin/999999')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ quoteReviewed: true })
+        .send({ quoteStatus: 'ANSWERED' })
         .expect(404)
     })
 
-    it('toggles quoteReviewed and writes an AuditLog row', async () => {
+    it('sets quoteStatus and writes an AuditLog row', async () => {
       const created = await saveValid(ownerToken)
-      expect(created.quoteReviewed).toBe(false)
+      expect(created.quoteStatus).toBeNull()
+
+      await request(app.getHttpServer())
+        .post(`/saved-configurations/${created.id}/request-quote`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200)
 
       const res = await request(app.getHttpServer())
         .patch(`/saved-configurations/admin/${created.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ quoteReviewed: true })
+        .send({ quoteStatus: 'ANSWERED' })
         .expect(200)
       const snapshot = (res.body as ApiResponse<SavedConfiguration>).data
-      expect(snapshot.quoteReviewed).toBe(true)
+      expect(snapshot.quoteStatus).toBe('ANSWERED')
 
       const row: SavedConfiguration | null = await dataSource
         .getRepository(SavedConfiguration)
         .findOneBy({ id: created.id })
-      expect(row!.quoteReviewed).toBe(true)
+      expect(row!.quoteStatus).toBe('ANSWERED')
 
       const auditRow: AuditLog | null = await auditLogRepo.findOneBy({
         entity: 'SavedConfiguration',
