@@ -1,6 +1,6 @@
 # Backend State
 
-NestJS 11 + TypeORM + PostgreSQL backend for a personal blog/portfolio. Auth, posts, tags, uploads (Cloudinary), user management, contact form, and RBAC (USER / EDITOR / AUTHOR / ADMIN) are all complete and in production.
+NestJS 11 + TypeORM + PostgreSQL backend for a personal blog/portfolio. Auth, posts, tags, uploads (swappable local-disk/Cloudinary backend, local disk by default), user management, contact form, and RBAC (USER / EDITOR / AUTHOR / ADMIN) are all complete and in production.
 
 ---
 
@@ -323,3 +323,46 @@ now also carries a `PUBLISHED_SKU`. Full suite green: 46 unit test files (231
 tests) and 32 e2e test files (543 tests). No entity/migration/DTO changes.
 `openapi-types.ts` regeneration is the usual manual step
 (`pnpm run generate:types` against the dev DB) — not run as part of this change.
+
+---
+
+### First production deploy prep: local-disk storage + trust proxy fix — done
+
+Ahead of the first production deploy, uploads no longer require Cloudinary. A
+new `LocalDiskStorageProvider` (`src/uploads/providers/local-disk.provider.ts`)
+implements the existing `StorageProvider` abstract class alongside
+`CloudinaryProvider`; `UploadsModule` picks between them via a `useFactory`
+keyed on the new `STORAGE_DRIVER` env var (`local` | `cloudinary`, default
+`local` — see `src/config/uploads.config.ts`). Only the selected backend is
+ever instantiated, so `CLOUDINARY_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET`
+became conditionally required in `environment.validation.ts` (`Joi.when('STORAGE_DRIVER', ...)`)
+instead of unconditionally required. Local uploads write under `UPLOADS_DIR`
+(default `./uploads`) and are served back out at `/uploads/*` by
+`app.create.ts` via `NestExpressApplication.useStaticAssets()`, with a
+`Cross-Origin-Resource-Policy: cross-origin` override scoped to that one route
+(helmet's global default would otherwise block the frontend, a different
+origin in production, from rendering `<img>` tags against these URLs).
+`Dockerfile` now seeds `/app/uploads` with `node`-user ownership before
+`USER node`, so a Coolify Persistent Storage volume mounted there gets correct
+permissions on first deploy — no reverse-proxy config change needed, Coolify's
+existing Caddy proxy already forwards `/uploads/*` to the app like any other
+path. See `src/uploads/CLAUDE.md`'s "Local-disk storage" section for the full
+mechanism, including the persistence/`APP_URL` caveats.
+
+Same session also fixed a separate pre-existing gap found while auditing for
+this deploy: `app.create.ts` now calls `app.set('trust proxy', 1)`. Without it,
+behind Coolify/Railway's reverse proxy, `ThrottlerGuard`'s per-IP rate limit
+would have collapsed into one shared bucket for every visitor (`req.ip`
+resolving to the proxy's own address), and `PaginationProvider`'s
+`first`/`last`/`next`/`prev` links would have been built with `http://` instead
+of `https://` (`request.protocol` reading the proxy-to-app hop, not the
+original client-to-proxy one).
+
+New unit test `src/uploads/providers/local-disk.provider.spec.ts` (6 tests:
+write/read round-trip, mimetype-extension fallback, nested folders, idempotent
+delete, and two path-traversal-sanitization cases). No DTO/entity/route/OpenAPI
+schema changes — `UploadResult`'s shape (`{ url, publicId }`) is unchanged, so
+`openapi-types.ts` does not need regenerating for this change. Full suite
+green: 260 unit tests, 585/586 e2e (the one failure,
+`resolve.e2e-spec.ts`'s SELECT-options-ordering assertion, is pre-existing and
+unrelated — reproduced identically on `master` with this change stashed out).

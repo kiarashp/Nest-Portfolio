@@ -139,12 +139,12 @@ This allows a client to send `null` to explicitly clear a nullable field (e.g. r
 ## Image upload pattern
 
 Product images are tracked as `UploadFile` rows (the same model posts use), **not** bare URLs. This is
-what lets Cloudinary assets be cleaned up when a product is deleted.
+what lets storage-backend assets be cleaned up when a product is deleted.
 
 - `UploadProductImageProvider` goes through `UploadsService.uploadFile(file, adminId, ` products/${id} `, { productId })`, which creates an `UploadFile` row carrying `productId` + `publicId`. It returns the `UploadFile` — it does **not** set `imageUrl`/`images`.
 - The flow is **decoupled** (like post images): the frontend uploads via `POST /products/:id/images`, gets back the URL, then sets `imageUrl` (featured) and/or `images` (gallery) via `PATCH /products/:id`. `UploadFile` = tracking/cleanup; the product's `imageUrl`/`images` columns = presentation pointers.
 - `FindProductImagesProvider` (`GET /products/:id/images`) lists a product's uploaded files for the admin picker. Product image management is ADMIN-only, so there is no per-user ownership check.
-- `DeleteProductImageProvider` (`DELETE /products/:id/images/:fileId`) deletes one file from Cloudinary + DB and clears it from `imageUrl`/`images` if referenced. The `:fileId` must belong to the route's product, else 404.
+- `DeleteProductImageProvider` (`DELETE /products/:id/images/:fileId`) deletes one file from the active storage backend + DB and clears it from `imageUrl`/`images` if referenced. The `:fileId` must belong to the route's product, else 404.
 - `DeleteProductProvider.softDelete` loads every `UploadFile` for the product and `uploadsService.deleteFile()`s each **before** soft-deleting the row. There is no restore endpoint, so purging the assets on soft-delete is safe.
 
 `Product` images are linked via `UploadFile.productId` (a nullable FK mirroring `postId`). `ProductsModule` registers `UploadFile` in its own `TypeOrmModule.forFeature` so the providers can inject that repository, and imports `UploadsModule` for the exported `UploadsService`. A `Product` cannot be hard-deleted while `upload_file` rows still reference it (FK with no cascade) — soft-delete purges them first; tests must delete the rows before hard-deleting products.
@@ -153,9 +153,9 @@ what lets Cloudinary assets be cleaned up when a product is deleted.
 
 ## Product type image tracking
 
-`ProductType.imageUrl` is also backed by an `UploadFile` row (via `UploadFile.productTypeId`), so its Cloudinary asset gets purged when the type is deleted or the image is replaced — the same tracking model as products/posts. Unlike products/posts, a type has only **one** image slot (no `images` gallery), so the flow is a **single combined endpoint** rather than the decoupled upload-then-PATCH pattern:
+`ProductType.imageUrl` is also backed by an `UploadFile` row (via `UploadFile.productTypeId`), so its storage-backend asset gets purged when the type is deleted or the image is replaced — the same tracking model as products/posts. Unlike products/posts, a type has only **one** image slot (no `images` gallery), so the flow is a **single combined endpoint** rather than the decoupled upload-then-PATCH pattern:
 
-- `POST /product-types/:id/image` (`UploadProductTypeImageProvider`) uploads the file **and** sets `imageUrl` in the same call. If a previous image was already tracked, it is purged from Cloudinary + the `upload_file` table first, so replacing the image never leaves an orphan behind. Returns the updated `ProductType` (not a bare `UploadFile`), since the caller needs the new `imageUrl` immediately with no follow-up request.
+- `POST /product-types/:id/image` (`UploadProductTypeImageProvider`) uploads the file **and** sets `imageUrl` in the same call. If a previous image was already tracked, it is purged from the storage backend + the `upload_file` table first, so replacing the image never leaves an orphan behind. Returns the updated `ProductType` (not a bare `UploadFile`), since the caller needs the new `imageUrl` immediately with no follow-up request.
 - `GET /product-types/:id/image` (`FindProductTypeImageProvider`) returns the tracked `UploadFile` for the admin edit form; 404 if none exists.
 - `DELETE /product-types/:id/image` (`DeleteProductTypeImageProvider`) purges the tracked file and clears `imageUrl` — but only if `imageUrl` still points at that file (guards against a direct `PATCH /product-types/:id` having pointed it elsewhere since upload). Returns the updated `ProductType`.
 - `DeleteProductTypeProvider.delete` (a **hard** delete, no soft-delete fallback) loads every `UploadFile` by `productTypeId` and `uploadsService.deleteFile()`s each **before** the actual `delete()` call — otherwise the FK on `upload_file.productTypeId` would block the delete. This runs after the existing products-still-reference-this-type conflict check.

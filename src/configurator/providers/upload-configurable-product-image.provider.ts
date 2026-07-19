@@ -19,8 +19,8 @@ export class UploadConfigurableProductImageProvider {
     private readonly configurableProductsRepository: Repository<ConfigurableProduct>,
     /** inject find-one provider for the 404 guard */
     private readonly findOneConfigurableProductProvider: FindOneConfigurableProductProvider,
-    /** inject StorageProvider to upload/replace the Cloudinary asset directly — this
-     * entity has no UploadFile row, mirroring the avatar-options pattern */
+    /** inject StorageProvider to upload/replace the asset directly on the active
+     * storage backend — this entity has no UploadFile row, mirroring the avatar-options pattern */
     private readonly storageProvider: StorageProvider,
     /** inject audit log service to record the image change */
     private readonly auditLogService: AuditLogService,
@@ -29,8 +29,8 @@ export class UploadConfigurableProductImageProvider {
   /**
    * Uploads an image for a configurable product and sets imageUrl/imagePublicId
    * in the same call — a product has only one image slot. Any previously
-   * tracked asset is destroyed from Cloudinary first so replacing the image
-   * never leaves an orphan behind.
+   * tracked asset is destroyed from the storage backend first so replacing the
+   * image never leaves an orphan behind.
    */
   public async upload(
     file: Express.Multer.File,

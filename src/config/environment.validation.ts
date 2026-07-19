@@ -20,9 +20,24 @@ export default Joi.object({
   GOOGLE_CLIENT_ID: Joi.string().required(),
   GOOGLE_CLIENT_SECRET: Joi.string().required(),
   API_VERSION: Joi.string().required(),
-  CLOUDINARY_NAME: Joi.string().required(),
-  CLOUDINARY_API_KEY: Joi.string().required(),
-  CLOUDINARY_API_SECRET: Joi.string().required(),
+  STORAGE_DRIVER: Joi.string().valid('local', 'cloudinary').default('local'),
+  UPLOADS_DIR: Joi.string().default('./uploads'),
+  // Only required when STORAGE_DRIVER=cloudinary — local disk is the default.
+  CLOUDINARY_NAME: Joi.string().when('STORAGE_DRIVER', {
+    is: 'cloudinary',
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
+  CLOUDINARY_API_KEY: Joi.string().when('STORAGE_DRIVER', {
+    is: 'cloudinary',
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
+  CLOUDINARY_API_SECRET: Joi.string().when('STORAGE_DRIVER', {
+    is: 'cloudinary',
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
   MAIL_HOST: Joi.string().required(),
   MAIL_PORT: Joi.number().port().default(587),
   MAIL_SECURE: Joi.string().valid('true', 'false').default('false'),

@@ -19,16 +19,16 @@ export class DeleteConfigurableProductImageProvider {
     private readonly configurableProductsRepository: Repository<ConfigurableProduct>,
     /** inject find-one provider to verify the product exists */
     private readonly findOneConfigurableProductProvider: FindOneConfigurableProductProvider,
-    /** inject StorageProvider to delete the Cloudinary asset directly */
+    /** inject StorageProvider to delete the asset directly from the active storage backend */
     private readonly storageProvider: StorageProvider,
     /** inject audit log service to record the image removal */
     private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
-   * Clears a configurable product's image: removes it from Cloudinary, then
-   * clears imageUrl/imagePublicId. Throws NotFoundException if no image is
-   * currently tracked.
+   * Clears a configurable product's image: removes it from the storage
+   * backend, then clears imageUrl/imagePublicId. Throws NotFoundException if
+   * no image is currently tracked.
    */
   public async deleteImage(
     productId: number,

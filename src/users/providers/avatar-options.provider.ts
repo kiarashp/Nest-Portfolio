@@ -23,7 +23,8 @@ export class AvatarOptionsProvider {
     private readonly avatarOptionRepo: Repository<AvatarOption>,
 
     /**
-     * Inject StorageProvider to upload images to Cloudinary and delete them on removal
+     * Inject StorageProvider to upload images to the active storage backend
+     * and delete them on removal
      */
     private readonly storageProvider: StorageProvider,
 
@@ -49,8 +50,9 @@ export class AvatarOptionsProvider {
   }
 
   /**
-   * Uploads the file to Cloudinary, then saves the url and publicId to the DB.
-   * The acting admin's id is recorded in the audit log after a successful save.
+   * Uploads the file to the active storage backend, then saves the url and
+   * publicId to the DB. The acting admin's id is recorded in the audit log
+   * after a successful save.
    */
   public async create(
     file: Express.Multer.File,
@@ -76,7 +78,7 @@ export class AvatarOptionsProvider {
   }
 
   /**
-   * Deletes the Cloudinary asset and removes the DB row.
+   * Deletes the asset from the active storage backend and removes the DB row.
    * Throws NotFoundException if no option with that id exists.
    * The acting admin's id is recorded in the audit log after successful deletion.
    */

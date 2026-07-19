@@ -4,6 +4,9 @@
 /build
 /documentation
 
+# Local-disk upload storage (default STORAGE_DRIVER=local)
+/uploads
+
 # generated OpenAPI schema + types (regenerate with: pnpm run generate:types)
 openapi.json
 openapi-types.ts

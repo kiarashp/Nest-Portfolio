@@ -35,7 +35,7 @@ export class UploadFileProvider {
 
   constructor(
     /**
-     * inject the active storage backend (currently Cloudinary, see UploadsModule)
+     * inject the active storage backend (see UploadsModule for how it's selected)
      */
     private readonly storageProvider: StorageProvider,
     /**

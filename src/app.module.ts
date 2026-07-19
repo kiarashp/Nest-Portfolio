@@ -10,6 +10,7 @@ import { PaginationModule } from './common/pagination/pagination.module'
 import appConfig from './config/app.config'
 import databaseConfig from './config/database.config'
 import cloudinaryConfig from './config/cloudinary.config'
+import uploadsConfig from './config/uploads.config'
 import environmentValidation from './config/environment.validation'
 import jwtConfig from './auth/config/jwt.config'
 import { UploadsModule } from './uploads/uploads.module'
@@ -53,7 +54,7 @@ const ENV = process.env.NODE_ENV
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: !ENV ? '.env' : `.env.${ENV}`,
-      load: [appConfig, databaseConfig, cloudinaryConfig],
+      load: [appConfig, databaseConfig, cloudinaryConfig, uploadsConfig],
       validationSchema: environmentValidation,
     }),
     TypeOrmModule.forRootAsync({

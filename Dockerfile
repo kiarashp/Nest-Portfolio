@@ -21,6 +21,11 @@ RUN pnpm install --frozen-lockfile --prod
 
 COPY --from=builder /app/dist ./dist
 
+# Seed the local-disk uploads directory with node-user ownership before Coolify's
+# persistent-storage volume gets mounted here — Docker copies this directory's
+# existing content/permissions into a brand-new named volume on first mount.
+RUN mkdir -p /app/uploads && chown -R node:node /app/uploads
+
 USER node
 EXPOSE 3000
 CMD ["pnpm", "run", "start:prod"]

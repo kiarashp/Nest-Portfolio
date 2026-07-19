@@ -212,7 +212,7 @@ Detail lives in the root `CLAUDE.md` architecture paragraph and `STATE.md`; head
 - `SegmentOption.value` of `'0'` is always rejected; options only on SELECT definitions; a definition's `dataType` is immutable (409) once assigned; deleting an assigned definition/option is blocked (409).
 - Assignment position renumbering is gapless and runs in a manual `QueryRunner` transaction (`renumber-assignments.util.ts`) using a **negate-then-finalize** two-step shift — a single-statement `position = position ± 1` bulk `UPDATE` genuinely violates the `(productId, position)` unique constraint because PostgreSQL checks it per row, not at statement end. Reuse `shiftRange` for any future bulk shift.
 - Condition validation is split: `validate-assignment-condition.util.ts` (pure shape, dispatched on `operator`) vs `validate-assignment-condition-rules.util.ts` (DB-dependent: direction rule, operator×dataType matrix, NUMBER controller needs `constraints.min >= 1`).
-- Soft-deleting a `ConfigurableProduct` keeps its Cloudinary image (unlike `Product`'s soft-delete, which purges) — see CONFIGURATOR.md §2.1. The image is a bare-columns single slot (avatar-options pattern, no `UploadFile` row), settable only via the image endpoints, never via create/update DTOs.
+- Soft-deleting a `ConfigurableProduct` keeps its stored image on the active storage backend (unlike `Product`'s soft-delete, which purges) — see CONFIGURATOR.md §2.1. The image is a bare-columns single slot (avatar-options pattern, no `UploadFile` row), settable only via the image endpoints, never via create/update DTOs.
 
 ## Testing
 
