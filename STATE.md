@@ -366,3 +366,59 @@ schema changes — `UploadResult`'s shape (`{ url, publicId }`) is unchanged, so
 green: 260 unit tests, 585/586 e2e (the one failure,
 `resolve.e2e-spec.ts`'s SELECT-options-ordering assertion, is pre-existing and
 unrelated — reproduced identically on `master` with this change stashed out).
+
+---
+
+### Dev-data seed rebuilt with the real Faradis Industrial Group catalog — done
+
+`pnpm run seed:dev`/`seed:prod` no longer create placeholder example content.
+The user supplied real company copy, a real 7-category product-type/spec
+schema, real sample products with SKUs, and the real FRH headmount-RTD
+ordering-code field breakdown (`forseeding.md`, repo root) plus ~50 real
+product photos (`seed-images/`, repo root — both now committed to the repo,
+since the seed script reads them from disk at runtime and is non-functional
+without them, the same reproducibility reasoning as always committing a
+migration alongside its entity change).
+
+- New `src/database/seeds/dev-seed-data.ts` holds all the static data
+  (`COMPANY`, `POST_TAGS`, `PRODUCT_TYPES` — 7 types, `PRODUCTS` — 31 products,
+  `FRH_SEGMENT_DEFINITIONS` — 14 defs, `FRH_ASSIGNMENTS` — 14 assignments incl.
+  2 conditional, `FRH_CONFIGURABLE_PRODUCT`), split out from
+  `dev-data.seed.ts` purely for readability given its size.
+- `dev-data.seed.ts` now also seeds the configurator (segment definitions +
+  options via `ConfiguratorDefinitionsService`, one `ConfigurableProduct` +
+  its 14 ordered assignments via `ConfiguratorProductsService`, built
+  incrementally through an `assignmentIdByDefinitionKey` map since later
+  assignments' conditions reference the real DB ids of earlier ones) and
+  uploads real images for every `ProductType`/`Product`/`ConfigurableProduct`
+  through the actual `StorageProvider` — a new `loadSeedImage(filename)`
+  helper reads a file from `seed-images/` and reshapes it into an
+  `Express.Multer.File`-like object (only `buffer`/`originalname`/
+  `mimetype`/`size` are ever read by any storage backend), then calls the
+  same `uploadImage()` provider methods a real admin upload would use.
+- `DevSeedModule` now also imports `ConfiguratorModule`, registers all six
+  configurator entities, and loads `appConfig` (needed so
+  `LocalDiskStorageProvider` reads the real `APP_URL` instead of defaulting to
+  `http://localhost:3000`).
+- **Non-obvious adaptation:** the real FRH ordering code uses `'0'` for
+  "fitting/thermowell not applicable," but `SegmentOption.value === '0'` is
+  always rejected (reserved zero-fill marker). Two fields (`fittingGate`,
+  `thermowell`) were remodeled as `'1'`/`'N'` gates, with the dependent
+  fields' "not applicable" state produced via conditional zero-fill instead of
+  a stored `'0'` option.
+- **One-off `src/database/scripts/wipe-legacy-catalog-seed.ts`** (not wired
+  into any npm script) hard-deletes every `Product`, `ProductType`, and
+  related `UploadFile` row, plus the 4 legacy placeholder post slugs, so the
+  rebuilt seed starts from a clean slate — the user chose a full nuke after
+  discovering the dev DB also held unrelated ad-hoc QA/test products beyond
+  the known legacy seed rows. Cloudinary assets themselves are not purged,
+  only the DB rows; users and tags are untouched.
+- Verified: `pnpm run lint` clean, `pnpm exec tsc --noEmit` clean (ignoring
+  pre-existing unrelated `documentation/` errors), `pnpm run test` green
+  (49 suites / 260 tests). `openapi-types.ts` regeneration not needed — no
+  route/DTO/schema changes, only seed data and one new manual script.
+- **Known pre-existing anomaly, not addressed here:** the dev DB contains
+  ~100 `e2e-*`-prefixed user accounts that per `test/CLAUDE.md` should only
+  ever exist in the separate test database — possibly a `.env.test`/
+  `.env.development` `DB_NAME` misconfiguration. Left for the user to
+  investigate separately.
