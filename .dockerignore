@@ -9,3 +9,5 @@ test
 .env*
 openapi.json
 openapi-types.ts
+seed-images
+forseeding.md
